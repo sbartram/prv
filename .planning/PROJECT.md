@@ -22,13 +22,13 @@ At a glance, without opening a browser, the user can see which of their watched 
 - [ ] User can remove a manually added PR from the watch list
 - [ ] List shows each PR's state: Open / Merged / Closed
 - [ ] User can filter the list by any combination of Open / Merged / Closed
-- [ ] Merged/closed PRs only appear if closed within a configurable recent window (e.g. 14 days)
+- [ ] Auto-found merged/closed PRs only appear if closed within a configurable recent window (default 14 days); manually added PRs are exempt
 - [ ] List shows the overall review decision (approved / changes requested / review required) plus which reviewers approved or requested changes
 - [ ] List shows one rollup workflow badge per PR (passing / failing / running)
 - [ ] Selecting a PR shows a detail view with each check/job and its status
 - [ ] Data refreshes automatically on a configurable interval
 - [ ] User can open the selected PR in the browser with a key
-- [ ] Authenticates by reusing the `gh` CLI login (`gh auth token`), falling back to the `GITHUB_TOKEN` env var
+- [ ] Authenticates with the same token `gh` would use: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login
 
 ### Out of Scope
 
@@ -48,7 +48,7 @@ At a glance, without opening a browser, the user can see which of their watched 
 ## Constraints
 
 - **Tech stack**: Go + Bubble Tea — single static binary; the established choice for GitHub TUIs
-- **Auth**: Reuse the `gh` CLI token; no separate login flow — the user already uses `gh`
+- **Auth**: Same token resolution as `gh` (env vars, then `gh` login); no separate login flow — the user already uses `gh`
 - **Repository / module path**: https://github.com/sbartram/prv — Go module `github.com/sbartram/prv`
 - **Host**: github.com only
 - **Rate limits**: Auto-refresh must stay well inside GitHub API rate limits for a long-running session
@@ -62,7 +62,9 @@ At a glance, without opening a browser, the user can see which of their watched 
 | Three PR states: Open / Merged / Closed | User wants merged and closed-unmerged kept apart | — Pending |
 | Closed PRs limited to a recent window | Avoids years of history flooding the list | — Pending |
 | Watch-only + open in browser | Keeps v1 small; actions stay on github.com | — Pending |
-| Auth via `gh auth token`, GITHUB_TOKEN fallback | No new login flow | — Pending |
+| Auth matches gh: GH_TOKEN → GITHUB_TOKEN → gh login | Same token gh uses; go-gh TokenForHost unchanged | — Pending |
+| Manually added PRs exempt from closed window | User added them on purpose; they stay until removed | — Pending |
+| Bubble Tea v2 (charm.land/*/v2) + go-gh v2 | v2 is stable; go-gh gives GraphQL, auth, browser | — Pending |
 
 ## Evolution
 
@@ -82,4 +84,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-11 after initialization*
+*Last updated: 2026-10-11 after requirements definition*
