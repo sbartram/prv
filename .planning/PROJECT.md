@@ -49,6 +49,7 @@ At a glance, without opening a browser, the user can see which of their watched 
 
 - **Tech stack**: Go + Bubble Tea — single static binary; the established choice for GitHub TUIs
 - **Auth**: Reuse the `gh` CLI token; no separate login flow — the user already uses `gh`
+- **Repository / module path**: https://github.com/sbartram/prv — Go module `github.com/sbartram/prv`
 - **Host**: github.com only
 - **Rate limits**: Auto-refresh must stay well inside GitHub API rate limits for a long-running session
 
