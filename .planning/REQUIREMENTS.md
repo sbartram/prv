@@ -110,7 +110,7 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Technical Defaults (from research conflicts)
 
-Recorded so planning doesn't re-litigate them; each can be revisited if the Phase-2 live spike disproves it.
+Recorded so planning doesn't re-litigate them; each can be revisited if the Phase 1 live spike disproves it.
 
 - **Discovery:** single `ISSUE_ADVANCED` search `is:pr (author:@me OR assignee:@me) (is:open OR closed:>=DATE)`; fall back to separate queries / `viewer.pullRequests` if authored PRs go missing. Dedupe by node ID.
 - **Check detail:** list badge from `statusCheckRollup.state` and counts; full check list fetched lazily for the selected PR.
@@ -122,12 +122,50 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| WATCH-01 | Phase 1 | Pending |
+| WATCH-02 | Phase 1 | Pending |
+| WATCH-03 | Phase 1 | Pending |
+| WATCH-04 | Phase 4 | Pending |
+| WATCH-05 | Phase 4 | Pending |
+| WATCH-06 | Phase 4 | Pending |
+| WATCH-07 | Phase 4 | Pending |
+| LIST-01 | Phase 1 | Pending |
+| LIST-02 | Phase 1 | Pending |
+| LIST-03 | Phase 1 | Pending |
+| LIST-04 | Phase 3 | Pending |
+| LIST-05 | Phase 1 | Pending |
+| LIST-06 | Phase 3 | Pending |
+| LIST-07 | Phase 3 | Pending |
+| LIST-08 | Phase 2 | Pending |
+| LIST-09 | Phase 4 | Pending |
+| FILT-01 | Phase 2 | Pending |
+| FILT-02 | Phase 2 | Pending |
+| FILT-03 | Phase 2 | Pending |
+| DETL-01 | Phase 3 | Pending |
+| DETL-02 | Phase 3 | Pending |
+| DETL-03 | Phase 3 | Pending |
+| RFSH-01 | Phase 2 | Pending |
+| RFSH-02 | Phase 2 | Pending |
+| RFSH-03 | Phase 2 | Pending |
+| RFSH-04 | Phase 2 | Pending |
+| RFSH-05 | Phase 2 | Pending |
+| RFSH-06 | Phase 2 | Pending |
+| NAV-01 | Phase 1 | Pending |
+| NAV-02 | Phase 2 | Pending |
+| NAV-03 | Phase 2 | Pending |
+| NAV-04 | Phase 1 | Pending |
+| NAV-05 | Phase 3 | Pending |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| CONF-01 | Phase 2 | Pending |
+| CONF-02 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 38 total
-- Mapped to phases: 0
-- Unmapped: 38 ⚠️
+- Mapped to phases: 38
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-11*
-*Last updated: 2026-10-11 after initial definition*
+*Last updated: 2026-10-11 after roadmap creation (traceability mapped)*
