@@ -441,3 +441,88 @@ func TestNoFailingNoRequest(t *testing.T) {
 		}
 	}
 }
+
+// TestFailingNames: step 2 names the failing check of every failing PR, from
+// the de-duplicated contexts, with one request carrying all three ids.
+func TestFailingNames(t *testing.T) {
+	c, tr := newFixtureClient(t, "status.json")
+	tr.failing = []string{"failing_contexts.json"}
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]domain.FailingCheck{
+		11: {Known: true, Name: "lint", More: 2},           // build failed, then passed in a newer suite
+		12: {Known: true, Name: "ci/jenkins"},              // a commit status
+		16: {Known: true, Name: "deploy", Cancelled: true}, // only a cancelled job
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Failing; got != want[pr.Ref.Number] {
+			t.Errorf("PR %d Failing = %+v, want %+v", pr.Ref.Number, got, want[pr.Ref.Number])
+		}
+	}
+	if len(tr.failBodies) != 1 {
+		t.Fatalf("FailingChecks requests = %d, want 1", len(tr.failBodies))
+	}
+	var payload struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal(tr.failBodies[0], &payload); err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := payload.Variables["ids"].([]any)
+	if !slices.Equal(ids, []any{"PR_11", "PR_12", "PR_16"}) {
+		t.Errorf("variables.ids = %v, want [PR_11 PR_12 PR_16]", ids)
+	}
+	for _, id := range []string{"PR_11", "PR_12", "PR_16"} {
+		if strings.Contains(payload.Query, id) {
+			t.Errorf("query text contains %s: ids must travel only as a variable", id)
+		}
+	}
+	// The row's colour and bucket still come from the rollup: PR 16 is failing.
+	for _, pr := range snap.PRs {
+		if pr.Ref.Number == 16 && pr.CI != domain.CIFailing {
+			t.Errorf("PR 16 CI = %v, want failing even when only a cancelled check is named", pr.CI)
+		}
+	}
+	// Cost is summed over both queries (1 + 1); limit and remaining come from
+	// the step-2 response, because status.json carries no limit.
+	if snap.RateLimit.Cost != 2 || snap.RateLimit.Limit != 5000 || snap.RateLimit.Remaining != 4987 {
+		t.Errorf("RateLimit = %+v, want cost 2, limit 5000, remaining 4987 from the step-2 response", snap.RateLimit)
+	}
+}
+
+// TestFailingCleansNames calls mapContext directly, bypassing go-gh's own
+// sanitiser, so the mapper's domain.Clean calls are what get tested.
+func TestFailingCleansNames(t *testing.T) {
+	run := mapContext(&wireContext{
+		Typename: "CheckRun", Name: "li\x1b[31mnt‮", Status: "COMPLETED", Conclusion: "FAILURE", DatabaseID: 3,
+		CheckSuite: &wireSuite{
+			CreatedAt: time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC),
+			App:       &struct{ Name string }{"App\x1b[1m‭"},
+			WorkflowRun: &struct {
+				Workflow *struct{ Name string }
+			}{Workflow: &struct{ Name string }{"c\x1b[0mi⁦"}},
+		},
+	})
+	if run.Name != "lint" || run.Workflow != "ci" {
+		t.Errorf("check run Name/Workflow = %q/%q, want lint/ci", run.Name, run.Workflow)
+	}
+	appOnly := mapContext(&wireContext{
+		Typename: "CheckRun", Name: "x", Status: "COMPLETED", Conclusion: "SUCCESS",
+		CheckSuite: &wireSuite{App: &struct{ Name string }{"App\x1b[1m‭"}},
+	})
+	if appOnly.Workflow != "App" {
+		t.Errorf("Workflow without a workflow run = %q, want the app name %q", appOnly.Workflow, "App")
+	}
+	status := mapContext(&wireContext{Typename: "StatusContext", Context: "ci/je\x1b[2Jnkins‮", State: "ERROR"})
+	if status.Name != "ci/jenkins" || !status.Context || status.State != domain.CheckFailing {
+		t.Errorf("status context = %+v, want Name ci/jenkins, Context true, failing", status)
+	}
+	for _, s := range []string{run.Name, run.Workflow, appOnly.Workflow, status.Name} {
+		if why := noUnsafe(s); why != "" {
+			t.Errorf("mapped string %q has a %s", s, why)
+		}
+	}
+}
