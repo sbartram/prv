@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"charm.land/bubbles/v2/help"
 	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
@@ -49,4 +50,18 @@ func ciStyle(c domain.CI) lipgloss.Style {
 // closed PRs (D-07). An unknown state is not dimmed.
 func dimmed(pr domain.PR) bool {
 	return pr.IsDraft || pr.State == domain.StateMerged || pr.State == domain.StateClosed
+}
+
+// helpStyles restyles the footer key hints in ANSI-16 only. help.DefaultStyles
+// and its dark and light variants use hex colours, which break the D-05 rule.
+func helpStyles() help.Styles {
+	return help.Styles{
+		ShortKey:       lipgloss.NewStyle(),
+		ShortDesc:      faintStyle,
+		ShortSeparator: faintStyle,
+		Ellipsis:       faintStyle,
+		FullKey:        lipgloss.NewStyle(),
+		FullDesc:       faintStyle,
+		FullSeparator:  faintStyle,
+	}
 }

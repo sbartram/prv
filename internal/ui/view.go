@@ -28,10 +28,57 @@ func (m Model) render() string {
 	case stateError:
 		return m.wrap(m.renderError())
 	case stateEmpty:
-		return m.wrap(fmt.Sprintf("No open PRs authored by or assigned to @%s, and none closed in the last %d days.\n\nq quit",
-			m.snap.Viewer, m.opts.ClosedDays))
+		return m.renderEmpty()
 	}
 	return m.renderList()
+}
+
+// renderEmpty is the screen for a snapshot with no PRs. When the snapshot is
+// partial (truncated or with warnings) it must not claim there are no open PRs
+// (WR-02): the notes in the footer say why the list is short.
+func (m Model) renderEmpty() string {
+	msg := fmt.Sprintf("No open PRs authored by or assigned to @%s, and none closed in the last %d days.",
+		m.snap.Viewer, m.opts.ClosedDays)
+	if m.snap.Truncated || len(m.snap.Warnings) > 0 {
+		msg = fmt.Sprintf("No PRs could be listed for @%s.", m.snap.Viewer)
+	}
+	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.footer()
+}
+
+// footer is the last line of the list and empty screens. Integrity notes come
+// first and outlive the key hints: on a narrow pane the hints go, then the
+// notes are cut with an ellipsis, but the notes are never dropped (WR-03).
+func (m Model) footer() string {
+	var notes []string
+	if m.snap.Truncated {
+		notes = append(notes, "list truncated")
+	}
+	if len(m.snap.Warnings) > 0 {
+		notes = append(notes, "some data could not be loaded")
+	}
+	const sep = " · "
+	line := strings.Join(notes, sep)
+
+	h := m.help // a copy: SetWidth must not change the model
+	room := 0   // 0: not sized yet, the hints are not cut
+	if m.w > 0 {
+		room = m.w
+		if line != "" {
+			if lipgloss.Width(line) >= m.w {
+				return ansi.Truncate(line, m.w, "…")
+			}
+			room = m.w - lipgloss.Width(line) - lipgloss.Width(sep)
+		}
+		if room < 8 {
+			return line // too little room for a useful hint
+		}
+	}
+	h.SetWidth(room)
+	hints := h.ShortHelpView(m.keys.ShortHelp())
+	if line == "" {
+		return hints
+	}
+	return line + sep + hints
 }
 
 // clock formats t in the zone of the model's clock: the local zone in
@@ -226,17 +273,9 @@ func (m Model) renderList() string {
 			return s
 		})
 
-	footer := "j/k move · q quit"
-	if m.snap.Truncated {
-		footer += " · list truncated"
-	}
-	if len(m.snap.Warnings) > 0 {
-		footer += " · some data could not be loaded"
-	}
-
 	lines := []string{m.header()}
 	lines = append(lines, strings.Split(t.String(), "\n")...)
-	lines = append(lines, footer)
+	lines = append(lines, m.footer())
 	for i, l := range lines {
 		lines[i] = m.cut(l)
 	}

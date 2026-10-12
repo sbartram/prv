@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"charm.land/bubbles/v2/help"
 	bkey "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -46,6 +47,7 @@ type Model struct {
 	fetcher Fetcher
 	opts    Options
 	keys    keyMap
+	help    help.Model // footer key hints, rendered from keys (D-17)
 
 	state viewState
 	spin  spinner.Model
@@ -88,11 +90,15 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 	if now == nil {
 		now = time.Now
 	}
+	h := help.New()
+	h.ShortSeparator = " · "
+	h.Styles = helpStyles()
 	return Model{
 		ctx:      ctx,
 		fetcher:  f,
 		opts:     opts,
 		keys:     defaultKeys(),
+		help:     h,
 		state:    stateLoading,
 		inFlight: true,
 		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
