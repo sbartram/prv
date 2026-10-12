@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Monitoring
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-10-12T15:53:29.330Z"
+stopped_at: Completed 02-06-PLAN.md
+last_updated: "2026-10-12T15:59:56.311Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 02 execution started
-state_head: e9388dd1c6d3828532b3c0a12b7eac9dd5aced57
+state_head: a7ec0940ed70ab2c165ffd9e35f2c961c98a7562
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 10
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 02 (Live Monitoring) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 02 execution started
 
@@ -65,6 +65,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P03 | 6 min | 2 tasks | 7 files |
 | Phase 02 P04 | 3 min | 2 tasks | 18 files |
 | Phase 02 P05 | 4 min | 2 tasks | 10 files |
+| Phase 02 P06 | 6 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-04: footer shows integrity notes before key hints; notes are cut with an ellipsis, never dropped; hints need at least 8 cells and come from keyMap.ShortHelp()
 - [Phase 02]: D-06 'always shows' read as 'from the first successful response on': api segment absent while Limit is 0, last value kept through failed refreshes
 - [Phase 02]: Rate warning boundary is Remaining*5 < Limit (999/5000 warns, 1000/5000 does not); header prio 6, footer drops hints before notes or api
+- [Phase 02]: 02-06: a current-generation tick that fires before pausedUntil re-arms instead of fetching; r during a pause keeps the generation and only shows the 4 s flash
+- [Phase 02]: 02-06: NextDelay is pure in domain (clock passed in); ui reads Backoff() through its own backoffer interface, so 02-07 adds the method to *github.Error without ui importing it
 
 ### Pending Todos
 
@@ -117,6 +120,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T15:53:29.301Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-10-12T15:59:56.282Z
+Stopped at: Completed 02-06-PLAN.md
 Resume file: None
