@@ -1,0 +1,537 @@
+{
+ "data": {
+  "viewer": {
+   "login": "octo"
+  },
+  "rateLimit": {
+   "cost": 1,
+   "remaining": 4999,
+   "resetAt": "2026-10-11T13:00:00Z"
+  },
+  "search": {
+   "issueCount": 19,
+   "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": "c19"
+   },
+   "nodes": [
+    {
+     "__typename": "PullRequest",
+     "id": "PR_1",
+     "number": 1,
+     "title": "null decision, approved",
+     "url": "https://github.com/acme/status/pull/1",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_2",
+     "number": 2,
+     "title": "null decision, no reviews",
+     "url": "https://github.com/acme/status/pull/2",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_3",
+     "number": 3,
+     "title": "null decision, changes requested",
+     "url": "https://github.com/acme/status/pull/3",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "CHANGES_REQUESTED",
+        "author": {
+         "login": "bob"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_4",
+     "number": 4,
+     "title": "review required",
+     "url": "https://github.com/acme/status/pull/4",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "REVIEW_REQUIRED",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_5",
+     "number": 5,
+     "title": "decision approved",
+     "url": "https://github.com/acme/status/pull/5",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "APPROVED",
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_6",
+     "number": 6,
+     "title": "changes beside approval",
+     "url": "https://github.com/acme/status/pull/6",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "CHANGES_REQUESTED",
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "CHANGES_REQUESTED",
+        "author": {
+         "login": "bob"
+        }
+       },
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_7",
+     "number": 7,
+     "title": "approve then comment, decision set",
+     "url": "https://github.com/acme/status/pull/7",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "APPROVED",
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_8",
+     "number": 8,
+     "title": "closed, review required",
+     "url": "https://github.com/acme/status/pull/8",
+     "isDraft": false,
+     "state": "CLOSED",
+     "closedAt": "2026-10-05T00:00:00Z",
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "REVIEW_REQUIRED",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_9",
+     "number": 9,
+     "title": "null rollup",
+     "url": "https://github.com/acme/status/pull/9",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_10",
+     "number": 10,
+     "title": "rollup success",
+     "url": "https://github.com/acme/status/pull/10",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "SUCCESS"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_11",
+     "number": 11,
+     "title": "rollup failure",
+     "url": "https://github.com/acme/status/pull/11",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "FAILURE"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_12",
+     "number": 12,
+     "title": "rollup error",
+     "url": "https://github.com/acme/status/pull/12",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "ERROR"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_13",
+     "number": 13,
+     "title": "rollup pending",
+     "url": "https://github.com/acme/status/pull/13",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "PENDING"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_14",
+     "number": 14,
+     "title": "rollup expected",
+     "url": "https://github.com/acme/status/pull/14",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "EXPECTED"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_15",
+     "number": 15,
+     "title": "rollup unknown value",
+     "url": "https://github.com/acme/status/pull/15",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": {
+      "state": "SOMETHING_NEW"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_16",
+     "number": 16,
+     "title": "draft, failing, changes",
+     "url": "https://github.com/acme/status/pull/16",
+     "isDraft": true,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": "CHANGES_REQUESTED",
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "CHANGES_REQUESTED",
+        "author": {
+         "login": "bob"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": {
+      "state": "FAILURE"
+     }
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_17",
+     "number": 17,
+     "title": "null review node",
+     "url": "https://github.com/acme/status/pull/17",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": [
+       null,
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_18",
+     "number": 18,
+     "title": "evil\u001b]0;pwned\u0007\u202etitle\tx",
+     "url": "https://github.com/acme/status/pull/18",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/\u001b[2Jrepo"
+     },
+     "author": {
+      "login": "bad\u001b[31mguy"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_19",
+     "number": 19,
+     "title": "approve then comment",
+     "url": "https://github.com/acme/status/pull/19",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/status"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": [
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "alice"
+        }
+       }
+      ]
+     },
+     "statusCheckRollup": {
+      "state": "SUCCESS"
+     }
+    }
+   ]
+  }
+ }
+}

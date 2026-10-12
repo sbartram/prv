@@ -142,7 +142,7 @@ const fixtureNodes = `
 {"__typename":"PullRequest","id":"PR_2","number":12,"title":"Bump deps","url":"https://github.com/acme/web/pull/12",
  "isDraft":false,"state":"MERGED","closedAt":"2026-10-10T09:00:00Z","mergedAt":"2026-10-10T09:00:00Z","updatedAt":"2026-10-10T09:00:00Z",
  "repository":{"nameWithOwner":"acme/web"},"author":{"login":"hubot"},
- "reviewDecision":null,"latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":null}`
+ "reviewDecision":"APPROVED","latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}`
 
 func fixtureModel(t *testing.T, body string) (tea.Model, *recorder) {
 	t.Helper()
@@ -177,7 +177,7 @@ func TestEndToEndFixture(t *testing.T) {
 	m, rec := fixtureModel(t, fixtureHead+fixtureNodes+fixtureTail)
 
 	view := plain(m)
-	for _, want := range []string{"@octo", "acme/api#481", "[draft] Fix token refresh", "me", "hubot", "merged"} {
+	for _, want := range []string{"@octo", "acme/api#481", "[draft] Fix token refresh", "me", "hubot", "merged", "– none", "– no checks", "✓ approved", "✓ passing"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view missing %q:\n%s", want, view)
 		}
