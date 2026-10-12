@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"testing"
@@ -186,4 +187,172 @@ func TestFetchDetailCleans(t *testing.T) {
 	if checks[1].Source != "Codecov" {
 		t.Errorf("app Source = %q, want the cleaned app name", checks[1].Source)
 	}
+}
+
+// builtPage returns a Detail response body with n unique passing check runs
+// named "<prefix>-<i>", plus the extra contexts given.
+func builtPage(t *testing.T, prefix string, n, total int, hasNext bool, cursor string, extra ...map[string]any) []byte {
+	t.Helper()
+	suite := map[string]any{
+		"createdAt":   "2026-10-11T08:00:00Z",
+		"app":         map[string]any{"name": "GitHub Actions"},
+		"workflowRun": map[string]any{"workflow": map[string]any{"name": "ci"}, "file": map[string]any{"path": ".github/workflows/ci.yml"}},
+	}
+	var nodes []map[string]any
+	for i := 0; i < n-len(extra); i++ {
+		nodes = append(nodes, map[string]any{
+			"__typename": "CheckRun", "name": fmt.Sprintf("%s-%03d", prefix, i), "status": "COMPLETED",
+			"conclusion": "SUCCESS", "databaseId": 1000 + i, "checkSuite": suite,
+		})
+	}
+	nodes = append(nodes, extra...)
+	body, err := json.Marshal(map[string]any{"data": map[string]any{"node": map[string]any{
+		"__typename": "PullRequest", "id": "PR_11",
+		"latestOpinionatedReviews": map[string]any{"nodes": []any{}},
+		"latestReviews":            map[string]any{"nodes": []any{}},
+		"reviewRequests":           map[string]any{"nodes": []any{}},
+		"statusCheckRollup": map[string]any{"state": "FAILURE", "contexts": map[string]any{
+			"totalCount": total,
+			"pageInfo":   map[string]any{"hasNextPage": hasNext, "endCursor": cursor},
+			"nodes":      nodes,
+		}},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+// dupRun is a check run named "dup" from the check suite created at created.
+func dupRun(conclusion, created string, id int) map[string]any {
+	return map[string]any{
+		"__typename": "CheckRun", "name": "dup", "status": "COMPLETED", "conclusion": conclusion, "databaseId": id,
+		"checkSuite": map[string]any{
+			"createdAt":   created,
+			"app":         map[string]any{"name": "GitHub Actions"},
+			"workflowRun": map[string]any{"workflow": map[string]any{"name": "ci"}, "file": map[string]any{"path": ".github/workflows/ci.yml"}},
+		},
+	}
+}
+
+// pagedTransport serves Detail page n (1-based) from answer and records the
+// "after" variable of every request.
+func pagedTransport(t *testing.T, afters *[]string, answer func(req *http.Request, n int) *http.Response) http.RoundTripper {
+	return rtFunc(func(req *http.Request) (*http.Response, error) {
+		raw, err := readBody(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		after, _ := requestVariables(t, raw)["after"].(string)
+		*afters = append(*afters, after)
+		return answer(req, len(*afters)), nil
+	})
+}
+
+func TestFetchDetailPaging(t *testing.T) {
+	t.Run("two pages", func(t *testing.T) {
+		d, err, tr := fetchDetailFixture(t, "detail_page1.json", "detail_page2.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(tr.detailBodies) != 2 {
+			t.Fatalf("Detail requests = %d, want 2", len(tr.detailBodies))
+		}
+		if v := requestVariables(t, tr.detailBodies[0]); v["after"] != nil {
+			t.Errorf("first request variables = %v, want no after", v)
+		}
+		if v := requestVariables(t, tr.detailBodies[1]); v["after"] != "CUR1" || v["id"] != "PR_11" {
+			t.Errorf("second request variables = %v, want id PR_11 and after CUR1", v)
+		}
+		builds := 0
+		for _, c := range d.Checks {
+			if c.Name == "build" {
+				builds++
+				if c.State != domain.CheckPassing {
+					t.Errorf("build state = %v, want passing: the newer run on page 2 wins", c.State)
+				}
+			}
+		}
+		if builds != 1 || len(d.Checks) != 149 {
+			t.Errorf("builds/checks = %d/%d, want 1/149", builds, len(d.Checks))
+		}
+		if d.Counts.Failing != 0 || d.Counts.Passing != 149 {
+			t.Errorf("Counts = %+v, want 0 failing and 149 passing", d.Counts)
+		}
+		if d.Truncated || d.Read != 150 || d.Total != 150 {
+			t.Errorf("Truncated/Read/Total = %v/%d/%d, want false/150/150", d.Truncated, d.Read, d.Total)
+		}
+	})
+
+	t.Run("five page cap", func(t *testing.T) {
+		var afters []string
+		c := clientWith(t, pagedTransport(t, &afters, func(req *http.Request, n int) *http.Response {
+			var extra []map[string]any
+			switch n {
+			case 1:
+				extra = append(extra, dupRun("FAILURE", "2026-10-11T07:00:00Z", 7))
+			case 5:
+				extra = append(extra, dupRun("SUCCESS", "2026-10-11T09:00:00Z", 9))
+			}
+			return jsonResp(req, 200, builtPage(t, fmt.Sprintf("p%d", n), 100, 731, true, fmt.Sprintf("CUR%d", n), extra...))
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := []string{"", "CUR1", "CUR2", "CUR3", "CUR4"}; !slices.Equal(afters, want) {
+			t.Errorf("after cursors = %q, want %q (exactly five requests)", afters, want)
+		}
+		if !d.Truncated || d.Read != 500 || d.Total != 731 {
+			t.Errorf("Truncated/Read/Total = %v/%d/%d, want true/500/731", d.Truncated, d.Read, d.Total)
+		}
+		if d.Counts != domain.CountChecks(d.Checks) {
+			t.Errorf("Counts = %+v, want CountChecks(Checks) = %+v", d.Counts, domain.CountChecks(d.Checks))
+		}
+		if d.Counts.Failing != 0 || len(d.Checks) != 499 {
+			t.Errorf("failing/checks = %d/%d, want 0/499: the failure on page 1 is superseded on page 5", d.Counts.Failing, len(d.Checks))
+		}
+	})
+
+	t.Run("later page fails with 502", func(t *testing.T) {
+		var afters []string
+		page1 := fixtureBytes(t, "detail_page1.json")
+		c := clientWith(t, pagedTransport(t, &afters, func(req *http.Request, n int) *http.Response {
+			if n == 1 {
+				return jsonResp(req, 200, page1)
+			}
+			return jsonResp(req, 502, []byte(`{"message":"Bad Gateway"}`))
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatalf("err = %v, want nil: the earlier page is kept", err)
+		}
+		if len(afters) != 2 {
+			t.Errorf("requests = %d, want 2 (paging stops at the failure)", len(afters))
+		}
+		if !d.Truncated || d.Read != 100 || d.Total != 150 {
+			t.Errorf("Truncated/Read/Total = %v/%d/%d, want true/100/150", d.Truncated, d.Read, d.Total)
+		}
+		if len(d.Checks) != 100 || d.Counts.Failing != 1 {
+			t.Errorf("checks/failing = %d/%d, want 100/1 from page 1 alone", len(d.Checks), d.Counts.Failing)
+		}
+	})
+
+	t.Run("later page rate limited", func(t *testing.T) {
+		var afters []string
+		page1 := fixtureBytes(t, "detail_page1.json")
+		c := clientWith(t, pagedTransport(t, &afters, func(req *http.Request, n int) *http.Response {
+			if n == 1 {
+				return jsonResp(req, 200, page1)
+			}
+			resp := jsonResp(req, 200, []byte(rateLimitedBody))
+			resp.Header.Set("X-RateLimit-Remaining", "0")
+			return resp
+		}))
+		_, err := c.FetchDetail(context.Background(), "PR_11")
+		var ge *Error
+		if !errors.As(err, &ge) || ge.Kind != KindRateLimited {
+			t.Fatalf("err = %v, want KindRateLimited", err)
+		}
+	})
 }
