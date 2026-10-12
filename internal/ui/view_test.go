@@ -251,7 +251,7 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 }
 
 func TestGolden(t *testing.T) {
-	sizes := [][2]int{{80, 24}, {120, 40}, {0, 0}}
+	sizes := [][2]int{{60, 15}, {80, 24}, {120, 40}, {0, 0}}
 	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
@@ -397,7 +397,7 @@ func TestScrollFollowsCursor(t *testing.T) {
 }
 
 func TestViewFitsScreen(t *testing.T) {
-	for _, sz := range [][2]int{{80, 24}, {120, 40}} {
+	for _, sz := range [][2]int{{60, 15}, {80, 24}, {120, 40}} {
 		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt"} {
 			t.Run(state+"_"+itoa(sz[0])+"x"+itoa(sz[1]), func(t *testing.T) {
 				ls := lines(stateModel(t, state, sz[0], sz[1]).View().Content)

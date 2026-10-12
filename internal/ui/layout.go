@@ -22,6 +22,7 @@ const (
 	minTitleW    = 10 // TITLE never gets fewer cells than this
 	maxPRColW    = 40 // cap for the PR column
 	maxAuthorCol = 16 // cap for the AUTHOR column
+	minPRColW    = 8  // the PR column is never cut below this
 	// chromeLines are the lines around the rows: the "prv · @login" line, the
 	// table's column-header row and the footer line.
 	chromeLines = 3
@@ -84,3 +85,29 @@ func (m *Model) clampOffset() {
 	}
 	m.offset = max(0, min(m.offset, len(m.rows)-v))
 }
+
+// sizes holds what layoutColumns needs to know about each column: the width it
+// wants and the narrowest it may get before the layout gives up on it.
+type sizes struct{ natural, min [colCount]int }
+
+// layout says which columns are shown and how wide each one is.
+type layout struct {
+	compact bool
+	show    [colCount]bool
+	width   [colCount]int
+}
+
+// dropStep is one step of the D-13 drop order.
+type dropStep struct {
+	col      int
+	collapse bool
+}
+
+// dropSteps is the D-13 order in which a narrowing pane loses columns.
+var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colTitle}}
+
+// layoutColumns is a stub (RED).
+func layoutColumns(sz sizes, total int) layout { return layout{} }
+
+// trimLeft is a stub (RED).
+func trimLeft(s string, w int) string { return s }
