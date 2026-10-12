@@ -68,7 +68,7 @@ func truncateCell(s string, w int) string {
 // them, and at least 1. Before the first size message every row is visible.
 func (m Model) visibleRows() int {
 	if m.h <= 0 {
-		return len(m.snap.PRs)
+		return len(m.rows)
 	}
 	return max(1, m.h-chromeLines)
 }
@@ -82,5 +82,5 @@ func (m *Model) clampOffset() {
 	if m.cursor >= m.offset+v {
 		m.offset = m.cursor - v + 1
 	}
-	m.offset = max(0, min(m.offset, len(m.snap.PRs)-v))
+	m.offset = max(0, min(m.offset, len(m.rows)-v))
 }

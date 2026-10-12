@@ -81,9 +81,9 @@ func (m Model) cut(line string) string {
 
 func (m Model) renderList() string {
 	// Build every cell first, so column widths stay the same while scrolling.
-	cells := make([][]string, 0, len(m.snap.PRs)+1)
+	cells := make([][]string, 0, len(m.rows)+1)
 	cells = append(cells, []string{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI"})
-	for i, pr := range m.snap.PRs {
+	for i, pr := range m.rows {
 		marker := " "
 		if i == m.cursor {
 			marker = ">"
@@ -111,7 +111,7 @@ func (m Model) renderList() string {
 
 	// Only the visible slice goes to the table. The table's own Height and
 	// YOffset are not used: they add an overflow row and shift StyleFunc rows.
-	end := min(len(m.snap.PRs), m.offset+m.visibleRows())
+	end := min(len(m.rows), m.offset+m.visibleRows())
 	t := table.New().
 		Border(lipgloss.HiddenBorder()).
 		BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
@@ -129,7 +129,7 @@ func (m Model) renderList() string {
 				return s.Inherit(headerStyle)
 			}
 			idx := m.offset + row
-			pr := m.snap.PRs[idx]
+			pr := m.rows[idx]
 			if dimmed(pr) {
 				s = s.Faint(true)
 			}
@@ -153,7 +153,7 @@ func (m Model) renderList() string {
 		footer += " · some data could not be loaded"
 	}
 
-	header := "prv · @" + m.snap.Viewer + " · " + strconv.Itoa(len(m.snap.PRs)) + " PRs"
+	header := "prv · @" + m.snap.Viewer + " · " + strconv.Itoa(len(m.rows)) + " PRs"
 	if !m.lastOK.IsZero() {
 		// A clock time, not "5s ago": nothing redraws once a second (D-05).
 		header += " · updated " + m.clock(m.lastOK, "15:04:05")
