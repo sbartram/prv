@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Watch list
 
-- [ ] **WATCH-01**: PRs the user authored appear on the list automatically
-- [ ] **WATCH-02**: PRs assigned to the user appear on the list automatically
-- [ ] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
+- [x] **WATCH-01**: PRs the user authored appear on the list automatically
+- [x] **WATCH-02**: PRs assigned to the user appear on the list automatically
+- [x] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
 - [ ] **WATCH-04**: User can add a PR by pasting a github.com PR URL or `owner/repo#123`; invalid or inaccessible PRs show an error and are not saved
 - [ ] **WATCH-05**: Manually added PRs are saved locally and reappear after restart
 - [ ] **WATCH-06**: User can remove a manually added PR
@@ -55,7 +55,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **NAV-01**: User can move through the list with j/k and the arrow keys
 - [ ] **NAV-02**: User can press `o` to open the selected PR in the browser
 - [ ] **NAV-03**: User can press `?` to see key bindings
-- [ ] **NAV-04**: User can quit with `q`
+- [x] **NAV-04**: User can quit with `q`
 - [ ] **NAV-05**: Layout adapts to terminal resizes and stays usable in narrow panes
 
 ### Auth & config
@@ -122,9 +122,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WATCH-01 | Phase 1 | Pending |
-| WATCH-02 | Phase 1 | Pending |
-| WATCH-03 | Phase 1 | Pending |
+| WATCH-01 | Phase 1 | Complete |
+| WATCH-02 | Phase 1 | Complete |
+| WATCH-03 | Phase 1 | Complete |
 | WATCH-04 | Phase 4 | Pending |
 | WATCH-05 | Phase 4 | Pending |
 | WATCH-06 | Phase 4 | Pending |
@@ -153,7 +153,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-01 | Phase 1 | Pending |
 | NAV-02 | Phase 2 | Pending |
 | NAV-03 | Phase 2 | Pending |
-| NAV-04 | Phase 1 | Pending |
+| NAV-04 | Phase 1 | Complete |
 | NAV-05 | Phase 3 | Pending |
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |

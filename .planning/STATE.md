@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Status at a Glance
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-10-12T00:32:26.190Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-10-12T00:38:53.047Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 0ce4e0e848cd31aeb99e89984b78455984081817
+state_head: f72873ea1fe34dcb8887f8cdbafbdcd79abfbf3a
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-11)
 ## Current Position
 
 Phase: 01 (Status at a Glance) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-11 — Phase 01 execution started
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 6 min | 2 tasks | 13 files |
+| Phase 01 P02 | 4 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Research C2/C4]: Defaults recorded in REQUIREMENTS.md (single ISSUE_ADVANCED search; latestOpinionatedReviews fallback). The Phase 1 spike confirms or overturns them.
 - [Phase 01]: go-gh defangs C0 control characters in API responses (ESC becomes visible ^[), so domain.Clean at the mapper seam is a second layer, tested through the client and directly
 - [Phase 01]: State zero value is StateOpen per the plan interface order; unknown remote states map to StateUnknown via ParseState and are never shown as open
+- [Phase 01]: 01-02: a GraphQL error on page 2 or later discards that page; earlier pages stay and the list is marked truncated
+- [Phase 01]: 01-02: API error messages are not token-scrubbed; built from status, fixed strings and domain.Clean(API message)
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T00:32:26.174Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-10-12T00:38:53.027Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
