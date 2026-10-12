@@ -18,6 +18,9 @@ type keyMap struct {
 	// (DETL-03). Scroll is help text only: the detail scrolls on Up and Down.
 	Enter, Back, Scroll bkey.Binding
 
+	// Expand lists the passing checks that the detail view folds (D-10).
+	Expand bkey.Binding
+
 	// State visibility (D-10). States is help text only; nothing matches on it.
 	ToggleOpen, ToggleMerged, ToggleClosed, States bkey.Binding
 
@@ -54,6 +57,8 @@ func defaultKeys() keyMap {
 		Back:   bkey.NewBinding(bkey.WithKeys("esc"), bkey.WithHelp("esc", "back")),
 		Scroll: bkey.NewBinding(bkey.WithKeys("j", "k"), bkey.WithHelp("j/k", "scroll")), // help text only; nothing matches on it
 
+		Expand: bkey.NewBinding(bkey.WithKeys("e"), bkey.WithHelp("e", "expand")),
+
 		ToggleOpen:   bkey.NewBinding(bkey.WithKeys("1"), bkey.WithHelp("1", "open")),
 		ToggleMerged: bkey.NewBinding(bkey.WithKeys("2"), bkey.WithHelp("2", "merged")),
 		ToggleClosed: bkey.NewBinding(bkey.WithKeys("3"), bkey.WithHelp("3", "closed")),
@@ -71,10 +76,10 @@ func (k keyMap) ShortHelp() []bkey.Binding {
 
 // DetailShortHelp is the footer hint list while the detail view is open (D-09).
 func (k keyMap) DetailShortHelp() []bkey.Binding {
-	return []bkey.Binding{k.Back, k.Open, k.Refresh, k.Scroll, k.Help, k.Quit}
+	return []bkey.Binding{k.Back, k.Open, k.Refresh, k.Scroll, k.Expand, k.Help, k.Quit}
 }
 
 // FullHelp implements help.KeyMap.
 func (k keyMap) FullHelp() [][]bkey.Binding {
-	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh, k.Open}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Enter, k.Back, k.Scroll}, {k.Help, k.Quit}}
+	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh, k.Open}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Enter, k.Back, k.Scroll, k.Expand}, {k.Help, k.Quit}}
 }

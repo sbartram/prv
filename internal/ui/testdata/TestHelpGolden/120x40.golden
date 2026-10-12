@@ -3,7 +3,7 @@ prv — keys and badges
 k/↑ up         /   PR #       enter details    ? help
 j/↓ down       esc clear #    esc   back       q quit
 r   refresh    1   open       j/k   scroll
-o   open       2   merged
+o   open       2   merged     e     expand
                3   closed
 
 Badges
@@ -12,6 +12,7 @@ Badges
   merge   ✓ mergeable  ⊘ blocked  ↓ behind  ✗ conflicts  – unknown or draft
   reviewers ✗ changes requested  … pending  ✓ approved
             …team name hidden  +N more
+  checks    ✗ failing  ⊘ cancelled  ● running  ✓ passing  – skipped
   [draft] draft PR · dimmed rows are drafts, merged or closed
 
 config ~/.config/prv/config.toml · every 60s · 14 days

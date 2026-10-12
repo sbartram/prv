@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -127,8 +128,9 @@ func TestHelpContent(t *testing.T) {
 				t.Errorf("checks legend %q missing %q", legend, want)
 			}
 		}
-		if !strings.Contains(v, "e expand") {
-			t.Errorf("overlay missing 'e expand':\n%s", v)
+		// The key table pads each key to its column, so match the pair.
+		if !regexp.MustCompile(`\be +expand\b`).MatchString(v) {
+			t.Errorf("overlay missing the 'e expand' binding:\n%s", v)
 		}
 	})
 	t.Run("limit not known", func(t *testing.T) {

@@ -52,6 +52,18 @@ func (m Model) renderHelp() string {
 	b.WriteString("  – unknown or draft")
 	b.WriteString("\n  reviewers ✗ changes requested  … pending  ✓ approved")
 	b.WriteString("\n            …team name hidden  +N more")
+	b.WriteString("\n  checks    ")
+	checks := []struct {
+		state domain.CheckState
+		word  string
+	}{{domain.CheckFailing, "failing"}, {domain.CheckCancelled, "cancelled"}, {domain.CheckRunning, "running"},
+		{domain.CheckPassing, "passing"}, {domain.CheckNeutral, "skipped"}}
+	for i, c := range checks {
+		if i > 0 {
+			b.WriteString("  ")
+		}
+		b.WriteString(checkStyle(c.state).Render(c.state.Glyph() + " " + c.word))
+	}
 	b.WriteString("\n  [draft] draft PR · dimmed rows are drafts, merged or closed\n\n")
 
 	b.WriteString("config " + domain.Clean(m.configPath) + " · every " + fmtInterval(m.interval) +

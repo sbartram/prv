@@ -93,6 +93,9 @@ func (m Model) detailKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.detail.vp.ScrollDown(1)
 	case bkey.Matches(msg, m.keys.Up):
 		m.detail.vp.ScrollUp(1)
+	case bkey.Matches(msg, m.keys.Expand):
+		m.detail.expanded = !m.detail.expanded
+		m.syncDetail()
 	}
 	return m, nil
 }
@@ -236,6 +239,10 @@ func (m Model) checksSummary() string {
 	add(c.Running, "running", domain.CheckRunning)
 	add(c.Passing, "passing", domain.CheckPassing)
 	add(c.Neutral, "skipped", domain.CheckNeutral)
+	if d.data.Truncated {
+		// D-03, D-08: keep the exact counts and say how much was read.
+		segs = append(segs, faintStyle.Render("read "+strconv.Itoa(d.data.Read)+" of "+strconv.Itoa(d.data.Total)+" runs"))
+	}
 	if len(segs) == 0 {
 		return "no checks"
 	}
@@ -243,13 +250,26 @@ func (m Model) checksSummary() string {
 }
 
 // checkLines is the CHECKS section: the summary line, then one line per check
-// in the order the detail data gives.
+// in the order the detail data gives. Unless expanded, only failing, cancelled
+// and running checks are listed; the others make one faint fold line (D-10).
 func (m Model) checkLines(width int) []string {
 	lines := []string{headerStyle.Render("CHECKS") + "  " + m.checksSummary()}
 	if m.detail.data == nil {
 		return lines
 	}
-	checks := m.detail.data.Checks
+	checks, folded := m.detail.data.Checks, 0
+	if !m.detail.expanded {
+		var shown []domain.Check
+		for _, c := range checks {
+			switch c.State {
+			case domain.CheckFailing, domain.CheckCancelled, domain.CheckRunning:
+				shown = append(shown, c)
+			default:
+				folded++
+			}
+		}
+		checks = shown
+	}
 
 	nameW, wordW, srcW := 0, 0, 0
 	for _, c := range checks {
@@ -286,6 +306,9 @@ func (m Model) checkLines(width int) []string {
 			line = faintStyle.Render(ansi.Strip(line)) // neutral and unknown: faint as a whole
 		}
 		lines = append(lines, line)
+	}
+	if folded > 0 {
+		lines = append(lines, faintStyle.Render("  … +"+strconv.Itoa(folded)+" more passing"))
 	}
 	return lines
 }
