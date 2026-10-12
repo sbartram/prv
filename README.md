@@ -95,3 +95,5 @@ A draft PR shows `[draft]` before its title. Its row is dimmed.
 ## License
 
 See [LICENSE](LICENSE).
+
+<!-- uat scratch: 2026-10-12T01:36:02Z -->
