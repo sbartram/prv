@@ -42,9 +42,9 @@
 
 ## Capability notes
 
-- rate-limit-limit-field: `rateLimit { limit cost remaining resetAt }`; `limit` feeds the faint `api N` footer, the yellow <20% header warning (D-06) and the reserve/pacing rules of `domain.NextDelay` (02-02 Task 1 and 2).
-- rate-limit-response-headers: a `captureTransport` under go-gh records exactly `Retry-After`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, because the exhausted primary limit arrives as HTTP 200 with a `*api.GraphQLError` that carries no headers (02-02 Task 3).
-- rate-limited-error-classification: `KindRateLimited` with `RetryAfter`/`ResetAt` and `Backoff()`; 403 without rate headers stays `KindForbidden` (SSO) (02-02 Task 3).
-- pull-request-created-at: `createdAt` is the within-bucket sort key that polling does not change (D-02; 02-03 Task 1).
-- polling-refresh: the same discovery query re-run on one generation-stamped tick chain, single-flight, interval from config.toml with a 15 s floor (02-01).
-- browser-open: go-gh `pkg/browser` built once with `io.Discard`, called from a `tea.Cmd`, gated by an exact https://github.com allow-list (02-05 Task 3).
+- rate-limit-limit-field: `rateLimit { limit cost remaining resetAt }`; `limit` feeds the faint `api N` footer, the yellow <20% header warning (D-06) and the reserve/pacing rules of `domain.NextDelay` (02-05; NextDelay in 02-06).
+- rate-limit-response-headers: a `captureTransport` under go-gh records exactly `Retry-After`, `X-RateLimit-Remaining` and `X-RateLimit-Reset`, because the exhausted primary limit arrives as HTTP 200 with a `*api.GraphQLError` that carries no headers (02-07 Task 1).
+- rate-limited-error-classification: `KindRateLimited` with `RetryAfter`/`ResetAt` and `Backoff()`; 403 without rate headers stays `KindForbidden` (SSO) (02-07 Task 1).
+- pull-request-created-at: `createdAt` is the within-bucket sort key that polling does not change (D-02; 02-03 Task 2).
+- polling-refresh: the same discovery query re-run on one generation-stamped tick chain, single-flight, interval from config.toml with a 15 s floor (02-01; r and single-flight under -race in 02-02).
+- browser-open: go-gh `pkg/browser` built once with `io.Discard`, called from a `tea.Cmd`, gated by an exact https://github.com allow-list (02-10 Task 2).

@@ -65,23 +65,36 @@ Plans:
   5. User can press `o` to open the selected PR in the browser and `?` to see the key bindings screen.
 
 **Pitfalls first addressed here**: Single-flight refresh with one tick chain that re-arms after each result. A generation counter drops stale ticks and results, and a manual `r` coalesces with an in-flight refresh. Selection is tracked by PR ref (owner/repo#n), not by row index, with a nearest-neighbour fallback. The sort is stable on a key that polling does not change. Every query includes `rateLimit { cost remaining resetAt }`. Backoff honours retry-after, then resetAt, then a bounded exponential. Cancel the context on quit. Wrap Cmds so that a panic is caught. Logs go to a file only. Open only `https://github.com` URLs, through go-gh `pkg/browser` in a `tea.Cmd`. Verify with a counting fake client over a simulated hour with `-race`.
-**Plans**: 5 plans
+**Plans**: 10 plans
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md — Tracer: auto-refresh on the config.toml interval with "updated HH:MM:SS"; r refreshes from any screen, single-flight with a generation counter; a failed refresh keeps the rows (D-07 marker), first-fetch failure retries (D-09); header/footer priority composer (WR-02, WR-03)
+- [ ] 02-01-PLAN.md — Tracer: auto-refresh on the config.toml refresh_interval through one generation-stamped tick chain (config → cmd → ui → github client); a failed refresh keeps the rows, a failed first fetch keeps the panel and retries (D-07, D-09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 02-02-PLAN.md — Rate limit: faint "api N" footer and yellow <20% warning; NextDelay backoff (retry-after, resetAt, bounded exponential, pacing); pause with r refusal; HTTP-200 primary and 403/429 secondary limit detection; simulated-hour test
+- [ ] 02-02-PLAN.md — r refreshes from any screen, single-flight with a keymap; header "updated HH:MM:SS" with spinner; selection follows the PR by ref with a nearest-neighbour fallback (D-03, D-05)
+- [ ] 02-03-PLAN.md — Attention sort: Bucket (D-01, D-04 as clarified: merged/closed drafts by lifecycle) and createdAt-then-ref tie-break (D-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md — Attention sort (D-01..D-04, createdAt tie-break) and selection that follows the PR by ref with a nearest-neighbour fallback
+- [ ] 02-04-PLAN.md — Header/footer truth on any width: D-07 failure marker with short reason, D-09 "retrying at", priority composer, notes before keymap hints (WR-03), honest empty screen (WR-02)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 02-04-PLAN.md — Open/Merged/Closed toggles (1/2/3) with header indicator and hidden count, PR-number prompt (/), filtered-empty message (D-13)
+- [ ] 02-05-PLAN.md — Rate limit visible: limit in the query, faint "api N" footer, yellow <20% header warning (D-06)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 02-05-PLAN.md — config.toml complete (closed_days, show, line-numbered errors, unknown-key warnings, --closed-days precedence in 1..365), ? help overlay from the keymap, o opens the selected PR on github.com
+- [ ] 02-06-PLAN.md — Automatic backoff: pure NextDelay (retry-after, resetAt, bounded exponential, reserve, pacing), pause with r refusal (D-08, D-09), simulated-hour test
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 02-07-PLAN.md — Real rate-limit responses: header-capturing transport, KindRateLimited for HTTP-200 primary and 403/429 secondary limits, later-page rule, end-to-end pause test
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 02-08-PLAN.md — Open/Merged/Closed toggles (1/2/3) with header indicator and hidden count, PR-number prompt (/), filtered-empty message (D-10..D-13)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 02-09-PLAN.md — config.toml complete (closed_days, show, line-numbered errors, --closed-days precedence in 1..365), unknown-key warnings with a bounded 8 s lifetime that never mask other messages (D-14..D-16)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 02-10-PLAN.md — ? help overlay from the keymap with badges, settings, API budget and config warnings (D-17); o opens the selected PR on github.com only
 **UI hint**: yes
 
 ### Phase 3: Blocker Detail
