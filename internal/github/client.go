@@ -27,6 +27,7 @@ type Options struct {
 // Client fetches pull requests. It implements ui.Fetcher.
 type Client struct {
 	gql        *api.GraphQLClient
+	capture    *captureTransport
 	closedDays int
 	now        func() time.Time
 }
@@ -35,17 +36,22 @@ type Client struct {
 // LogIgnoreEnv stops GH_DEBUG from writing HTTP traffic over the screen, and
 // the response cache stays off so polling never shows stale data.
 func NewClient(opts Options) (*Client, error) {
+	base := opts.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	capture := &captureTransport{base: base}
 	gql, err := api.NewGraphQLClient(api.ClientOptions{
 		Host:         "github.com",
 		AuthToken:    opts.Token,
 		Timeout:      20 * time.Second,
 		LogIgnoreEnv: true,
-		Transport:    opts.Transport,
+		Transport:    capture,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating GitHub client: %w", err)
 	}
-	c := &Client{gql: gql, closedDays: opts.ClosedDays, now: opts.Now}
+	c := &Client{gql: gql, capture: capture, closedDays: opts.ClosedDays, now: opts.Now}
 	if c.closedDays <= 0 {
 		c.closedDays = domain.DefaultClosedDays
 	}
@@ -149,6 +155,13 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 		var resp wireResp
 		err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp)
 		if err != nil {
+			err = classify(err, c.capture.latest())
+			var ce *Error
+			isErr := errors.As(err, &ce)
+			if page == 1 && isErr && ce.Kind == KindRateLimited {
+				// Never show partial data while rate limited.
+				return domain.Snapshot{}, err
+			}
 			if page > 1 {
 				if errors.Is(err, context.Canceled) {
 					return domain.Snapshot{}, err
@@ -160,8 +173,9 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 			}
 			// GitHub reports errors together with data: show the rows that loaded.
 			var ge *api.GraphQLError
-			if !errors.As(err, &ge) || (resp.Viewer.Login == "" && len(resp.Search.Nodes) == 0) {
-				return domain.Snapshot{}, classify(err)
+			if !isErr || ce.Kind != KindGraphQL || !errors.As(err, &ge) ||
+				(resp.Viewer.Login == "" && len(resp.Search.Nodes) == 0) {
+				return domain.Snapshot{}, err
 			}
 			msg := "Some data could not be loaded"
 			if len(ge.Errors) > 0 {
