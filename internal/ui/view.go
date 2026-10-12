@@ -46,8 +46,11 @@ func (m Model) renderEmpty() string {
 }
 
 // footer is the last line of the list and empty screens. Integrity notes come
-// first and outlive the key hints: on a narrow pane the hints go, then the
-// notes are cut with an ellipsis, but the notes are never dropped (WR-03).
+// first, then the key hints; the faint "api N" budget sits at the right edge.
+// On a narrow pane the hints go first, then the notes are cut with an
+// ellipsis, but neither the notes nor the api segment is dropped (WR-03, D-06).
+// The api segment is absent until the first successful response has told us
+// the limit: showing a number before that would be made up.
 func (m Model) footer() string {
 	var notes []string
 	if m.snap.Truncated {
@@ -59,26 +62,49 @@ func (m Model) footer() string {
 	const sep = " · "
 	line := strings.Join(notes, sep)
 
+	api := ""
+	if m.snap.RateLimit.Limit > 0 {
+		api = faintStyle.Render("api " + strconv.Itoa(m.snap.RateLimit.Remaining))
+	}
+	join := func(a, b string) string {
+		if a == "" || b == "" {
+			return a + b
+		}
+		return a + sep + b
+	}
+
 	h := m.help // a copy: SetWidth must not change the model
-	room := 0   // 0: not sized yet, the hints are not cut
-	if m.w > 0 {
-		room = m.w
+	if m.w <= 0 {
+		// Not sized yet: nothing is cut or padded.
+		h.SetWidth(0)
+		return join(join(line, h.ShortHelpView(m.keys.ShortHelp())), api)
+	}
+
+	avail := m.w // cells left for the notes and hints
+	if api != "" {
+		avail -= lipgloss.Width(api) + 1 // and one space before the api segment
+	}
+	if avail < 1 {
+		return ansi.Truncate(api, m.w, "")
+	}
+	left := line
+	if line != "" && lipgloss.Width(line) >= avail {
+		left = ansi.Truncate(line, avail, "…")
+	} else {
+		room := avail
 		if line != "" {
-			if lipgloss.Width(line) >= m.w {
-				return ansi.Truncate(line, m.w, "…")
-			}
-			room = m.w - lipgloss.Width(line) - lipgloss.Width(sep)
+			room -= lipgloss.Width(line) + lipgloss.Width(sep)
 		}
-		if room < 8 {
-			return line // too little room for a useful hint
+		if room >= 8 { // less is too little room for a useful hint
+			h.SetWidth(room)
+			left = join(line, h.ShortHelpView(m.keys.ShortHelp()))
 		}
 	}
-	h.SetWidth(room)
-	hints := h.ShortHelpView(m.keys.ShortHelp())
-	if line == "" {
-		return hints
+	if api == "" {
+		return left
 	}
-	return line + sep + hints
+	pad := m.w - lipgloss.Width(left) - lipgloss.Width(api)
+	return left + strings.Repeat(" ", max(pad, 1)) + api
 }
 
 // clock formats t in the zone of the model's clock: the local zone in
@@ -147,8 +173,8 @@ func fit(segs []segment, sep string, width int) string {
 	return line
 }
 
-// header builds the first line of the list view. Prio 3 and 6 are left free:
-// the filter segment (plan 02-08) takes 3 and the rate warning (plan 02-05) 6.
+// header builds the first line of the list view. Prio 3 is left free for the
+// filter segment (plan 02-08). The rate warning takes 6.
 func (m Model) header() string {
 	segs := []segment{
 		{"prv", 1},
@@ -174,6 +200,11 @@ func (m Model) header() string {
 			text += " " + m.spin.View()
 		}
 		segs = append(segs, segment{text, prio})
+	}
+	// D-06: below 20% of the limit the budget moves up into the header.
+	if rl := m.snap.RateLimit; rl.Limit > 0 && rl.Remaining*5 < rl.Limit {
+		segs = append(segs, segment{warnStyle.Render("api " + strconv.Itoa(rl.Remaining) + "/" +
+			strconv.Itoa(rl.Limit) + " · resets " + m.clock(rl.ResetAt, "15:04")), 6})
 	}
 	return fit(segs, " · ", m.w)
 }

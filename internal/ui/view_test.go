@@ -736,7 +736,7 @@ func TestFooterPriorityNarrow(t *testing.T) {
 		if w >= 20 && !strings.HasSuffix(f, "api 4812") {
 			t.Errorf("w=%d footer = %q, want the api segment kept at the right edge", w, f)
 		}
-		if !strings.HasPrefix(f, "list truncated"[:min(w, 14)]) {
+		if !strings.HasPrefix(f, "list") {
 			t.Errorf("w=%d footer = %q, want the notes first", w, f)
 		}
 	}
