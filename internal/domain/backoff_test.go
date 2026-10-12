@@ -14,6 +14,7 @@ func TestNextDelay(t *testing.T) {
 	}
 	ok := Outcome{}
 	fail := Outcome{Failed: true}
+	far := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC) // T.Sub saturates; + 1 s must not wrap
 
 	tests := []struct {
 		name     string
@@ -58,6 +59,8 @@ func TestNextDelay(t *testing.T) {
 		{"rate limited with no timing waits at least 60 s", sec(15), 1, RateLimit{}, Outcome{Failed: true, RateLimited: true}, sec(60), sec(60)},
 		{"rate limited with no timing, deep in failures", sec(60), 3, RateLimit{}, Outcome{Failed: true, RateLimited: true}, sec(240), sec(240)},
 		{"rate limited reset in a year is cut to 65 min", sec(60), 1, RateLimit{}, Outcome{Failed: true, RateLimited: true, ResetAt: T.Add(8760 * time.Hour)}, min(65), min(65)},
+		{"rate limited reset beyond Duration range is cut to 65 min", sec(60), 1, RateLimit{}, Outcome{Failed: true, RateLimited: true, ResetAt: far}, min(65), min(65)},
+		{"reserve pause with a reset beyond Duration range is cut to 65 min", sec(60), 0, rl(1, 10, far), ok, min(65), min(65)},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
