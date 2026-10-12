@@ -50,14 +50,27 @@ func (m Model) stateIndicator() string {
 	return "[" + slot(domain.StateOpen) + " " + slot(domain.StateMerged) + " " + slot(domain.StateClosed) + "]"
 }
 
+// filterLabel is the state indicator followed by the kept number filter, as
+// "[open · closed] #12".
+func (m Model) filterLabel() string {
+	if m.numFilter == "" {
+		return m.stateIndicator()
+	}
+	return m.stateIndicator() + " #" + m.numFilter
+}
+
 // renderFilteredEmpty is the screen for a snapshot that has PRs when the
 // filters hide every one of them (D-13). It must not read like an empty
 // account: it names the filters and how many PRs they hide. The footer still
 // carries the integrity notes (WR-02).
 func (m Model) renderFilteredEmpty() string {
-	msg := "No PRs match: " + m.stateIndicator() +
-		" — " + strconv.Itoa(len(m.snap.PRs)-len(m.rows)) + " hidden by filters · 1/2/3 toggle"
-	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.footer()
+	escHint := ""
+	if m.numFilter != "" {
+		escHint = "esc clear · "
+	}
+	msg := "No PRs match: " + m.filterLabel() +
+		" — " + strconv.Itoa(len(m.snap.PRs)-len(m.rows)) + " hidden by filters · " + escHint + "1/2/3 toggle"
+	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.bottom()
 }
 
 // renderEmpty is the screen for a snapshot with no PRs. When the snapshot is
@@ -69,7 +82,37 @@ func (m Model) renderEmpty() string {
 	if m.snap.Truncated || len(m.snap.Warnings) > 0 {
 		msg = fmt.Sprintf("No PRs could be listed for @%s.", m.snap.Viewer)
 	}
-	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.footer()
+	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.bottom()
+}
+
+// notes are the footer's integrity notes, flash first so it is cut last.
+func (m Model) notes() []string {
+	var notes []string
+	if m.flash != "" && m.now().Before(m.flashUntil) {
+		notes = append(notes, warnStyle.Render(m.flash))
+	}
+	if m.snap.Truncated {
+		notes = append(notes, "list truncated")
+	}
+	if len(m.snap.Warnings) > 0 {
+		notes = append(notes, "some data could not be loaded")
+	}
+	return notes
+}
+
+// bottom is the last line of every screen that has rows or a filter: the
+// number prompt while it is open, otherwise the footer. The prompt replaces
+// the footer, so it never costs a list row (chromeLines stays 3).
+func (m Model) bottom() string {
+	if !m.prompting {
+		return m.footer()
+	}
+	line := "/ " + m.numFilter + "█   (" + strconv.Itoa(len(m.rows)) + " of " + strconv.Itoa(len(m.snap.PRs)) +
+		" · enter keep · esc clear)"
+	if notes := m.notes(); len(notes) > 0 {
+		line += " · " + strings.Join(notes, " · ")
+	}
+	return m.cut(line)
 }
 
 // footer is the last line of the list and empty screens. Integrity notes come
@@ -79,18 +122,8 @@ func (m Model) renderEmpty() string {
 // The api segment is absent until the first successful response has told us
 // the limit: showing a number before that would be made up.
 func (m Model) footer() string {
-	var notes []string
-	if m.flash != "" && m.now().Before(m.flashUntil) {
-		notes = append(notes, warnStyle.Render(m.flash)) // first, so it is cut last
-	}
-	if m.snap.Truncated {
-		notes = append(notes, "list truncated")
-	}
-	if len(m.snap.Warnings) > 0 {
-		notes = append(notes, "some data could not be loaded")
-	}
 	const sep = " · "
-	line := strings.Join(notes, sep)
+	line := strings.Join(m.notes(), sep)
 
 	api := ""
 	if m.snap.RateLimit.Limit > 0 {
@@ -215,7 +248,7 @@ func (m Model) header() string {
 	segs := []segment{
 		{"prv", 1},
 		{"@" + m.snap.Viewer, 2},
-		{m.stateIndicator(), 3},
+		{m.filterLabel(), 3},
 		{count, 4},
 	}
 	if !m.lastOK.IsZero() {
@@ -349,7 +382,7 @@ func (m Model) renderList() string {
 
 	lines := []string{m.header()}
 	lines = append(lines, strings.Split(t.String(), "\n")...)
-	lines = append(lines, m.footer())
+	lines = append(lines, m.bottom())
 	for i, l := range lines {
 		lines[i] = m.cut(l)
 	}

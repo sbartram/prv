@@ -25,6 +25,10 @@ type Fetcher interface {
 // 15 s floor is the config package's job, so tests can use short intervals.
 const defaultInterval = 60 * time.Second
 
+// maxFilterDigits is how many digits the number prompt keeps. A PR number has
+// at most 7 digits in practice; a longer prefix matches nothing anyway.
+const maxFilterDigits = 7
+
 // Options configures the model.
 type Options struct {
 	ClosedDays int
@@ -59,6 +63,14 @@ type Model struct {
 	// show is which lifecycle states are visible (D-10). It lasts for the
 	// session only: nothing is written to disk (D-12).
 	show domain.StateSet
+
+	// numFilter is the digit prefix typed after "/" (D-11). The prompt is a
+	// hand-rolled buffer: it takes digits only, so nothing else from a key
+	// press or a paste is stored or drawn. prompting is true while the prompt
+	// line is open.
+	numFilter string
+	prompting bool
+	pkeys     promptKeys
 
 	// Selection is tracked by PR ref (D-03). selected is the source of truth;
 	// rebuild derives cursor from it after every snapshot. rows is what is on
@@ -124,6 +136,7 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 		fetcher:  f,
 		opts:     opts,
 		keys:     defaultKeys(),
+		pkeys:    defaultPromptKeys(),
 		help:     h,
 		state:    stateLoading,
 		inFlight: true,
@@ -143,7 +156,23 @@ func (m Model) Init() tea.Cmd {
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		if m.prompting {
+			for _, r := range msg.Content {
+				if r >= '0' && r <= '9' && len(m.numFilter) < maxFilterDigits {
+					m.numFilter += string(r)
+				}
+			}
+			m.rebuild()
+		}
 	case tea.KeyPressMsg:
+		if m.prompting {
+			m.promptKey(msg)
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		switch {
 		case bkey.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
@@ -160,6 +189,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateLoading
 			}
 			return m, m.beginFetch()
+		case bkey.Matches(msg, m.keys.Filter):
+			if m.state == stateList { // the prompt line only exists on the list screens
+				m.prompting = true
+			}
+		case m.numFilter != "" && bkey.Matches(msg, m.keys.Clear):
+			m.numFilter = ""
+			m.rebuild()
 		case bkey.Matches(msg, m.keys.ToggleOpen):
 			m.show = m.show.Toggle(domain.StateOpen)
 			m.rebuild()
@@ -239,6 +275,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// promptKey handles one key press while the number prompt is open (D-11).
+// Digits are typed (1, 2 and 3 do not toggle), enter keeps the filter, esc
+// clears it, backspace deletes. Every other key is ignored; q does not quit.
+// The caller handles ctrl+c.
+func (m *Model) promptKey(msg tea.KeyPressMsg) {
+	switch {
+	case bkey.Matches(msg, m.pkeys.Accept):
+		m.prompting = false
+	case bkey.Matches(msg, m.pkeys.Cancel):
+		m.numFilter, m.prompting = "", false
+		m.rebuild()
+	case bkey.Matches(msg, m.pkeys.Delete):
+		if m.numFilter != "" {
+			m.numFilter = m.numFilter[:len(m.numFilter)-1]
+			m.rebuild()
+		}
+	default:
+		if r := []rune(msg.Text); len(r) == 1 && r[0] >= '0' && r[0] <= '9' && len(m.numFilter) < maxFilterDigits {
+			m.numFilter += string(r)
+			m.rebuild()
+		}
+	}
+}
+
 // schedule applies the backoff policy to the result of the current-generation
 // fetch (err is nil on success) and arms the one tick for the next refresh. It
 // also sets or clears the rate-limit pause.
@@ -264,7 +324,7 @@ func (m *Model) schedule(err error) tea.Cmd {
 // neighbour in the old order (D-03).
 func (m *Model) rebuild() {
 	oldRows, oldCur := m.rows, m.cursor
-	m.rows = domain.Visible(m.snap.PRs, m.show, "")
+	m.rows = domain.Visible(m.snap.PRs, m.show, m.numFilter)
 	switch {
 	case len(m.rows) == 0:
 		// Keep m.selected: the PR may come back.

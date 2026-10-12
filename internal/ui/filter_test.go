@@ -213,3 +213,214 @@ func TestFilterIndicator(t *testing.T) {
 		t.Errorf("footer hints lack '1/2/3 states':\n%s", got)
 	}
 }
+
+// ---- number prompt (plan 02-08 task 2) ----
+
+// promptSnap holds a/b#12, #120, #1234, #312 and #5.
+func promptSnap() domain.Snapshot { return selSnap(12, 120, 1234, 312, 5) }
+
+func lastLine(m tea.Model) string {
+	ls := strings.Split(plain(m), "\n")
+	return ls[len(ls)-1]
+}
+
+func special(code rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: code} }
+
+func send(m tea.Model, msgs ...tea.Msg) tea.Model {
+	for _, msg := range msgs {
+		m, _ = m.Update(msg)
+	}
+	return m
+}
+
+func TestNumberPrompt(t *testing.T) {
+	open := func() tea.Model { return press(filterModel(120, 40, promptSnap()), "/") }
+	t.Run("open", func(t *testing.T) {
+		got := lastLine(open())
+		if !strings.HasPrefix(got, "/ █") || !strings.Contains(got, "(5 of 5 · enter keep · esc clear)") {
+			t.Errorf("last line = %q", got)
+		}
+	})
+	t.Run("narrow", func(t *testing.T) {
+		m := press(open(), "1", "2")
+		if got := lastLine(m); !strings.HasPrefix(got, "/ 12█   (3 of 5 · enter keep · esc clear)") {
+			t.Errorf("last line = %q", got)
+		}
+		if refs := rowRefs(m); strings.Join(refs, ",") != "a/b#12,a/b#120,a/b#1234" {
+			t.Errorf("rows = %v", refs)
+		}
+	})
+	t.Run("cap", func(t *testing.T) {
+		m := press(open(), "1", "2", "3", "4", "5", "6", "7", "8")
+		if got := m.(Model).numFilter; got != "1234567" {
+			t.Errorf("numFilter = %q, want 1234567", got)
+		}
+	})
+	t.Run("backspace", func(t *testing.T) {
+		m := send(open(), special(tea.KeyBackspace))
+		if got := m.(Model).numFilter; got != "" {
+			t.Errorf("numFilter = %q after backspace on empty", got)
+		}
+		m = send(press(m, "1", "2"), special(tea.KeyBackspace))
+		if got := m.(Model).numFilter; got != "1" {
+			t.Errorf("numFilter = %q, want 1", got)
+		}
+	})
+	t.Run("ignored keys", func(t *testing.T) {
+		m := press(open(), "a", "?", "-")
+		if got := m.(Model).numFilter; got != "" {
+			t.Errorf("numFilter = %q, want nothing typed", got)
+		}
+		if !m.(Model).prompting {
+			t.Error("an ignored key closed the prompt")
+		}
+	})
+	t.Run("quit keys", func(t *testing.T) {
+		if _, cmd := open().Update(key("q")); cmd != nil {
+			t.Error("q returned a Cmd while the prompt is open")
+		}
+		_, cmd := open().Update(key("ctrl+c"))
+		if cmd == nil {
+			t.Fatal("ctrl+c returned no Cmd")
+		}
+		if _, ok := cmd().(tea.QuitMsg); !ok {
+			t.Error("ctrl+c did not quit")
+		}
+	})
+	t.Run("digits are not toggles", func(t *testing.T) {
+		m := press(open(), "1", "2", "3")
+		if got := headerOf(m); !strings.Contains(got, "[open merged closed] #123") {
+			t.Errorf("header = %q, want all states on and #123", got)
+		}
+	})
+	t.Run("paste", func(t *testing.T) {
+		m := send(open(), tea.PasteMsg{Content: "PR #4a2"})
+		if got := m.(Model).numFilter; got != "42" {
+			t.Errorf("numFilter = %q, want 42", got)
+		}
+		m = send(open(), tea.PasteMsg{Content: "\x1b[31m99999999999\x1b[0m"})
+		if got := m.(Model).numFilter; got != "3199999" {
+			t.Errorf("numFilter = %q, want only digits, at most %d (3199999)", got, maxFilterDigits)
+		}
+		// Outside the prompt a paste is ignored.
+		m = send(filterModel(120, 40, promptSnap()), tea.PasteMsg{Content: "12"})
+		if got := m.(Model).numFilter; got != "" {
+			t.Errorf("numFilter = %q, want a paste outside the prompt ignored", got)
+		}
+	})
+	t.Run("enter keeps", func(t *testing.T) {
+		m := send(press(open(), "1", "2"), special(tea.KeyEnter))
+		if m.(Model).prompting {
+			t.Error("enter left the prompt open")
+		}
+		if got := headerOf(m); !strings.Contains(got, "[open merged closed] #12") {
+			t.Errorf("header = %q, want #12 after the state indicator", got)
+		}
+		if strings.HasPrefix(lastLine(m), "/ ") || !strings.Contains(lastLine(m), "j/k move") {
+			t.Errorf("last line = %q, want the footer back", lastLine(m))
+		}
+		if refs := rowRefs(m); len(refs) != 3 {
+			t.Errorf("rows = %v, want 3 kept", refs)
+		}
+		if got := markedRef(t, press(m, "j")); got != "a/b#120" {
+			t.Errorf("j moved to %q, want a/b#120", got)
+		}
+	})
+	t.Run("esc clears", func(t *testing.T) {
+		kept := send(press(open(), "1", "2"), special(tea.KeyEnter))
+		m := send(kept, special(tea.KeyEscape))
+		if got := headerOf(m); strings.Contains(got, "#12") || m.(Model).numFilter != "" {
+			t.Errorf("header = %q, want the kept filter cleared", got)
+		}
+		if refs := rowRefs(m); len(refs) != 5 {
+			t.Errorf("rows = %v, want all 5 back", refs)
+		}
+		m = send(press(open(), "1"), special(tea.KeyEscape))
+		if m.(Model).prompting || m.(Model).numFilter != "" || len(rowRefs(m)) != 5 {
+			t.Error("esc while typing did not clear and close the prompt")
+		}
+		// A kept filter can be reopened and edited.
+		m = press(kept, "/", "3")
+		if got := m.(Model).numFilter; got != "123" {
+			t.Errorf("numFilter = %q, want the kept digits editable", got)
+		}
+	})
+	t.Run("filtered empty", func(t *testing.T) {
+		m := press(open(), "9", "9")
+		v := plain(m)
+		want := "No PRs match: [open merged closed] #99 — 5 hidden by filters · esc clear · 1/2/3 toggle"
+		if !strings.Contains(v, want) {
+			t.Errorf("view lacks %q:\n%s", want, v)
+		}
+		if !strings.HasPrefix(lastLine(m), "/ 99█") {
+			t.Errorf("last line = %q, want the prompt", lastLine(m))
+		}
+	})
+}
+
+func TestPrefixMatch(t *testing.T) {
+	m := press(filterModel(120, 40, promptSnap()), "/", "1", "2")
+	if refs := rowRefs(m); strings.Join(refs, ",") != "a/b#12,a/b#120,a/b#1234" {
+		t.Errorf("12 matched %v, want #12, #120 and #1234 but not #312", refs)
+	}
+	m = press(filterModel(120, 40, selSnap(1, 10)), "/", "0", "1")
+	if refs := rowRefs(m); len(refs) != 0 {
+		t.Errorf("01 matched %v, want nothing", refs)
+	}
+	if !strings.Contains(plain(m), "No PRs match:") {
+		t.Errorf("a number matching nothing must show the filtered-empty message:\n%s", plain(m))
+	}
+}
+
+func TestPromptKeepsOrder(t *testing.T) {
+	snap := selSnap(1200, 12, 120, 99)
+	snap.PRs[2].CI = domain.CIFailing // attention order puts #120 first
+	domain.Sort(snap.PRs)
+	full := rowRefs(filterModel(120, 40, snap))
+	m := press(filterModel(120, 40, snap), "/", "1", "2")
+	var want []string
+	for _, r := range full {
+		if strings.HasPrefix(strings.TrimPrefix(r, "a/b#"), "12") {
+			want = append(want, r)
+		}
+	}
+	if got := rowRefs(m); strings.Join(got, ",") != strings.Join(want, ",") || len(want) != 3 {
+		t.Errorf("filtered rows = %v, want %v (the full-list order)", got, want)
+	}
+	if want[0] != "a/b#120" {
+		t.Errorf("setup: full order = %v, want #120 first", full)
+	}
+}
+
+func TestRefreshWhilePrompting(t *testing.T) {
+	m := press(filterModel(120, 40, promptSnap()), "/", "1", "2")
+	m = refreshTo(m, 12, 3, 125, 7)
+	if !m.(Model).prompting || m.(Model).numFilter != "12" {
+		t.Errorf("prompting = %v, numFilter = %q, want the prompt kept open with 12", m.(Model).prompting, m.(Model).numFilter)
+	}
+	if refs := rowRefs(m); strings.Join(refs, ",") != "a/b#12,a/b#125" {
+		t.Errorf("rows = %v, want the filter applied to the new data", refs)
+	}
+	if got := lastLine(m); !strings.HasPrefix(got, "/ 12█   (2 of 4 ") {
+		t.Errorf("last line = %q", got)
+	}
+}
+
+func TestFilterHint(t *testing.T) {
+	if got := lastLine(filterModel(120, 40, promptSnap())); !strings.Contains(got, "/ PR #") {
+		t.Errorf("footer = %q, want the '/ PR #' hint", got)
+	}
+}
+
+func TestPromptRowBudget(t *testing.T) {
+	nums := make([]int, 26)
+	for i := range nums {
+		nums[i] = i + 1
+	}
+	m := filterModel(80, 24, selSnap(nums...))
+	before := len(strings.Split(plain(m), "\n"))
+	after := len(strings.Split(plain(press(m, "/")), "\n"))
+	if before != after || after > 24 {
+		t.Errorf("lines before the prompt = %d, with it = %d, want equal and at most 24", before, after)
+	}
+}

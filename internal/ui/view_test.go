@@ -239,6 +239,9 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 		return newTestModel(t, domain.Snapshot{Viewer: "octo"}, w, h)
 	case "list":
 		return newTestModel(t, fixtureThirty(), w, h)
+	case "prompt":
+		var m tea.Model = newTestModel(t, fixtureThirty(), w, h)
+		return press(m, "/", "1", "2").(Model)
 	case "filtered":
 		var m tea.Model = newTestModel(t, fixtureSix(), w, h)
 		return press(m, "1", "2", "3").(Model)
@@ -249,7 +252,7 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 
 func TestGolden(t *testing.T) {
 	sizes := [][2]int{{80, 24}, {120, 40}, {0, 0}}
-	for _, state := range []string{"loading", "error", "empty", "list", "filtered"} {
+	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
 			t.Run(name, func(t *testing.T) {
@@ -395,7 +398,7 @@ func TestScrollFollowsCursor(t *testing.T) {
 
 func TestViewFitsScreen(t *testing.T) {
 	for _, sz := range [][2]int{{80, 24}, {120, 40}} {
-		for _, state := range []string{"loading", "error", "empty", "list", "filtered"} {
+		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt"} {
 			t.Run(state+"_"+itoa(sz[0])+"x"+itoa(sz[1]), func(t *testing.T) {
 				ls := lines(stateModel(t, state, sz[0], sz[1]).View().Content)
 				if len(ls) > sz[1] {
@@ -410,7 +413,7 @@ func TestViewFitsScreen(t *testing.T) {
 		}
 	}
 	t.Run("not sized does not panic", func(t *testing.T) {
-		for _, state := range []string{"loading", "error", "empty", "list", "filtered"} {
+		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt"} {
 			_ = stateModel(t, state, 0, 0).View()
 		}
 	})

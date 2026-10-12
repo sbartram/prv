@@ -12,6 +12,24 @@ type keyMap struct {
 
 	// State visibility (D-10). States is help text only; nothing matches on it.
 	ToggleOpen, ToggleMerged, ToggleClosed, States bkey.Binding
+
+	// PR-number filter (D-11). Filter opens the prompt; Clear drops a kept
+	// number filter in list mode.
+	Filter, Clear bkey.Binding
+}
+
+// promptKeys are the keys the number prompt handles while it is open. Every
+// other key is ignored, apart from ctrl+c.
+type promptKeys struct {
+	Accept, Cancel, Delete bkey.Binding
+}
+
+func defaultPromptKeys() promptKeys {
+	return promptKeys{
+		Accept: bkey.NewBinding(bkey.WithKeys("enter")),
+		Cancel: bkey.NewBinding(bkey.WithKeys("esc")),
+		Delete: bkey.NewBinding(bkey.WithKeys("backspace")),
+	}
 }
 
 func defaultKeys() keyMap {
@@ -26,15 +44,18 @@ func defaultKeys() keyMap {
 		ToggleMerged: bkey.NewBinding(bkey.WithKeys("2"), bkey.WithHelp("2", "merged")),
 		ToggleClosed: bkey.NewBinding(bkey.WithKeys("3"), bkey.WithHelp("3", "closed")),
 		States:       bkey.NewBinding(bkey.WithKeys("1", "2", "3"), bkey.WithHelp("1/2/3", "states")),
+
+		Filter: bkey.NewBinding(bkey.WithKeys("/"), bkey.WithHelp("/", "PR #")),
+		Clear:  bkey.NewBinding(bkey.WithKeys("esc"), bkey.WithHelp("esc", "clear #")),
 	}
 }
 
 // ShortHelp implements help.KeyMap.
 func (k keyMap) ShortHelp() []bkey.Binding {
-	return []bkey.Binding{k.Move, k.Refresh, k.States, k.Quit}
+	return []bkey.Binding{k.Move, k.Refresh, k.Filter, k.States, k.Quit}
 }
 
 // FullHelp implements help.KeyMap.
 func (k keyMap) FullHelp() [][]bkey.Binding {
-	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh}, {k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Quit}}
+	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh}, {k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Filter, k.Clear}, {k.Quit}}
 }
