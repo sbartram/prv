@@ -37,23 +37,50 @@ type Check struct {
 // typename is "StatusContext" for a commit status (which reads state); any
 // other typename is a check run (which reads status, and conclusion once it is
 // COMPLETED). The mapping is total: any value it does not know is
-// (CheckOther, "unknown").
+// (CheckOther, "unknown"), never failing and never passing.
 func ClassifyCheck(typename, status, conclusion, state string) (CheckState, string) {
-	if typename != "StatusContext" {
-		switch status {
-		case "IN_PROGRESS":
-			return CheckRunning, "running"
-		case "QUEUED", "REQUESTED", "PENDING":
-			return CheckRunning, "queued"
-		case "WAITING":
-			return CheckRunning, "waiting"
-		case "COMPLETED":
-			switch conclusion {
-			case "FAILURE":
-				return CheckFailing, "failure"
-			case "SUCCESS":
-				return CheckPassing, "success"
-			}
+	if typename == "StatusContext" {
+		switch state {
+		case "ERROR":
+			return CheckFailing, "error"
+		case "FAILURE":
+			return CheckFailing, "failure"
+		case "PENDING":
+			return CheckRunning, "pending"
+		case "EXPECTED":
+			return CheckRunning, "expected"
+		case "SUCCESS":
+			return CheckPassing, "success"
+		}
+		return CheckOther, "unknown"
+	}
+	switch status {
+	case "IN_PROGRESS":
+		return CheckRunning, "running"
+	case "QUEUED", "REQUESTED", "PENDING":
+		return CheckRunning, "queued"
+	case "WAITING":
+		return CheckRunning, "waiting"
+	case "COMPLETED":
+		switch conclusion {
+		case "FAILURE":
+			return CheckFailing, "failure"
+		case "TIMED_OUT":
+			return CheckFailing, "timed out"
+		case "STARTUP_FAILURE":
+			return CheckFailing, "startup failure"
+		case "ACTION_REQUIRED":
+			return CheckFailing, "action required"
+		case "CANCELLED":
+			return CheckCancelled, "cancelled"
+		case "SUCCESS":
+			return CheckPassing, "success"
+		case "SKIPPED":
+			return CheckNeutral, "skipped"
+		case "NEUTRAL":
+			return CheckNeutral, "neutral"
+		case "STALE":
+			return CheckNeutral, "stale"
 		}
 	}
 	return CheckOther, "unknown"
@@ -108,29 +135,44 @@ type FailingCheck struct {
 // SummarizeFailing picks the check a failing row names from the de-duplicated
 // checks (LatestChecks). complete is false when the contexts page was
 // truncated: then no name is known, because a re-run on the missing page may
-// have fixed it. The name is the failing check that sorts first by lower-cased
-// name, and More counts the other failing checks, never GitHub's per-state
-// counts (D-02). No failing check gives the zero value.
+// have fixed it.
+//
+// A failing check is named before any cancelled one (D-04): the name is the
+// failing check that sorts first by lower-cased name, and More counts the
+// other failing checks. Cancelled checks are never added to that count, so the
+// row agrees with a detail summary that shows failing and cancelled
+// separately. When no check fails, the first cancelled check is named with
+// Cancelled set, and More counts the other cancelled checks. Counts come from
+// the de-duplicated checks, never from GitHub's per-state counts (D-02). No
+// failing or cancelled check gives the zero value.
 func SummarizeFailing(latest []Check, complete bool) FailingCheck {
 	if !complete {
 		return FailingCheck{}
 	}
-	var first *Check
+	if name, n := firstNamed(latest, CheckFailing); n > 0 {
+		return FailingCheck{Known: true, Name: name, More: n - 1}
+	}
+	if name, n := firstNamed(latest, CheckCancelled); n > 0 {
+		return FailingCheck{Known: true, Name: name, Cancelled: true, More: n - 1}
+	}
+	return FailingCheck{}
+}
+
+// firstNamed returns the first name by nameLess among the checks in state, and
+// how many checks are in that state.
+func firstNamed(checks []Check, state CheckState) (string, int) {
+	var first string
 	n := 0
-	for i := range latest {
-		c := &latest[i]
-		if c.State != CheckFailing {
+	for _, c := range checks {
+		if c.State != state {
 			continue
 		}
-		n++
-		if first == nil || nameLess(c.Name, first.Name) {
-			first = c
+		if n == 0 || nameLess(c.Name, first) {
+			first = c.Name
 		}
+		n++
 	}
-	if first == nil {
-		return FailingCheck{}
-	}
-	return FailingCheck{Known: true, Name: first.Name, More: n - 1}
+	return first, n
 }
 
 // nameLess orders names case-insensitively, then byte-wise, so the named check
