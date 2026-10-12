@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"cmp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -24,7 +26,7 @@ const (
 type Check struct {
 	Name     string // check-run name, or the status context name
 	Workflow string // workflow name, else the check suite's app name, else ""
-	Source   string // left empty here; the detail view fills it (plan 03-06)
+	Source   string // detail view only: the workflow file's base name, else the app name; "" for a status
 	Context  bool   // true for a commit StatusContext
 	State    CheckState
 	Word     string // lowercase display word, e.g. "failure", "timed out"
@@ -186,20 +188,93 @@ func nameLess(a, b string) bool {
 }
 
 // Glyph returns the one-cell glyph of the state.
-func (s CheckState) Glyph() string { return "" }
+func (s CheckState) Glyph() string {
+	switch s {
+	case CheckFailing:
+		return "✗"
+	case CheckCancelled:
+		return "⊘"
+	case CheckRunning:
+		return "●"
+	case CheckPassing:
+		return "✓"
+	case CheckNeutral:
+		return "–"
+	}
+	return "?"
+}
 
-// CheckCounts is how many de-duplicated checks are in each display class.
+// rank is the detail view order (D-10): failing, cancelled, running, passing,
+// then skipped or neutral, then unknown.
+func (s CheckState) rank() int {
+	switch s {
+	case CheckFailing:
+		return 0
+	case CheckCancelled:
+		return 1
+	case CheckRunning:
+		return 2
+	case CheckPassing:
+		return 3
+	case CheckNeutral:
+		return 4
+	}
+	return 5
+}
+
+// CheckCounts is how many checks are in each display class. Neutral also holds
+// the checks of class CheckOther.
 type CheckCounts struct {
 	Failing, Cancelled, Running, Passing, Neutral int
 }
 
-// CountChecks counts checks by class. CheckOther counts as neutral.
-func CountChecks(checks []Check) CheckCounts { return CheckCounts{} }
+// CountChecks counts checks by class. Callers pass the de-duplicated checks
+// (LatestChecks), so a superseded re-run is never counted (D-03).
+func CountChecks(checks []Check) CheckCounts {
+	var n CheckCounts
+	for _, c := range checks {
+		switch c.State {
+		case CheckFailing:
+			n.Failing++
+		case CheckCancelled:
+			n.Cancelled++
+		case CheckRunning:
+			n.Running++
+		case CheckPassing:
+			n.Passing++
+		default:
+			n.Neutral++
+		}
+	}
+	return n
+}
 
-// SortChecks sorts checks in place into the detail view order.
-func SortChecks(checks []Check) {}
+// SortChecks sorts checks in place into the detail view order (D-10): failing,
+// cancelled, running, passing, skipped or neutral, unknown; within a class by
+// lower-cased name, then workflow, then name. The same checks in any input
+// order give the same output.
+func SortChecks(checks []Check) {
+	slices.SortStableFunc(checks, func(a, b Check) int {
+		if c := cmp.Compare(a.State.rank(), b.State.rank()); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Workflow, b.Workflow); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
+}
 
 // Detail is the full detail of one pull request.
+//
+// Checks are de-duplicated (LatestChecks) and sorted (SortChecks). Counts are
+// always CountChecks(Checks), the de-duplicated checks, never GitHub's own
+// per-state counts, which include superseded runs (D-03). Truncated means not
+// every check run was read; Read is the number of check runs read and Total the
+// number GitHub reports, so the view can say "read N of M".
 type Detail struct {
 	Checks    []Check
 	Reviewers []Reviewer

@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"errors"
+	"path"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -89,6 +90,8 @@ type wireSuite struct {
 	App         *struct{ Name string }
 	WorkflowRun *struct {
 		Workflow *struct{ Name string }
+		// File is requested by the Detail query only; FailingChecks leaves it empty.
+		File *struct{ Path string }
 	}
 }
 
@@ -110,6 +113,14 @@ func mapContext(c *wireContext) domain.Check {
 			ch.Workflow = domain.Clean(s.WorkflowRun.Workflow.Name)
 		case s.App != nil:
 			ch.Workflow = domain.Clean(s.App.Name)
+		}
+		// Source is for the detail view: the workflow file's base name, else the
+		// app name. The path is cleaned before path.Base takes its last element.
+		switch {
+		case s.WorkflowRun != nil && s.WorkflowRun.File != nil && s.WorkflowRun.File.Path != "":
+			ch.Source = path.Base(domain.Clean(s.WorkflowRun.File.Path))
+		case s.App != nil:
+			ch.Source = domain.Clean(s.App.Name)
 		}
 	}
 	return ch
@@ -190,10 +201,38 @@ func (c *Client) fetchFailing(ctx context.Context, snap *domain.Snapshot) error 
 // failingWarning is the snapshot warning when check names could not be loaded.
 const failingWarning = "Check names could not be loaded"
 
-// FetchDetail returns the full detail of one pull request.
-func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
-	return domain.Detail{}, nil
-}
+// detailQuery is the on-demand query for one pull request (D-01): its reviewers
+// and every check context, 100 at a time. The id and the page cursor travel only
+// as variables. It requests no per-state count selection (D-03: GitHub's numbers
+// include superseded runs, RESEARCH F1) and no per-check link field (T-03-21).
+// The query is read-only.
+const detailQuery = `query Detail($id: ID!, $after: String) {
+  rateLimit { limit cost remaining resetAt }
+  node(id: $id) {
+    __typename
+    ... on PullRequest {
+      id state isDraft reviewDecision mergeStateStatus mergeable
+      latestOpinionatedReviews(first: 50) { nodes { state author { __typename login } } }
+      latestReviews(first: 50) { nodes { state author { __typename login } } }
+      reviewRequests(first: 50) { nodes { requestedReviewer { __typename
+        ... on User { login } ... on Bot { login } ... on Mannequin { login }
+        ... on Team { combinedSlug } ... on EnterpriseTeam { combinedSlug } } } }
+      statusCheckRollup {
+        state
+        contexts(first: 100, after: $after) {
+          totalCount
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            __typename
+            ... on CheckRun { name status conclusion databaseId
+              checkSuite { createdAt app { name } workflowRun { workflow { name } file { path } } } }
+            ... on StatusContext { context state }
+          }
+        }
+      }
+    }
+  }
+}`
 
 // Wire structs for the Detail response.
 
@@ -219,5 +258,61 @@ type wireDetailNode struct {
 	}
 }
 
-// detailReviewers maps the reviewers of a Detail node.
-func detailReviewers(n *wireDetailNode) []domain.Reviewer { return nil }
+// detailReviewers maps the reviewers of a Detail node under the list rules,
+// plus the commented and dismissed ones from latestReviews.
+func detailReviewers(n *wireDetailNode) []domain.Reviewer {
+	return domain.MergeReviewers(
+		reviewInputs(n.LatestOpinionatedReviews.Nodes),
+		requestInputs(n.ReviewRequests.Nodes),
+		reviewInputs(n.LatestReviews.Nodes),
+	)
+}
+
+// errDetailGone is returned when the node is missing or is not a pull request.
+func errDetailGone() error {
+	return &Error{Kind: KindGraphQL, Message: "this pull request could not be loaded"}
+}
+
+// FetchDetail returns the full detail of one pull request: its de-duplicated,
+// sorted checks, every reviewer with their state, and the counts. The error
+// policy follows Fetch: a rate limit or a cancelled context is returned as is,
+// partial GraphQL data is kept, and any other error is returned.
+func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
+	var resp wireDetailResp
+	err := c.gql.DoWithContext(ctx, detailQuery, map[string]any{"id": id}, &resp)
+	if err != nil {
+		err = classify(err, c.capture.latest())
+		if errors.Is(err, context.Canceled) {
+			return domain.Detail{}, err
+		}
+		var ce *Error
+		var ge *api.GraphQLError
+		keep := errors.As(err, &ce) && ce.Kind == KindGraphQL && errors.As(err, &ge) &&
+			resp.Node != nil && resp.Node.Typename == "PullRequest"
+		if !keep {
+			return domain.Detail{}, err
+		}
+	}
+	n := resp.Node
+	if n == nil || n.Typename != "PullRequest" {
+		return domain.Detail{}, errDetailGone()
+	}
+
+	var d domain.Detail
+	var checks []domain.Check
+	if r := n.StatusCheckRollup; r != nil {
+		d.Total = r.Contexts.TotalCount
+		d.Truncated = r.Contexts.PageInfo.HasNextPage
+		for _, ctxNode := range r.Contexts.Nodes {
+			if ctxNode != nil {
+				checks = append(checks, mapContext(ctxNode))
+			}
+		}
+	}
+	d.Read = len(checks)
+	d.Checks = domain.LatestChecks(checks)
+	domain.SortChecks(d.Checks)
+	d.Counts = domain.CountChecks(d.Checks)
+	d.Reviewers = detailReviewers(n)
+	return d, nil
+}

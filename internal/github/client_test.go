@@ -599,6 +599,7 @@ func TestFailingCleansNames(t *testing.T) {
 			App:       &struct{ Name string }{"App\x1b[1m‭"},
 			WorkflowRun: &struct {
 				Workflow *struct{ Name string }
+				File     *struct{ Path string }
 			}{Workflow: &struct{ Name string }{"c\x1b[0mi⁦"}},
 		},
 	})
