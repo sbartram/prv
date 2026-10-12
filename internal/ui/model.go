@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	bkey "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
@@ -44,6 +45,7 @@ type Model struct {
 	ctx     context.Context
 	fetcher Fetcher
 	opts    Options
+	keys    keyMap
 
 	state  viewState
 	spin   spinner.Model
@@ -84,6 +86,7 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 		ctx:      ctx,
 		fetcher:  f,
 		opts:     opts,
+		keys:     defaultKeys(),
 		state:    stateLoading,
 		inFlight: true,
 		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
@@ -103,21 +106,24 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		switch {
+		case bkey.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
-		case "r":
-			if m.state == stateError && !m.inFlight {
-				m.gen++ // orphans the pending tick
-				m.state = stateLoading
-				return m, m.beginFetch()
+		case bkey.Matches(msg, m.keys.Refresh):
+			if m.inFlight {
+				return m, nil // merges with the running refresh
 			}
-		case "j", "down":
+			m.gen++ // orphans the pending tick
+			if m.state == stateError {
+				m.state = stateLoading
+			}
+			return m, m.beginFetch()
+		case bkey.Matches(msg, m.keys.Down):
 			if m.state == stateList && m.cursor < len(m.snap.PRs)-1 {
 				m.cursor++
 				m.clampOffset()
 			}
-		case "k", "up":
+		case bkey.Matches(msg, m.keys.Up):
 			if m.state == stateList && m.cursor > 0 {
 				m.cursor--
 				m.clampOffset()
