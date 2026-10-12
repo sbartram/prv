@@ -59,7 +59,7 @@ func NewClient(opts Options) (*Client, error) {
 // always passed as the variable $q, never concatenated into this document.
 const discoveryQuery = `query Watch($q: String!, $after: String) {
   viewer { login }
-  rateLimit { cost remaining resetAt }
+  rateLimit { limit cost remaining resetAt }
   search(query: $q, type: ISSUE_ADVANCED, first: 100, after: $after) {
     issueCount
     pageInfo { hasNextPage endCursor }
@@ -93,6 +93,7 @@ func BuildSearch(now time.Time, closedDays int) string {
 type wireResp struct {
 	Viewer    struct{ Login string }
 	RateLimit struct {
+		Limit     int
 		Cost      int
 		Remaining int
 		ResetAt   time.Time
@@ -182,6 +183,7 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 			snap.PRs = append(snap.PRs, pr)
 		}
 		snap.RateLimit.Cost += pageSnap.RateLimit.Cost
+		snap.RateLimit.Limit = pageSnap.RateLimit.Limit
 		snap.RateLimit.Remaining = pageSnap.RateLimit.Remaining
 		snap.RateLimit.ResetAt = pageSnap.RateLimit.ResetAt
 
@@ -214,6 +216,7 @@ func mapResponse(resp wireResp) domain.Snapshot {
 	snap := domain.Snapshot{
 		Viewer: domain.Clean(resp.Viewer.Login),
 		RateLimit: domain.RateLimit{
+			Limit:     resp.RateLimit.Limit,
 			Cost:      resp.RateLimit.Cost,
 			Remaining: resp.RateLimit.Remaining,
 			ResetAt:   resp.RateLimit.ResetAt,

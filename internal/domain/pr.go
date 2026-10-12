@@ -100,6 +100,7 @@ type PR struct {
 
 // RateLimit is the GraphQL rate limit data returned with a query.
 type RateLimit struct {
+	Limit     int
 	Cost      int
 	Remaining int
 	ResetAt   time.Time
