@@ -222,6 +222,31 @@ func TestLaterPageFailure(t *testing.T) {
 	}
 }
 
+func TestLaterPageRateLimit(t *testing.T) {
+	calls := 0
+	page1 := fixtureBytes(t, "search_page1.json") // hasNextPage is true
+	c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return jsonResp(req, 200, page1), nil
+		}
+		resp := jsonResp(req, 200, []byte(rateLimitedBody))
+		resp.Header.Set("X-RateLimit-Remaining", "0")
+		return resp, nil
+	}))
+	snap, err := c.Fetch(context.Background())
+	var ge *Error
+	if !errors.As(err, &ge) || ge.Kind != KindRateLimited {
+		t.Fatalf("err = %v, want KindRateLimited", err)
+	}
+	if len(snap.PRs) != 0 || snap.Truncated || len(snap.Warnings) != 0 {
+		t.Errorf("snapshot = %+v, want empty: the previous data stays on screen", snap)
+	}
+	if calls != 2 {
+		t.Errorf("requests = %d, want 2", calls)
+	}
+}
+
 // TestTokenNeverAppears runs every failure path with a recognisable token and
 // checks that no message, hint or warning contains it, even when the
 // transport's own error text carries the Authorization header.

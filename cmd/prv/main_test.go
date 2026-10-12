@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -234,7 +235,7 @@ func (r *recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-const fixtureHead = `{"data":{"viewer":{"login":"octo"},"rateLimit":{"cost":1,"remaining":4999,"resetAt":"2026-10-11T13:00:00Z"},` +
+const fixtureHead = `{"data":{"viewer":{"login":"octo"},"rateLimit":{"limit":5000,"cost":1,"remaining":4999,"resetAt":"2026-10-11T13:00:00Z"},` +
 	`"search":{"issueCount":2,"pageInfo":{"hasNextPage":false,"endCursor":"c"},"nodes":[`
 
 const fixtureTail = `]}}}`
@@ -287,6 +288,9 @@ func TestEndToEndFixture(t *testing.T) {
 			t.Errorf("view missing %q:\n%s", want, view)
 		}
 	}
+	if !strings.Contains(view, "api 4999") {
+		t.Errorf("view missing the budget 'api 4999':\n%s", view)
+	}
 	row1 := func() string { return lineWith(plain(m), "acme/api#481") }
 	row2 := func() string { return lineWith(plain(m), "acme/web#12") }
 	if !strings.HasPrefix(row1(), ">") || strings.HasPrefix(row2(), ">") {
@@ -337,6 +341,62 @@ func TestEndToEndFixture(t *testing.T) {
 			t.Errorf("zero-row view lost the header:\n%s", v)
 		}
 	})
+}
+
+// rateLimitedTransport serves the fixture on request 1 and an exhausted
+// primary-limit response (HTTP 200 with errors) on every later request.
+type rateLimitedTransport struct {
+	n     atomic.Int64
+	reset time.Time
+}
+
+func (r *rateLimitedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	h := http.Header{"Content-Type": []string{"application/json"}}
+	body := fixtureHead + fixtureNodes + fixtureTail
+	if r.n.Add(1) > 1 {
+		body = `{"data":null,"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`
+		h.Set("X-RateLimit-Remaining", "0")
+		h.Set("X-RateLimit-Reset", strconv.FormatInt(r.reset.Unix(), 10))
+	}
+	return &http.Response{StatusCode: 200, Header: h, Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+}
+
+// TestRateLimitedEndToEnd drives the real client through a rate-limited
+// refresh: the failure and the pause show in the header, the rows stay, and r
+// makes no further request.
+func TestRateLimitedEndToEnd(t *testing.T) {
+	fixed := func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) }
+	rt := &rateLimitedTransport{reset: time.Date(2026, 10, 11, 12, 30, 0, 0, time.UTC)}
+	client, err := github.NewClient(github.Options{Token: "test-token-not-real", ClosedDays: 14, Now: fixed, Transport: rt})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14, Now: fixed})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+	if !strings.Contains(plain(m), "acme/api#481") {
+		t.Fatalf("first fetch did not list the fixture:\n%s", plain(m))
+	}
+
+	m, cmd := send(m, key("r"))
+	m = runCmd(m, cmd)
+	view := plain(m)
+	for _, want := range []string{"✗ refresh failed 12:00 (rate limit)", "paused until 12:30 (rate limit)", "acme/api#481", "acme/web#12"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view missing %q:\n%s", want, view)
+		}
+	}
+	if n := rt.n.Load(); n != 2 {
+		t.Fatalf("requests = %d, want 2", n)
+	}
+
+	m, _ = send(m, key("r")) // refused: its command is not run
+	if n := rt.n.Load(); n != 2 {
+		t.Errorf("requests after the refused r = %d, want 2", n)
+	}
+	if v := plain(m); !strings.Contains(v, "rate limited — resumes 12:30") {
+		t.Errorf("footer missing the refusal:\n%s", v)
+	}
 }
 
 func TestLiveEndToEnd(t *testing.T) {
