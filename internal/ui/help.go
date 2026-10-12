@@ -50,6 +50,8 @@ func (m Model) renderHelp() string {
 		b.WriteString(mergeStyle(mg).Render(mg.Badge()))
 	}
 	b.WriteString("  – unknown or draft")
+	b.WriteString("\n  reviewers ✗ changes requested  … pending  ✓ approved")
+	b.WriteString("\n            …team name hidden  +N more")
 	b.WriteString("\n  [draft] draft PR · dimmed rows are drafts, merged or closed\n\n")
 
 	b.WriteString("config " + domain.Clean(m.configPath) + " · every " + fmtInterval(m.interval) +

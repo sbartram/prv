@@ -339,7 +339,7 @@ func (m Model) cut(line string) string {
 
 func (m Model) renderList() string {
 	// Build every cell first, so column widths stay the same while scrolling.
-	headers := [colCount]string{colPR: "PR", colTitle: "TITLE", colAuthor: "AUTHOR", colState: "STATE", colReview: "REVIEW", colMerge: "MERGE", colCI: "CI"}
+	headers := [colCount]string{colPR: "PR", colTitle: "TITLE", colAuthor: "AUTHOR", colState: "STATE", colReview: "REVIEW", colReviewers: "REVIEWERS", colMerge: "MERGE", colCI: "CI"}
 	cells := make([][colCount]string, 0, len(m.rows))
 	var sz sizes
 	for c, h := range headers {
@@ -347,6 +347,7 @@ func (m Model) renderList() string {
 	}
 	sz.natural[colMarker] = 1
 	minCI := lipgloss.Width(headers[colCI])
+	sz.collapsed[colReviewers] = lipgloss.Width("REVS")
 	for i, pr := range m.rows {
 		marker := " "
 		if i == m.cursor {
@@ -362,7 +363,8 @@ func (m Model) renderList() string {
 		}
 		row := [colCount]string{
 			colMarker: marker, colPR: pr.Ref.String(), colTitle: title, colAuthor: author, colState: pr.State.String(),
-			colReview: pr.Review.Badge(), colMerge: pr.Merge.Badge(), colCI: ciCell(pr, maxCIColW),
+			colReview: pr.Review.Badge(), colReviewers: reviewersCell(pr.Reviewers, m.snap.Viewer, 0),
+			colMerge: pr.Merge.Badge(), colCI: ciCell(pr, maxCIColW),
 		}
 		cells = append(cells, row)
 		for c, text := range row {
@@ -370,9 +372,11 @@ func (m Model) renderList() string {
 		}
 		// The CI cell can shrink to its bare badge and no further.
 		minCI = max(minCI, lipgloss.Width(pr.CI.Badge()))
+		sz.collapsed[colReviewers] = max(sz.collapsed[colReviewers], lipgloss.Width(reviewersCount(pr.Reviewers)))
 	}
 	sz.natural[colPR] = min(sz.natural[colPR], maxPRColW)
 	sz.natural[colAuthor] = min(sz.natural[colAuthor], maxAuthorCol)
+	sz.natural[colReviewers] = min(sz.natural[colReviewers], maxReviewersW)
 	sz.natural[colCI] = min(sz.natural[colCI], maxCIColW)
 	sz.min = sz.natural
 	sz.min[colCI] = min(minCI, sz.natural[colCI])
@@ -389,7 +393,11 @@ func (m Model) renderList() string {
 	}
 	shownHeaders := make([]string, len(vis))
 	for i, c := range vis {
-		shownHeaders[i] = truncateCell(headers[c], lay.width[c])
+		h := headers[c]
+		if lay.collapsed[c] {
+			h = "REVS" // only REVIEWERS collapses
+		}
+		shownHeaders[i] = truncateCell(h, lay.width[c])
 	}
 	shownRows := make([][]string, len(cells))
 	for r, pr := range m.rows {
@@ -399,6 +407,12 @@ func (m Model) renderList() string {
 			switch c {
 			case colPR:
 				text = trimLeft(text, lay.width[c])
+			case colReviewers:
+				if lay.collapsed[c] {
+					text = reviewersCount(pr.Reviewers)
+				} else {
+					text = reviewersCell(pr.Reviewers, m.snap.Viewer, lay.width[c])
+				}
 			case colCI:
 				text = ciCell(pr, lay.width[c])
 			default:

@@ -507,10 +507,15 @@ func TestTitleTruncatesFirst(t *testing.T) {
 		if !strings.Contains(row, "✓ approved") || !strings.Contains(row, "✓ passing") {
 			t.Errorf("w=%d long row lost its badges (only TITLE may be cut): %q", w, row)
 		}
-		// The other rows keep every shown cell whole: no … outside TITLE.
+		// The other shown cells stay whole; only TITLE is cut.
 		for _, l := range ls {
-			if strings.Contains(l, "acme/api#102") && strings.Contains(l, "…") {
-				t.Errorf("w=%d row of #102 holds a cut cell: %q", w, l)
+			if !strings.Contains(l, "acme/api#102") {
+				continue
+			}
+			for _, cell := range []string{"acme/api#102", "✗ changes", "✗bob …carol ✓dave", "⊘ blocked", "✗ failing"} {
+				if !strings.Contains(l, cell) {
+					t.Errorf("w=%d row of #102 lost %q: %q", w, cell, l)
+				}
 			}
 		}
 	}

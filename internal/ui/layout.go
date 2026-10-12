@@ -83,8 +83,14 @@ type dropStep struct {
 	collapse bool
 }
 
-// dropSteps is the D-13 order in which a narrowing pane loses columns.
-var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colMerge}, {col: colTitle}}
+// dropSteps is the D-13 order in which a narrowing pane loses columns. A
+// collapse step folds a column into its count-only form first, so REVIEWERS
+// shrinks to "+N" before it goes.
+var dropSteps = []dropStep{
+	{col: colAuthor}, {col: colState},
+	{col: colReviewers, collapse: true}, {col: colReviewers},
+	{col: colMerge}, {col: colTitle},
+}
 
 // layoutColumns decides which columns are shown and how wide each one is
 // for a pane total cells wide. A total of 0 or less means the pane has not
@@ -94,7 +100,8 @@ var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colMerge}, {
 //
 // The pane narrows in the D-13 order. TITLE is the flexible column: it gets
 // what is left, down to minTitleW cells. When it cannot keep that, the next
-// column of dropSteps is dropped and TITLE gets another try; once TITLE
+// step of dropSteps (a column dropped or collapsed) is taken and TITLE gets
+// another try; once TITLE
 // itself is dropped, the CI cell narrows to its bare badge and then the PR
 // column narrows (never below minPRColW). A column never comes back at a
 // smaller width, because each step only adds to the set of dropped columns.
@@ -106,7 +113,6 @@ func layoutColumns(sz sizes, total int) layout {
 		l.width[c] = sz.natural[c]
 	}
 	l.width[colMarker] = 1
-	l.show[colReviewers] = false // RED stub, replaced in GREEN
 	if total <= 0 {
 		return l
 	}
@@ -139,8 +145,14 @@ func layoutColumns(sz sizes, total int) layout {
 		if k >= len(dropSteps) {
 			break
 		}
-		l.show[dropSteps[k].col] = false
-		l.width[dropSteps[k].col] = 0
+		if st := dropSteps[k]; st.collapse {
+			l.width[st.col] = sz.collapsed[st.col]
+			l.collapsed[st.col] = true
+		} else {
+			l.show[st.col] = false
+			l.width[st.col] = 0
+			l.collapsed[st.col] = false
+		}
 	}
 	// Even PR, REVIEW and CI at their natural widths do not fit. The CI cell
 	// drops its check name first, then the PR ref is cut from the left.
