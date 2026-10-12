@@ -13,6 +13,7 @@ const (
 	colAuthor
 	colState
 	colReview
+	colMerge
 	colCI
 	colCount
 )
@@ -77,9 +78,8 @@ type dropStep struct {
 	collapse bool
 }
 
-// dropSteps is the D-13 order in which a narrowing pane loses columns. Plan
-// 03-05 inserts REVIEWERS and MERGE before colTitle.
-var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colTitle}}
+// dropSteps is the D-13 order in which a narrowing pane loses columns.
+var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colMerge}, {col: colTitle}}
 
 // layoutColumns decides which columns are shown and how wide each one is
 // for a pane total cells wide. A total of 0 or less means the pane has not

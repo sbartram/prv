@@ -9,6 +9,7 @@ o   open       2   merged
 Badges
   review  ✓ approved  ✗ changes  ○ required  – none
   ci      ✓ passing  ✗ failing  ● running  – no checks  ? unknown
+  merge   ✓ mergeable  ⊘ blocked  ↓ behind  ✗ conflicts  – unknown or draft
   [draft] draft PR · dimmed rows are drafts, merged or closed
 
 config ~/.config/prv/config.toml · every 60s · 14 days

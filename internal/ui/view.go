@@ -339,8 +339,8 @@ func (m Model) cut(line string) string {
 
 func (m Model) renderList() string {
 	// Build every cell first, so column widths stay the same while scrolling.
-	headers := []string{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI"}
-	cells := make([][]string, 0, len(m.rows))
+	headers := [colCount]string{colPR: "PR", colTitle: "TITLE", colAuthor: "AUTHOR", colState: "STATE", colReview: "REVIEW", colMerge: "MERGE", colCI: "CI"}
+	cells := make([][colCount]string, 0, len(m.rows))
 	var sz sizes
 	for c, h := range headers {
 		sz.natural[c] = lipgloss.Width(h)
@@ -360,10 +360,9 @@ func (m Model) renderList() string {
 		if strings.EqualFold(pr.Author, m.snap.Viewer) {
 			author = "me"
 		}
-		row := []string{
-			marker, pr.Ref.String(), title, author, pr.State.String(),
-			pr.Review.Badge(),
-			ciCell(pr, maxCIColW),
+		row := [colCount]string{
+			colMarker: marker, colPR: pr.Ref.String(), colTitle: title, colAuthor: author, colState: pr.State.String(),
+			colReview: pr.Review.Badge(), colMerge: pr.Merge.Badge(), colCI: ciCell(pr, maxCIColW),
 		}
 		cells = append(cells, row)
 		for c, text := range row {
@@ -437,6 +436,8 @@ func (m Model) renderList() string {
 			switch c {
 			case colReview:
 				s = s.Inherit(reviewStyle(pr.Review))
+			case colMerge:
+				s = s.Inherit(mergeStyle(pr.Merge))
 			case colCI:
 				s = s.Inherit(ciStyle(pr.CI))
 			}
@@ -494,7 +495,7 @@ func shortRef(r domain.Ref) string {
 }
 
 // renderCompact is the list of a pane under compactBelow cells (D-14): a
-// marker, the short ref and the REVIEW and CI glyphs on every row. The
+// marker, the short ref and the REVIEW, MERGE and CI glyphs on every row. The
 // column-header line carries the hint to widen the pane.
 func (m Model) renderCompact() string {
 	end := min(len(m.rows), m.offset+m.visibleRows())
@@ -505,7 +506,7 @@ func (m Model) renderCompact() string {
 	return m.stack(headerStyle.Render("  PR")+faintStyle.Render("  widen for columns"), rows)
 }
 
-// compactRow draws row i as "> ref ✓✓". Each segment is styled on its own and
+// compactRow draws row i as "> ref ✓✓✓". Each segment is styled on its own and
 // the selected row's segments each carry the reverse style, so a style never
 // wraps text that already holds escape codes. A ref that does not fit is cut
 // from the left and keeps its number; when there is no room for even one cell
@@ -516,9 +517,9 @@ func (m Model) compactRow(i int) string {
 	if i == m.cursor {
 		marker = "> "
 	}
-	review, ci := pr.Review.Glyph(), pr.CI.Glyph()
+	review, merge, ci := pr.Review.Glyph(), pr.Merge.Glyph(), pr.CI.Glyph()
 	ref := shortRef(pr.Ref)
-	if budget := m.w - lipgloss.Width(marker) - 1 - lipgloss.Width(review) - lipgloss.Width(ci); m.w > 0 {
+	if budget := m.w - lipgloss.Width(marker) - 1 - lipgloss.Width(review) - lipgloss.Width(merge) - lipgloss.Width(ci); m.w > 0 {
 		if budget < 1 {
 			ref = ""
 		} else {
@@ -538,5 +539,6 @@ func (m Model) compactRow(i int) string {
 	}
 	return m.cut(base.Render(text) +
 		base.Inherit(reviewStyle(pr.Review)).Render(review) +
+		base.Inherit(mergeStyle(pr.Merge)).Render(merge) +
 		base.Inherit(ciStyle(pr.CI)).Render(ci))
 }

@@ -381,9 +381,9 @@ func TestTitleTruncatesFirst(t *testing.T) {
 }
 
 func TestTruncateBoundary(t *testing.T) {
-	cells := [][]string{
-		{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI"},
-		{">", "acme/api#1", strings.Repeat("x", 200), "alice", "open", "✓ approved", "✓ passing"},
+	cells := [][colCount]string{
+		{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "MERGE", "CI"},
+		{">", "acme/api#1", strings.Repeat("x", 200), "alice", "open", "✓ approved", "✓ mergeable", "✓ passing"},
 	}
 	var sz sizes
 	for _, row := range cells {
@@ -398,7 +398,7 @@ func TestTruncateBoundary(t *testing.T) {
 	if w < 10 || w > total {
 		t.Fatalf("TITLE width = %d", w)
 	}
-	sum := 6 // gaps
+	sum := 7 // gaps
 	for c := range lay.show {
 		if !lay.show[c] {
 			t.Fatalf("column %d is hidden at %d cells", c, total)
@@ -416,10 +416,10 @@ func TestTruncateBoundary(t *testing.T) {
 	if !strings.HasSuffix(over, "…") || lipgloss.Width(over) != w {
 		t.Errorf("title of %d cells = %q (width %d), want it to end in … and fit %d", w+1, over, lipgloss.Width(over), w)
 	}
-	// A narrow pane never takes TITLE below 10 cells: at 50 cells AUTHOR is
-	// gone and TITLE sits on its floor.
-	if l := layoutColumns(sz, 50); !l.show[colTitle] || l.width[colTitle] != 10 {
-		t.Errorf("TITLE in a 50-cell pane = shown %v, width %d, want shown at the floor of 10", l.show[colTitle], l.width[colTitle])
+	// A narrow pane never takes TITLE below 10 cells: at 44 cells AUTHOR,
+	// STATE and MERGE are gone and TITLE sits on its floor.
+	if l := layoutColumns(sz, 44); !l.show[colTitle] || l.width[colTitle] != 10 {
+		t.Errorf("TITLE in a 44-cell pane = shown %v, width %d, want shown at the floor of 10", l.show[colTitle], l.width[colTitle])
 	}
 	// Not sized yet: TITLE gets its widest cell.
 	if got := layoutColumns(sz, 0).width[colTitle]; got != 200 {

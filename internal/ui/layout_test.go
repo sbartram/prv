@@ -14,10 +14,10 @@ import (
 )
 
 // testSizes are the column sizes of a typical list: TITLE wants 40 cells and
-// the other columns 44 plus 6 gaps, so everything fits from 60 cells up.
+// the other columns 55 plus 7 gaps, so everything fits from 72 cells up.
 func testSizes() sizes {
 	var sz sizes
-	sz.natural = [colCount]int{colMarker: 1, colPR: 12, colTitle: 40, colAuthor: 6, colState: 6, colReview: 10, colCI: 9}
+	sz.natural = [colCount]int{colMarker: 1, colPR: 12, colTitle: 40, colAuthor: 6, colState: 6, colReview: 10, colMerge: 11, colCI: 9}
 	sz.min = sz.natural
 	return sz
 }
@@ -33,9 +33,10 @@ func shownCols(l layout) []int {
 }
 
 func TestLayoutColumns(t *testing.T) {
-	all := []int{colMarker, colPR, colTitle, colAuthor, colState, colReview, colCI}
-	noAuthor := []int{colMarker, colPR, colTitle, colState, colReview, colCI}
-	noState := []int{colMarker, colPR, colTitle, colReview, colCI}
+	all := []int{colMarker, colPR, colTitle, colAuthor, colState, colReview, colMerge, colCI}
+	noAuthor := []int{colMarker, colPR, colTitle, colState, colReview, colMerge, colCI}
+	noState := []int{colMarker, colPR, colTitle, colReview, colMerge, colCI}
+	noMerge := []int{colMarker, colPR, colTitle, colReview, colCI}
 	noTitle := []int{colMarker, colPR, colReview, colCI}
 
 	shortTitle := testSizes()
@@ -60,16 +61,18 @@ func TestLayoutColumns(t *testing.T) {
 		{"unsized keeps every column uncut", testSizes(), 0, all, 40, 12, 9},
 		{"negative width is unsized", testSizes(), -5, all, 40, 12, 9},
 		{"room for everything", testSizes(), 200, all, 40, 12, 9},
-		{"TITLE takes what is left", testSizes(), 70, all, 20, 12, 9},
-		{"TITLE at its minimum", testSizes(), 60, all, 10, 12, 9},
-		{"AUTHOR drops first", testSizes(), 59, noAuthor, 16, 12, 9},
-		{"AUTHOR gone, TITLE at its minimum", testSizes(), 53, noAuthor, 10, 12, 9},
-		{"STATE drops second", testSizes(), 52, noState, 16, 12, 9},
-		{"STATE gone, TITLE at its minimum", testSizes(), 46, noState, 10, 12, 9},
+		{"TITLE takes what is left", testSizes(), 82, all, 20, 12, 9},
+		{"TITLE at its minimum", testSizes(), 72, all, 10, 12, 9},
+		{"AUTHOR drops first", testSizes(), 71, noAuthor, 16, 12, 9},
+		{"AUTHOR gone, TITLE at its minimum", testSizes(), 65, noAuthor, 10, 12, 9},
+		{"STATE drops second", testSizes(), 64, noState, 16, 12, 9},
+		{"STATE gone, TITLE at its minimum", testSizes(), 58, noState, 10, 12, 9},
+		{"MERGE drops third", testSizes(), 57, noMerge, 21, 12, 9},
+		{"MERGE gone, TITLE at its minimum", testSizes(), 46, noMerge, 10, 12, 9},
 		{"TITLE drops last", testSizes(), 45, noTitle, 0, 12, 9},
 		{"only the four columns left, exactly fitting", bigPR, 53, noTitle, 0, 30, 9},
-		{"a short TITLE does not force a drop", shortTitle, 57, all, 7, 12, 9},
-		{"a short TITLE still drops AUTHOR when it must", shortTitle, 56, noAuthor, 7, 12, 9},
+		{"a short TITLE does not force a drop", shortTitle, 69, all, 7, 12, 9},
+		{"a short TITLE still drops AUTHOR when it must", shortTitle, 68, noAuthor, 7, 12, 9},
 		{"PR narrows when nothing else can", bigPR, 40, noTitle, 0, 17, 9},
 		{"CI narrows to its minimum, then PR", bigCI, 40, noTitle, 0, 15, 11},
 	} {

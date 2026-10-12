@@ -41,6 +41,15 @@ func (m Model) renderHelp() string {
 		}
 		b.WriteString(ciStyle(c).Render(c.Badge()))
 	}
+	b.WriteString("\n  merge   ")
+	merges := []domain.Merge{domain.MergeMergeable, domain.MergeBlocked, domain.MergeBehind, domain.MergeConflicts}
+	for i, mg := range merges {
+		if i > 0 {
+			b.WriteString("  ")
+		}
+		b.WriteString(mergeStyle(mg).Render(mg.Badge()))
+	}
+	b.WriteString("  – unknown or draft")
 	b.WriteString("\n  [draft] draft PR · dimmed rows are drafts, merged or closed\n\n")
 
 	b.WriteString("config " + domain.Clean(m.configPath) + " · every " + fmtInterval(m.interval) +

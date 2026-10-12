@@ -68,5 +68,13 @@ func helpStyles() help.Styles {
 
 // mergeStyle colours the MERGE badge.
 func mergeStyle(m domain.Merge) lipgloss.Style {
-	return lipgloss.NewStyle()
+	switch m {
+	case domain.MergeMergeable:
+		return lipgloss.NewStyle().Foreground(lipgloss.Green)
+	case domain.MergeBlocked, domain.MergeBehind:
+		return lipgloss.NewStyle().Foreground(lipgloss.Yellow)
+	case domain.MergeConflicts:
+		return lipgloss.NewStyle().Foreground(lipgloss.Red)
+	}
+	return faintStyle
 }
