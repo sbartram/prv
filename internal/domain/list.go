@@ -21,6 +21,47 @@ func InWindow(pr PR, now time.Time, closedDays int) bool {
 	return true
 }
 
+// Bucket returns the attention bucket of a PR (D-01); a lower number needs
+// attention sooner:
+//
+//	1 open, failing CI
+//	2 open, changes requested
+//	3 open, approved and CI passing (ready to merge)
+//	4 open, CI running
+//	5 every other open PR (this includes approved with no checks or an
+//	  unknown CI state: "no checks" never counts as passing)
+//	6 open draft
+//	7 merged
+//	8 closed
+//	9 unknown state
+//
+// Lifecycle state is checked before the draft flag (D-04 as clarified on
+// 2026-10-12): only an open draft sorts in bucket 6; a merged or closed draft
+// sorts with merged or closed PRs.
+func Bucket(pr PR) int {
+	switch pr.State {
+	case StateMerged:
+		return 7
+	case StateClosed:
+		return 8
+	case StateUnknown:
+		return 9
+	}
+	switch {
+	case pr.IsDraft:
+		return 6
+	case pr.CI == CIFailing:
+		return 1
+	case pr.Review == ReviewChangesRequested:
+		return 2
+	case pr.Review == ReviewApproved && pr.CI == CIPassing:
+		return 3
+	case pr.CI == CIRunning:
+		return 4
+	}
+	return 5
+}
+
 func stateRank(s State) int {
 	switch s {
 	case StateOpen:
