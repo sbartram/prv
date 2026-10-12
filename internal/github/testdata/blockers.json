@@ -1,0 +1,334 @@
+{
+ "data": {
+  "viewer": {
+   "login": "octo"
+  },
+  "rateLimit": {
+   "limit": 5000,
+   "cost": 2,
+   "remaining": 4998,
+   "resetAt": "2026-10-11T13:00:00Z"
+  },
+  "search": {
+   "issueCount": 12,
+   "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": "c12"
+   },
+   "nodes": [
+    {
+     "__typename": "PullRequest",
+     "id": "PR_1",
+     "number": 1,
+     "title": "clean",
+     "url": "https://github.com/acme/blockers/pull/1",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-01T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "CLEAN",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_2",
+     "number": 2,
+     "title": "has hooks",
+     "url": "https://github.com/acme/blockers/pull/2",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-02T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "HAS_HOOKS",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_3",
+     "number": 3,
+     "title": "unstable",
+     "url": "https://github.com/acme/blockers/pull/3",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-03T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "UNSTABLE",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_4",
+     "number": 4,
+     "title": "blocked",
+     "url": "https://github.com/acme/blockers/pull/4",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-04T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "BLOCKED",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_5",
+     "number": 5,
+     "title": "behind",
+     "url": "https://github.com/acme/blockers/pull/5",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-05T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "BEHIND",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_6",
+     "number": 6,
+     "title": "dirty",
+     "url": "https://github.com/acme/blockers/pull/6",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-06T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "DIRTY",
+     "mergeable": "CONFLICTING",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_7",
+     "number": 7,
+     "title": "unknown mergeable",
+     "url": "https://github.com/acme/blockers/pull/7",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-07T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "UNKNOWN",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_8",
+     "number": 8,
+     "title": "unknown conflicting",
+     "url": "https://github.com/acme/blockers/pull/8",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-08T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "UNKNOWN",
+     "mergeable": "CONFLICTING",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_9",
+     "number": 9,
+     "title": "draft blocked",
+     "url": "https://github.com/acme/blockers/pull/9",
+     "isDraft": true,
+     "state": "OPEN",
+     "createdAt": "2026-10-09T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "BLOCKED",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_10",
+     "number": 10,
+     "title": "merged unknown",
+     "url": "https://github.com/acme/blockers/pull/10",
+     "isDraft": false,
+     "state": "MERGED",
+     "createdAt": "2026-10-10T08:00:00Z",
+     "closedAt": "2026-10-10T09:00:00Z",
+     "mergedAt": "2026-10-10T09:00:00Z",
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "UNKNOWN",
+     "mergeable": "UNKNOWN",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_11",
+     "number": 11,
+     "title": "closed dirty",
+     "url": "https://github.com/acme/blockers/pull/11",
+     "isDraft": false,
+     "state": "CLOSED",
+     "createdAt": "2026-10-11T08:00:00Z",
+     "closedAt": "2026-10-09T09:00:00Z",
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "DIRTY",
+     "mergeable": "CONFLICTING",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_12",
+     "number": 12,
+     "title": "future value",
+     "url": "https://github.com/acme/blockers/pull/12",
+     "isDraft": false,
+     "state": "OPEN",
+     "createdAt": "2026-10-12T08:00:00Z",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T08:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/blockers"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "mergeStateStatus": "FUTURE_VALUE",
+     "mergeable": "MERGEABLE",
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    }
+   ]
+  }
+ }
+}

@@ -421,6 +421,38 @@ func TestRateLimitDecoded(t *testing.T) {
 	}
 }
 
+// TestMergeMapping: Fetch maps mergeStateStatus and mergeable through
+// DeriveMerge, deciding state and draft first (D-07, RESEARCH F4/F5).
+func TestMergeMapping(t *testing.T) {
+	c, tr := newFixtureClient(t, "blockers.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]domain.Merge{
+		1: domain.MergeMergeable, 2: domain.MergeMergeable, 3: domain.MergeMergeable,
+		4: domain.MergeBlocked, 5: domain.MergeBehind, 6: domain.MergeConflicts,
+		7: domain.MergeUnknown, 8: domain.MergeConflicts, 9: domain.MergeUnknown,
+		10: domain.MergeNone, 11: domain.MergeNone, 12: domain.MergeUnknown,
+	}
+	if len(snap.PRs) != len(want) {
+		t.Fatalf("PRs = %d, want %d", len(snap.PRs), len(want))
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Merge; got != want[pr.Ref.Number] {
+			t.Errorf("PR %d Merge = %q, want %q", pr.Ref.Number, got.Badge(), want[pr.Ref.Number].Badge())
+		}
+	}
+	if len(tr.failBodies) != 0 {
+		t.Errorf("FailingChecks requests = %d, want 0 (no failing rollup in the fixture)", len(tr.failBodies))
+	}
+	for _, field := range []string{"mergeStateStatus mergeable"} {
+		if !strings.Contains(string(tr.bodies[0]), field) {
+			t.Errorf("the discovery query must request %q", field)
+		}
+	}
+}
+
 // TestNoFailingNoRequest: a refresh in which no listed PR has a FAILURE or
 // ERROR rollup sends no FailingChecks request (D-01).
 func TestNoFailingNoRequest(t *testing.T) {

@@ -95,6 +95,8 @@ type PR struct {
 	// Failing is the failing check named in the CI cell (LIST-07); the zero
 	// value shows the plain badge.
 	Failing FailingCheck
+	// Merge is the merge-readiness (LIST-06); the zero value is a blank cell.
+	Merge Merge
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
