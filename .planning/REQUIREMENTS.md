@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Watch list
 
-- [ ] **WATCH-01**: PRs the user authored appear on the list automatically
-- [ ] **WATCH-02**: PRs assigned to the user appear on the list automatically
-- [ ] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
+- [x] **WATCH-01**: PRs the user authored appear on the list automatically
+- [x] **WATCH-02**: PRs assigned to the user appear on the list automatically
+- [x] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
 - [ ] **WATCH-04**: User can add a PR by pasting a github.com PR URL or `owner/repo#123`; invalid or inaccessible PRs show an error and are not saved
 - [ ] **WATCH-05**: Manually added PRs are saved locally and reappear after restart
 - [ ] **WATCH-06**: User can remove a manually added PR
@@ -19,11 +19,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### List display
 
-- [ ] **LIST-01**: Each row shows repo, PR number, title, author, and a draft marker
-- [ ] **LIST-02**: Each row shows state: Open, Merged, or Closed
-- [ ] **LIST-03**: Each row shows review status: approved, changes requested, review required, or no review status. Repos without required reviews still show approved or changes requested based on actual reviews, and never show "review required" by mistake
+- [x] **LIST-01**: Each row shows repo, PR number, title, author, and a draft marker
+- [x] **LIST-02**: Each row shows state: Open, Merged, or Closed
+- [x] **LIST-03**: Each row shows review status: approved, changes requested, review required, or no review status. Repos without required reviews still show approved or changes requested based on actual reviews, and never show "review required" by mistake
 - [ ] **LIST-04**: Each row shows reviewers who approved or requested changes, and reviewers still pending
-- [ ] **LIST-05**: Each row shows one CI badge: passing, failing, running, or no checks. A PR with no checks never shows as passing
+- [x] **LIST-05**: Each row shows one CI badge: passing, failing, running, or no checks. A PR with no checks never shows as passing
 - [ ] **LIST-06**: Each row shows merge-readiness: mergeable, blocked, behind, or conflicts
 - [ ] **LIST-07**: For failing PRs, the row shows the name of a failing check
 - [ ] **LIST-08**: List is sorted by need for attention (failing CI / changes requested first) in a stable order that does not shuffle between refreshes
@@ -52,16 +52,16 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: User can move through the list with j/k and the arrow keys
+- [x] **NAV-01**: User can move through the list with j/k and the arrow keys
 - [ ] **NAV-02**: User can press `o` to open the selected PR in the browser
 - [ ] **NAV-03**: User can press `?` to see key bindings
-- [ ] **NAV-04**: User can quit with `q`
+- [x] **NAV-04**: User can quit with `q`
 - [ ] **NAV-05**: Layout adapts to terminal resizes and stays usable in narrow panes
 
 ### Auth & config
 
-- [ ] **AUTH-01**: Uses the same token `gh` would: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login
-- [ ] **AUTH-02**: If no token is found, prv exits with a clear message explaining how to log in
+- [x] **AUTH-01**: Uses the same token `gh` would: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login
+- [x] **AUTH-02**: If no token is found, prv exits with a clear message explaining how to log in
 - [ ] **AUTH-03**: The token is never logged, displayed, or written to disk
 - [ ] **CONF-01**: Settings (refresh interval, closed window) are read from `~/.config/prv/config.toml`, with defaults if the file is missing
 - [ ] **CONF-02**: `go install github.com/sbartram/prv/cmd/prv@latest` installs a working binary, and `prv --version` prints its version
@@ -122,18 +122,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WATCH-01 | Phase 1 | Pending |
-| WATCH-02 | Phase 1 | Pending |
-| WATCH-03 | Phase 1 | Pending |
+| WATCH-01 | Phase 1 | Complete |
+| WATCH-02 | Phase 1 | Complete |
+| WATCH-03 | Phase 1 | Complete |
 | WATCH-04 | Phase 4 | Pending |
 | WATCH-05 | Phase 4 | Pending |
 | WATCH-06 | Phase 4 | Pending |
 | WATCH-07 | Phase 4 | Pending |
-| LIST-01 | Phase 1 | Pending |
-| LIST-02 | Phase 1 | Pending |
-| LIST-03 | Phase 1 | Pending |
+| LIST-01 | Phase 1 | Complete |
+| LIST-02 | Phase 1 | Complete |
+| LIST-03 | Phase 1 | Complete |
 | LIST-04 | Phase 3 | Pending |
-| LIST-05 | Phase 1 | Pending |
+| LIST-05 | Phase 1 | Complete |
 | LIST-06 | Phase 3 | Pending |
 | LIST-07 | Phase 3 | Pending |
 | LIST-08 | Phase 2 | Pending |
@@ -150,13 +150,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RFSH-04 | Phase 2 | Pending |
 | RFSH-05 | Phase 2 | Pending |
 | RFSH-06 | Phase 2 | Pending |
-| NAV-01 | Phase 1 | Pending |
+| NAV-01 | Phase 1 | Complete |
 | NAV-02 | Phase 2 | Pending |
 | NAV-03 | Phase 2 | Pending |
-| NAV-04 | Phase 1 | Pending |
+| NAV-04 | Phase 1 | Complete |
 | NAV-05 | Phase 3 | Pending |
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
+| AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Pending |
 | CONF-01 | Phase 2 | Pending |
 | CONF-02 | Phase 1 | Pending |

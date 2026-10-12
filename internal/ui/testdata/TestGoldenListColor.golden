@@ -1,0 +1,9 @@
+prv · @octo · 6 PRs
+[1m[m  [1mPR[m           [1mTITLE[m                       [1mAUTHOR[m [1mSTATE[m  [1mREVIEW[m     [1mCI[m         
+[7m>[m[7m [m[7macme/api#101[m[7m [m[7mAdd retry to the client[m[7m [m[7m    [m[7mme[m[7m [m[7m    [m[7mopen[m[7m [m[7m  [m[7;32m✓ approved[m[7;32m [m[7;32m✓ passing[m[7;32m  [m
+  acme/api#102 Rework the cache layer      alice  open   [31m✗ changes[m  [31m✗ failing[m  
+[2m [m [2macme/web#7[m   [2m[draft] Spike a new sidebar[m [2mme[m     [2mopen[m   [2m– none[m     [2;33m● running[m  
+[2m [m [2macme/web#6[m   [2mFix the login redirect[m      [2mbob[m    [2mmerged[m [2;32m✓ approved[m [2;32m✓ passing[m  
+[2m [m [2macme/docs#3[m  [2mDrop the old guide[m          [2mme[m     [2mclosed[m [2;33m○ required[m [2m– no checks[m
+  acme/docs#2  Typo in the readme          carol  open   [2m– none[m     [2m? unknown[m  
+j/k move · q quit

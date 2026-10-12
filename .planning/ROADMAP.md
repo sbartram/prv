@@ -34,17 +34,17 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Early gate**: Run the live-verification spike (research/SUMMARY.md, "Live-Verification Spike", all 10 questions, via `gh api graphql`) before the discovery query, review derivation, and token resolution are frozen. Record the findings in the phase directory. Q1, Q4, Q5, and Q8 decide this phase: discovery shape (C2), the latestOpinionatedReviews fallback (C4), and token precedence. Q2, Q7, Q9, and Q10 feed the Phase 3 contexts decision (C3). Q3 and Q6 feed the Phase 4 per-alias error handling.
 **Pitfalls first addressed here**: A null `reviewDecision` is derived from latestOpinionatedReviews and never maps to "review required". A null `statusCheckRollup` maps to "no checks". One total mapping covers CheckRun and StatusContext, with an unknown case, and CANCELLED/NEUTRAL/SKIPPED are never red. Recorded GraphQL fixtures cover these cases plus comment-after-approve. Read the raw GraphQL envelope (partial data plus `errors[]`). Dedupe by node ID. The 14-day closed window is a fixed default in the discovery query until Phase 2 makes it configurable. Strip control characters and ANSI from remote strings. No I/O in Update/View. Do not log the token (`LogIgnoreEnv`). Data is fetched once at launch; auto-refresh arrives in Phase 2.
-**Plans**: 4 plans
+**Plans**: 3/4 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Walking skeleton: tracer (token, live ISSUE_ADVANCED search, Bubble Tea v2 list, j/k/q, --version, no-token exit) + review/CI badges and remote-string sanitising
+- [x] 01-01-PLAN.md — Walking skeleton: tracer (token, live ISSUE_ADVANCED search, Bubble Tea v2 list, j/k/q, --version, no-token exit) + review/CI badges and remote-string sanitising
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01-02-PLAN.md — Right PRs once each in D-06 order (paging, dedupe, exact window) + loading/error/empty states with hints, r retry, token hygiene
+- [x] 01-02-PLAN.md — Right PRs once each in D-06 order (paging, dedupe, exact window) + loading/error/empty states with hints, r retry, token hygiene
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 01-03-PLAN.md — Readable rows: ANSI-16 badge colours, dimmed drafts/merged/closed, explicit widths (TITLE first), scrolling, golden snapshots
+- [x] 01-03-PLAN.md — Readable rows: ANSI-16 badge colours, dimmed drafts/merged/closed, explicit widths (TITLE first), scrolling, golden snapshots
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-04-PLAN.md — README + automated release gate (local go install, --version, hygiene) + user-gated go install @latest checkpoint
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Status at a Glance | 0/4 | Not started | - |
+| 1. Status at a Glance | 3/4 | In Progress | - |
 | 2. Live Monitoring | 0/TBD | Not started | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |

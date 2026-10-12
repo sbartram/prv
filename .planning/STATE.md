@@ -3,15 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Status at a Glance
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-10-12T00:22:04.224Z"
-last_activity: "2026-10-11: Roadmap created (4 phases, 38/38 v1 requirements mapped)"
-state_head: 3d753f57951d8f8e21b6d518f7a9f60b9c0e25ae
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-10-12T00:44:29.366Z"
+last_activity: 2026-10-11
+last_activity_desc: Phase 01 execution started
+state_head: 95231fcf23eda79bfc6d5f744849ae15796362a0
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 3
   percent: 0
 ---
 
@@ -22,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-11)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Phase 1: Status at a Glance
+**Current focus:** Phase 01 — Status at a Glance
 
 ## Current Position
 
-Phase: 01 (Status at a Glance) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
+Phase: 01 (Status at a Glance) — EXECUTING
+Plan: 4 of 4
 Status: Ready to execute
-Last activity: 2026-10-11: Roadmap created (4 phases, 38/38 v1 requirements mapped)
+Last activity: 2026-10-11 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -51,6 +52,13 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P01 | 6 min | 2 tasks | 13 files |
+| Phase 01 P02 | 4 min | 2 tasks | 11 files |
+| Phase 01 P03 | 12min | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -64,6 +72,12 @@ Recent decisions affecting current work:
 - [Research C1]: Resolved. Token order is GH_TOKEN → GITHUB_TOKEN → gh login (go-gh TokenForHost), per PROJECT.md. Spike Q5 confirms it on the installed gh.
 - [Research C5]: Resolved. Manually added PRs are exempt from the closed window (WATCH-07).
 - [Research C2/C4]: Defaults recorded in REQUIREMENTS.md (single ISSUE_ADVANCED search; latestOpinionatedReviews fallback). The Phase 1 spike confirms or overturns them.
+- [Phase 01]: go-gh defangs C0 control characters in API responses (ESC becomes visible ^[), so domain.Clean at the mapper seam is a second layer, tested through the client and directly
+- [Phase 01]: State zero value is StateOpen per the plan interface order; unknown remote states map to StateUnknown via ParseState and are never shown as open
+- [Phase 01]: 01-02: a GraphQL error on page 2 or later discards that page; earlier pages stay and the list is marked truncated
+- [Phase 01]: 01-02: API error messages are not token-scrubbed; built from status, fixed strings and domain.Clean(API message)
+- [Phase 01]: 01-03: TITLE width is max(10, min(widest title, space left)); narrow panes cut at the right edge until NAV-05
+- [Phase 01]: 01-03: list view has no blank lines (header, column row, rows, footer) so visible rows = height - 3
 
 ### Pending Todos
 
@@ -85,6 +99,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T22:15:03.082Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-status-at-a-glance/01-CONTEXT.md
+Last session: 2026-10-12T00:44:29.348Z
+Stopped at: Completed 01-03-PLAN.md
+Resume file: None
