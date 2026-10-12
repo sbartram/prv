@@ -112,7 +112,24 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+- [ ] 03-01-PLAN.md — Tracer: a failing PR's row names its failing check (✗ lint +2) through the D-01 two-step fetch; re-runs collapsed, cancelled-only marker, never a guessed name (D-01..D-04)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — Narrow panes for the list: pure layoutColumns with the D-13 drop order, compact rows below 40 cells, resize and never-overflow property test, 60x15 goldens (D-13, D-14)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md — MERGE column (state and draft first, UNKNOWN+CONFLICTING) and REVIEWERS column (pending wins, hidden teams, +N), both in the D-13 drop order (D-05..D-07)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 03-04-PLAN.md — enter opens a full-screen detail: every check failing first, every reviewer, fold with e, paged contexts and an honest summary; esc returns to the same PR (D-08..D-10)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 03-05-PLAN.md — The open detail refreshes with the list, drops stale results, respects pauses, says "no longer in list" when its PR leaves; fits any pane and every detail state has goldens (D-11, D-12, D-14)
+
 **UI hint**: yes
 
 ### Phase 4: Curated Watch List
@@ -140,5 +157,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
-| 3. Blocker Detail | 0/TBD | Not started | - |
+| 3. Blocker Detail | 0/5 | Planned | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |
