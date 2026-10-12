@@ -24,6 +24,9 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) render() string {
+	if m.showHelp {
+		return m.renderHelp()
+	}
 	switch m.state {
 	case stateLoading:
 		return m.wrap(m.spin.View() + " Fetching your PRs…")

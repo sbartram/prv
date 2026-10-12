@@ -78,6 +78,10 @@ type Model struct {
 	prompting bool
 	pkeys     promptKeys
 
+	// showHelp is true while the full-screen help overlay is open (D-17).
+	// Refreshes carry on behind it.
+	showHelp bool
+
 	// Selection is tracked by PR ref (D-03). selected is the source of truth;
 	// rebuild derives cursor from it after every snapshot. rows is what is on
 	// screen: snap.PRs after the filters.
@@ -181,6 +185,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rebuild()
 		}
 	case tea.KeyPressMsg:
+		if m.showHelp {
+			// D-17: any key returns to the list and is consumed; q closes the
+			// overlay rather than quitting. Only ctrl+c still quits.
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m.showHelp = false
+			return m, nil
+		}
 		if m.prompting {
 			m.promptKey(msg)
 			if msg.String() == "ctrl+c" {
@@ -191,6 +204,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case bkey.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
+		case bkey.Matches(msg, m.keys.Help):
+			m.showHelp = true
 		case bkey.Matches(msg, m.keys.Refresh):
 			if m.inFlight {
 				return m, nil // merges with the running refresh

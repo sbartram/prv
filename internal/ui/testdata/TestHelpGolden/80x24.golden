@@ -1,0 +1,17 @@
+prv — keys and badges
+
+k/↑ up         /   PR #       ? help
+j/↓ down       esc clear #    q quit
+r   refresh    1   open
+               2   merged
+               3   closed
+
+Badges
+  review  ✓ approved  ✗ changes  ○ required  – none
+  ci      ✓ passing  ✗ failing  ● running  – no checks  ? unknown
+  [draft] draft PR · dimmed rows are drafts, merged or closed
+
+config ~/.config/prv/config.toml · every 60s · 14 days
+api 4812 / 5000, resets 15:02
+
+press any key to return
