@@ -65,7 +65,23 @@ Plans:
   5. User can press `o` to open the selected PR in the browser and `?` to see the key bindings screen.
 
 **Pitfalls first addressed here**: Single-flight refresh with one tick chain that re-arms after each result. A generation counter drops stale ticks and results, and a manual `r` coalesces with an in-flight refresh. Selection is tracked by PR ref (owner/repo#n), not by row index, with a nearest-neighbour fallback. The sort is stable on a key that polling does not change. Every query includes `rateLimit { cost remaining resetAt }`. Backoff honours retry-after, then resetAt, then a bounded exponential. Cancel the context on quit. Wrap Cmds so that a panic is caught. Logs go to a file only. Open only `https://github.com` URLs, through go-gh `pkg/browser` in a `tea.Cmd`. Verify with a counting fake client over a simulated hour with `-race`.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+- [ ] 02-01-PLAN.md — Tracer: auto-refresh on the config.toml interval with "updated HH:MM:SS"; r refreshes from any screen, single-flight with a generation counter; a failed refresh keeps the rows (D-07 marker), first-fetch failure retries (D-09); header/footer priority composer (WR-02, WR-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 02-02-PLAN.md — Rate limit: faint "api N" footer and yellow <20% warning; NextDelay backoff (retry-after, resetAt, bounded exponential, pacing); pause with r refusal; HTTP-200 primary and 403/429 secondary limit detection; simulated-hour test
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 02-03-PLAN.md — Attention sort (D-01..D-04, createdAt tie-break) and selection that follows the PR by ref with a nearest-neighbour fallback
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 02-04-PLAN.md — Open/Merged/Closed toggles (1/2/3) with header indicator and hidden count, PR-number prompt (/), filtered-empty message (D-13)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 02-05-PLAN.md — config.toml complete (closed_days, show, line-numbered errors, unknown-key warnings, --closed-days precedence in 1..365), ? help overlay from the keymap, o opens the selected PR on github.com
 **UI hint**: yes
 
 ### Phase 3: Blocker Detail
@@ -109,6 +125,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
-| 2. Live Monitoring | 0/TBD | Not started | - |
+| 2. Live Monitoring | 0/5 | Planned | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |
