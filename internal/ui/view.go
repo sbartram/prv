@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -21,9 +23,30 @@ func (m Model) render() string {
 	case stateLoading:
 		return m.spin.View() + " Fetching your PRs…"
 	case stateError:
-		return "Could not load your PRs\n\n" + m.err.Error() + "\n\nq quit"
+		return m.renderError()
+	case stateEmpty:
+		return fmt.Sprintf("No open PRs authored by or assigned to @%s, and none closed in the last %d days.\n\nq quit",
+			m.snap.Viewer, m.opts.ClosedDays)
 	}
 	return m.renderList()
+}
+
+// hinter is implemented by errors that know how to tell the user what to do.
+// It is declared here so that ui never imports internal/github.
+type hinter interface{ Hint() string }
+
+func (m Model) renderError() string {
+	var b strings.Builder
+	b.WriteString("Could not load your PRs\n\n")
+	b.WriteString(m.err.Error())
+	var h hinter
+	if errors.As(m.err, &h) {
+		if hint := h.Hint(); hint != "" {
+			b.WriteString("\n\n" + hint)
+		}
+	}
+	b.WriteString("\n\nr retry · q quit")
+	return b.String()
 }
 
 func (m Model) renderList() string {
@@ -62,5 +85,11 @@ func (m Model) renderList() string {
 		})
 	b.WriteString(t.String())
 	b.WriteString("\n\nj/k move · q quit")
+	if m.snap.Truncated {
+		b.WriteString(" · list truncated")
+	}
+	if len(m.snap.Warnings) > 0 {
+		b.WriteString(" · some data could not be loaded")
+	}
 	return b.String()
 }

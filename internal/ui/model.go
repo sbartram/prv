@@ -5,6 +5,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -27,6 +28,7 @@ type viewState int
 const (
 	stateLoading viewState = iota
 	stateList
+	stateEmpty
 	stateError
 )
 
@@ -65,8 +67,16 @@ type fetchedMsg struct {
 	err  error
 }
 
+// fetchCmd runs one fetch. A panic inside the fetcher becomes an error with a
+// fixed message: the panic value is never shown, and the terminal is not left
+// in the alt screen.
 func (m Model) fetchCmd() tea.Cmd {
-	return func() tea.Msg {
+	return func() (msg tea.Msg) {
+		defer func() {
+			if recover() != nil {
+				msg = fetchedMsg{err: errors.New("unexpected internal error while loading PRs")}
+			}
+		}()
 		snap, err := m.fetcher.Fetch(m.ctx)
 		return fetchedMsg{snap: snap, err: err}
 	}
@@ -84,12 +94,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "r":
+			if m.state == stateError && !m.loading {
+				m.state = stateLoading
+				m.loading = true
+				return m, tea.Batch(m.spin.Tick, m.fetchCmd())
+			}
 		case "j", "down":
-			if m.cursor < len(m.snap.PRs)-1 {
+			if m.state == stateList && m.cursor < len(m.snap.PRs)-1 {
 				m.cursor++
 			}
 		case "k", "up":
-			if m.cursor > 0 {
+			if m.state == stateList && m.cursor > 0 {
 				m.cursor--
 			}
 		}
@@ -102,6 +118,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case fetchedMsg:
+		if errors.Is(msg.err, context.Canceled) {
+			return m, nil // the program is quitting
+		}
 		m.loading = false
 		m.cursor = 0
 		if msg.err != nil {
@@ -109,9 +128,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.state = stateList
 		m.err = nil
 		m.snap = msg.snap
+		if len(msg.snap.PRs) == 0 {
+			m.state = stateEmpty
+			return m, nil
+		}
+		m.state = stateList
 	}
 	return m, nil
 }

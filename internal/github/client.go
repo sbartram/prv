@@ -5,6 +5,7 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -144,8 +145,29 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 	seen := map[string]bool{}
 	for page := 1; page <= maxPages; page++ {
 		var resp wireResp
-		if err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp); err != nil {
-			return domain.Snapshot{}, fmt.Errorf("fetching PRs: %w", err)
+		err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp)
+		if err != nil {
+			if page > 1 {
+				if errors.Is(err, context.Canceled) {
+					return domain.Snapshot{}, err
+				}
+				// Earlier pages stay on screen, and the list says it is partial.
+				snap.Truncated = true
+				snap.Warnings = addWarning(snap.Warnings, "Only part of the list could be loaded")
+				break
+			}
+			// GitHub reports errors together with data: show the rows that loaded.
+			var ge *api.GraphQLError
+			if !errors.As(err, &ge) || (resp.Viewer.Login == "" && len(resp.Search.Nodes) == 0) {
+				return domain.Snapshot{}, classify(err)
+			}
+			msg := "Some data could not be loaded"
+			if len(ge.Errors) > 0 {
+				if m := domain.Clean(ge.Errors[0].Message); m != "" {
+					msg += ": " + m
+				}
+			}
+			snap.Warnings = addWarning(snap.Warnings, msg)
 		}
 		pageSnap := mapResponse(resp)
 		if page == 1 {
@@ -177,6 +199,14 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 	})
 	domain.Sort(snap.PRs)
 	return snap, nil
+}
+
+// addWarning appends msg unless it is already present.
+func addWarning(ws []string, msg string) []string {
+	if slices.Contains(ws, msg) {
+		return ws
+	}
+	return append(ws, msg)
 }
 
 func mapResponse(resp wireResp) domain.Snapshot {
