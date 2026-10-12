@@ -11,6 +11,12 @@ import (
 	"charm.land/lipgloss/v2/table"
 )
 
+// Table column indexes.
+const (
+	colReview = 5
+	colCI     = 6
+)
+
 // View renders the current state. The alt screen is declared here in v2.
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
@@ -80,8 +86,26 @@ func (m Model) renderList() string {
 		BorderColumn(false).BorderHeader(false).BorderRow(false).
 		Headers("", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI").
 		Rows(rows...).
-		StyleFunc(func(_, _ int) lipgloss.Style {
-			return lipgloss.NewStyle().PaddingRight(2)
+		StyleFunc(func(row, col int) lipgloss.Style {
+			base := lipgloss.NewStyle().PaddingRight(2)
+			if row == table.HeaderRow {
+				return base.Inherit(headerStyle)
+			}
+			pr := m.snap.PRs[row]
+			s := base
+			if dimmed(pr) {
+				s = s.Faint(true)
+			}
+			switch col {
+			case colReview:
+				s = s.Inherit(reviewStyle(pr.Review))
+			case colCI:
+				s = s.Inherit(ciStyle(pr.CI))
+			}
+			if row == m.cursor {
+				s = s.Inherit(selectedStyle)
+			}
+			return s
 		})
 	b.WriteString(t.String())
 	b.WriteString("\n\nj/k move · q quit")
