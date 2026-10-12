@@ -100,6 +100,14 @@ func (m Model) notes() []string {
 	return notes
 }
 
+// warning is the config-warning text while its 8 s are running, else "".
+func (m Model) warning() string {
+	if len(m.warnings) == 0 || !m.now().Before(m.warnUntil) {
+		return ""
+	}
+	return strings.Join(m.warnings, " · ")
+}
+
 // bottom is the last line of every screen that has rows or a filter: the
 // number prompt while it is open, otherwise the footer. The prompt replaces
 // the footer, so it never costs a list row (chromeLines stays 3).
@@ -140,10 +148,13 @@ func (m Model) footer() string {
 	if m.w <= 0 {
 		// Not sized yet: nothing is cut or padded.
 		h.SetWidth(0)
+		if w := m.warning(); w != "" {
+			line = join(line, warnStyle.Render(w))
+		}
 		return join(join(line, h.ShortHelpView(m.keys.ShortHelp())), api)
 	}
 
-	avail := m.w // cells left for the notes and hints
+	avail := m.w // cells left for the notes, the warning and the hints
 	if api != "" {
 		avail -= lipgloss.Width(api) + 1 // and one space before the api segment
 	}
@@ -158,9 +169,15 @@ func (m Model) footer() string {
 		if line != "" {
 			room -= lipgloss.Width(line) + lipgloss.Width(sep)
 		}
+		// The config warning outranks the key hints but never the notes (D-15).
+		if w := m.warning(); w != "" && room >= 12 {
+			w = ansi.Truncate(w, room, "…")
+			left = join(left, warnStyle.Render(w))
+			room -= lipgloss.Width(w) + lipgloss.Width(sep)
+		}
 		if room >= 8 { // less is too little room for a useful hint
 			h.SetWidth(room)
-			left = join(line, h.ShortHelpView(m.keys.ShortHelp()))
+			left = join(left, h.ShortHelpView(m.keys.ShortHelp()))
 		}
 	}
 	if api == "" {
@@ -300,6 +317,9 @@ func (m Model) renderError() string {
 		b.WriteString("\n\npaused until " + m.clock(m.pausedUntil, "15:04") + " (rate limit)")
 	} else if !m.nextAt.IsZero() {
 		b.WriteString("\n\nretrying at " + m.clock(m.nextAt, "15:04"))
+	}
+	if w := m.warning(); w != "" {
+		b.WriteString("\n\n" + warnStyle.Render(w))
 	}
 	b.WriteString("\n\nr retry · q quit")
 	return b.String()

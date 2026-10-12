@@ -29,10 +29,16 @@ const defaultInterval = 60 * time.Second
 // at most 7 digits in practice; a longer prefix matches nothing anyway.
 const maxFilterDigits = 7
 
+// warnFor is how long the config warnings stay on screen, counted from the
+// first fetch result: the loading screen has no footer to show them in.
+const warnFor = 8 * time.Second
+
 // Options configures the model.
 type Options struct {
 	ClosedDays int
 	Show       domain.StateSet  // states visible at launch; zero means domain.AllStates (D-12)
+	ConfigPath string           // display form of the config path, for the help overlay
+	Warnings   []string         // config warnings, shown for warnFor from the first fetch result (D-15)
 	Interval   time.Duration    // zero means defaultInterval
 	Now        func() time.Time // nil means time.Now
 }
@@ -99,6 +105,13 @@ type Model struct {
 	pausedUntil time.Time
 	flash       string
 	flashUntil  time.Time
+
+	// Config warnings (D-15) have their own fields and footer segment, so a
+	// flash never overwrites them and they never hide a flash. warnUntil is
+	// zero until the first fetch result starts the clock.
+	configPath string
+	warnings   []string
+	warnUntil  time.Time
 }
 
 // backoffer is implemented by errors that know when to retry. ui declares it
@@ -131,19 +144,21 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 		show = domain.AllStates
 	}
 	return Model{
-		show:     show,
-		ctx:      ctx,
-		fetcher:  f,
-		opts:     opts,
-		keys:     defaultKeys(),
-		pkeys:    defaultPromptKeys(),
-		help:     h,
-		state:    stateLoading,
-		inFlight: true,
-		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
-		interval: interval,
-		now:      now,
-		after:    afterTick,
+		show:       show,
+		warnings:   opts.Warnings,
+		ctx:        ctx,
+		fetcher:    f,
+		opts:       opts,
+		keys:       defaultKeys(),
+		pkeys:      defaultPromptKeys(),
+		help:       h,
+		state:      stateLoading,
+		inFlight:   true,
+		spin:       spinner.New(spinner.WithSpinner(spinner.Dot)),
+		interval:   interval,
+		configPath: opts.ConfigPath,
+		now:        now,
+		after:      afterTick,
 	}
 }
 
@@ -253,12 +268,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.lastOK.IsZero() {
 				// Data has been shown: keep the rows and the state, undimmed.
 				m.failedAt = m.now()
-				return m, m.schedule(msg.err)
+				return m, tea.Batch(m.schedule(msg.err), m.startWarning())
 			}
 			// No data yet: the error panel, and the tick retries on its own.
 			m.cursor, m.offset = 0, 0
 			m.state = stateError
-			return m, m.schedule(msg.err)
+			return m, tea.Batch(m.schedule(msg.err), m.startWarning())
 		}
 		m.err = nil
 		m.failedAt = time.Time{}
@@ -270,9 +285,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = stateList
 		}
-		return m, m.schedule(nil)
+		return m, tea.Batch(m.schedule(nil), m.startWarning())
 	}
 	return m, nil
+}
+
+// startWarning starts the config-warning clock on the first fetch result and
+// returns the Cmd that redraws the screen when the warning expires. Later
+// results return nil, so the warnings show once (D-15).
+func (m *Model) startWarning() tea.Cmd {
+	if len(m.warnings) == 0 || !m.warnUntil.IsZero() {
+		return nil
+	}
+	m.warnUntil = m.now().Add(warnFor)
+	return m.after(warnFor, redrawMsg{})
 }
 
 // promptKey handles one key press while the number prompt is open (D-11).

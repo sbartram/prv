@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/cli/go-gh/v2/pkg/auth"
@@ -62,21 +63,26 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "prv "+buildVersion())
 		return 0
 	}
-	if *closedDays < 1 {
-		fmt.Fprintln(stderr, "prv: --closed-days must be at least 1")
+	if *closedDays < config.MinClosedDays || *closedDays > config.MaxClosedDays {
+		fmt.Fprintln(stderr, "prv: --closed-days must be between 1 and 365")
 		return 2
 	}
 
 	// A broken config stops prv before the token lookup and the TUI. When the
 	// path itself cannot be found there is no config to read: keep the defaults.
+	// The file is read once, here; edits while prv runs need a restart.
 	cfg := config.Default()
+	shownPath := ""
 	if path, err := configPath(); err == nil {
 		cfg, err = config.Load(path)
 		if err != nil {
 			fmt.Fprintln(stderr, "prv: "+err.Error())
 			return 2
 		}
+		shownPath = path
 	}
+	home, _ := os.UserHomeDir() // an error leaves home empty: no substitution
+	days := effectiveClosedDays(fs, *closedDays, cfg)
 
 	// The token goes only into github.Options.Token. It is never printed,
 	// logged or written. Missing means exactly the empty string.
@@ -85,7 +91,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, noTokenMessage)
 		return 1
 	}
-	client, err := github.NewClient(github.Options{Token: token, ClosedDays: *closedDays})
+	client, err := github.NewClient(github.Options{Token: token, ClosedDays: days})
 	if err != nil {
 		fmt.Fprintln(stderr, "prv: "+err.Error())
 		return 1
@@ -93,10 +99,42 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p := tea.NewProgram(ui.New(ctx, client, ui.Options{ClosedDays: *closedDays, Interval: cfg.Interval}), tea.WithContext(ctx))
+	p := tea.NewProgram(ui.New(ctx, client, ui.Options{
+		ClosedDays: days,
+		Interval:   cfg.Interval,
+		Show:       cfg.Show,
+		Warnings:   cfg.Warnings,
+		ConfigPath: displayPath(shownPath, home),
+	}), tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, "prv: "+err.Error())
 		return 1
 	}
 	return 0
+}
+
+// effectiveClosedDays is the closed window in days: the --closed-days flag
+// when it was given, else closed_days from the config, else the default (D-16).
+func effectiveClosedDays(fs *flag.FlagSet, flagValue int, cfg config.Config) int {
+	set := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "closed-days" {
+			set = true
+		}
+	})
+	if set {
+		return flagValue
+	}
+	return cfg.ClosedDays
+}
+
+// displayPath shortens a path under home to "~/...". An empty path is "none".
+func displayPath(path, home string) string {
+	if path == "" {
+		return "none"
+	}
+	if home != "" && strings.HasPrefix(path, home+"/") {
+		return "~" + path[len(home):]
+	}
+	return path
 }
