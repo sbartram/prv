@@ -279,6 +279,7 @@ If the PR's rollup is failing but the de-duplicated set holds no failing or canc
 - Triggers: `enter` on the list (immediate), and the success branch of `fetchedMsg` while the detail view is open and no detail fetch is in flight. State: `detailSeq int`, `detailInFlight bool`. A `detailMsg` whose `seq != m.detailSeq` or whose `ref != m.detail.ref` is dropped (stale after `esc` + another `enter`).
 - This is the one deliberate reading of D-11: user-visible behaviour is identical ("one small query per tick, only while open"), but the detail query is a second sequenced Cmd rather than part of the first Cmd, because an `enter` pressed during an in-flight refresh must not wait for the next tick (see Open Question 6).
 - Pagination: `contexts(first:100, after: $after)` loop in `FetchDetail`, at most 5 pages (same cap as `maxPages`, client.go:144); `Detail.Truncated` set when the cap is hit. Summary line: from de-duplicated contexts when complete, otherwise from `checkRunCountsByState` + `statusContextCountsByState` with a trailing marker, because past the cap counts are the only complete data (D-08).
+  - *Superseded at plan revision (2026-10-12):* D-03 requires de-duplicated counts at every size, so GitHub's per-state counts are not used anywhere. Past the 5-page cap, the summary counts the de-duplicated contexts that were read and says how many runs were read of how many exist (plans 03-06 and 03-07).
 - Errors: keep the last `Detail`, set `detailErr`, show a faint `✗ could not refresh details` line (Phase 2 D-07 style). A rate-limit error from the detail Cmd should also set `pausedUntil` through the same `backoffer` interface used by `schedule`.
 
 ### Pattern 4: Pure column layout (NAV-05)
@@ -360,7 +361,7 @@ type detailState struct {
 ### Pitfall 1: Stale superseded runs inflate the failing count
 **What goes wrong:** `+21` on a PR with one real failure; the detail summary says "21 failing".
 **Why:** contexts and per-state counts include every workflow run on the commit (F1).
-**How to avoid:** `LatestChecks` before any count or name; counts only as a labelled fallback when paging is capped.
+**How to avoid:** `LatestChecks` before any count or name; counts only as a labelled fallback when paging is capped. *(Superseded at plan revision, 2026-10-12: no per-state-count fallback; past the cap the de-duplicated counts of the runs read are shown with the read cap disclosed, per D-03.)*
 **Warning signs:** a fixture where `totalCount` differs from the de-duplicated length; add the vscode-shaped fixture.
 
 ### Pitfall 2: Merged PR shown as "–" / closed PR shown as "blocked"
@@ -537,27 +538,36 @@ Not a rename/refactor/migration phase. Omitted.
 | A6 | Detail-fetch rate-limit errors can feed the existing pause (`pausedUntil`) without extra rules. | Pattern 3 | A rate-limited detail fetch might not pause refreshes; low risk (the next discovery fetch would hit the same limit and pause). |
 | A7 | Compact threshold 40 and column caps (REVIEWERS 22, CI 24) are reasonable starting points. | Pattern 4 | Goldens will show; adjustable. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-02 versus D-03 (counts vs dedupe).**
+The user answered all seven questions on 2026-10-12. The answers are recorded in `03-CONTEXT.md` (D-02, D-07, D-11 and D-14 revised; Claude's Discretion updated). Each item below cites where.
+
+1. **D-02 versus D-03 (counts vs dedupe).** — **RESOLVED** (CONTEXT D-02, revised 2026-10-12)
    - What we know: counts include superseded runs (F1); D-03 says derived counts are de-duplicated.
    - Recommendation: `+N` from de-duplicated contexts; truncated page → no name, no `+N`. Treat as the resolution unless the user objects. Tell the user, since D-02's text said otherwise.
+   - Resolution: adopted. `+N` comes from the de-duplicated contexts, never from `checkRunCountsByState`; a truncated page shows no name and no `+N`.
 
-2. **Naming PRs whose contexts are truncated.**
+2. **Naming PRs whose contexts are truncated.** — **RESOLVED** (CONTEXT D-02, revised 2026-10-12)
    - What we know: pytorch-scale matrices (131-355 contexts) exceed 100; CONTEXT says unnamed `✗ failing`.
    - Optional improvement: for truncated failing PRs only, page `node(id:){…contexts(first:100, after)}` up to 2 more pages (1 point each) and name from the complete set. Recommendation: not in v1 plans; keep `SummarizeFailing(…, complete bool)` so it can be added.
+   - Resolution: no extra paging in v1. A failing PR with more than 100 contexts shows the plain `✗ failing` badge. The user accepted this limit for LIST-07; it is recorded under LIST-07 in `REQUIREMENTS.md`.
 
-3. **What happens to TITLE between "TITLE at minimum" and compact mode (about 40-50 columns).**
+3. **What happens to TITLE between "TITLE at minimum" and compact mode (about 40-50 columns).** — **RESOLVED** (CONTEXT D-14, revised 2026-10-12)
    - What we know: marker 2 + PR 13 + REVIEW 11 + CI 11 + gaps is about 40 before TITLE's 10-cell minimum, so D-13's order (after MERGE drops) leaves no room for TITLE's minimum around 40-50 columns.
    - Recommendation: allow TITLE to drop entirely after MERGE has dropped and before CI/REVIEW narrow. State the rule in the plan.
+   - Resolution: adopted. Between about 40 and 50 columns, TITLE drops entirely after MERGE drops.
 
-4. **0x0 behaviour.** CONTEXT: "renders nothing". Existing convention: 0x0 = unsized, render everything uncut (`list_0x0.golden` is 32 lines). Recommendation: keep the established convention for list and detail (compact mode and column dropping apply only when width > 0); the requirement that matters is no panic. Confirm with the user in plan review.
+4. **0x0 behaviour.** — **RESOLVED** (CONTEXT D-14, revised 2026-10-12) CONTEXT: "renders nothing". Existing convention: 0x0 = unsized, render everything uncut (`list_0x0.golden` is 32 lines). Recommendation: keep the established convention for list and detail (compact mode and column dropping apply only when width > 0); the requirement that matters is no panic. Confirm with the user in plan review.
+   - Resolution: adopted. 0x0 keeps the established convention (unsized, everything rendered uncut, as `list_0x0.golden`) and never panics.
 
-5. **`UNKNOWN` + `CONFLICTING` → conflicts (A2).** Recommendation: include; it needs the extra scalar `mergeable` (already in the verified query).
+5. **`UNKNOWN` + `CONFLICTING` → conflicts (A2).** — **RESOLVED** (CONTEXT D-07, revised 2026-10-12) Recommendation: include; it needs the extra scalar `mergeable` (already in the verified query).
+   - Resolution: adopted. UNKNOWN with `mergeable: CONFLICTING` shows conflicts; any other UNKNOWN shows `–`.
 
-6. **D-11 mechanism.** Recommendation as in Pattern 3 (separate sequenced Cmd after each successful refresh while open, plus an immediate one on `enter`). If the user wants the literal "inside the same Cmd", the open-time fetch still needs its own Cmd, so the two-path version is unavoidable.
+6. **D-11 mechanism.** — **RESOLVED** (CONTEXT D-11, clarified 2026-10-12) Recommendation as in Pattern 3 (separate sequenced Cmd after each successful refresh while open, plus an immediate one on `enter`). If the user wants the literal "inside the same Cmd", the open-time fetch still needs its own Cmd, so the two-path version is unavoidable.
+   - Resolution: adopted. The detail fetch is a separate Cmd sequenced after each successful refresh and guarded by a detail sequence number and a ref check.
 
-7. **Hidden-team text.** Recommendation: `…team` (one) / `…2 teams` (several) in the list, and "team (name hidden)" in the detail view.
+7. **Hidden-team text.** — **RESOLVED** (CONTEXT Claude's Discretion, decided 2026-10-12) Recommendation: `…team` (one) / `…2 teams` (several) in the list, and "team (name hidden)" in the detail view.
+   - Resolution: adopted for the list (`…team` / `…2 teams`, counted as pending). The detail wording stays at Claude's discretion; the plans use "(name hidden)".
 
 ## Environment Availability
 

@@ -33,13 +33,13 @@
 | check-suite-ordering | INTEGRATE | |
 | workflow-run-name-and-file | INTEGRATE | |
 | status-context-fields | INTEGRATE | |
-| check-run-counts-by-state | INTEGRATE | |
-| status-context-counts-by-state | INTEGRATE | |
+| check-run-counts-by-state | OPT-OUT | not needed: the counts include superseded re-runs (RESEARCH F1) and D-03 requires de-duplicated counts at every size; the detail summary counts the de-duplicated contexts it read and discloses a partial read (03-06, 03-07) |
+| status-context-counts-by-state | OPT-OUT | not needed: same reason as check-run-counts-by-state |
 | contexts-pagination | INTEGRATE | |
 | node-batch-lookup | INTEGRATE | |
 | node-lookup | INTEGRATE | |
 | check-run-is-required | OPT-OUT | explicitly out of scope: dropped for v1 (Phase 1 spike Q10; CONTEXT carried-forward rule) |
-| check-run-details-url | OPT-OUT | explicitly out of scope: o opens only the PR URL on https://github.com; fetching per-check links would add an attacker-chosen URL to the screen (03-04 threat T-03-13) |
+| check-run-details-url | OPT-OUT | explicitly out of scope: o opens only the PR URL on https://github.com; fetching per-check links would add an attacker-chosen URL to the screen (03-06 threat T-03-21) |
 | status-context-target-url | OPT-OUT | explicitly out of scope: same reason as check-run-details-url |
 | check-run-annotations-and-logs | OPT-OUT | explicitly out of scope: CI log viewing is out of scope (REQUIREMENTS.md Out of Scope: open in browser instead) |
 | check-suite-latest-filter | OPT-OUT | not needed: CheckRunFilter checkType LATEST de-duplicates inside one suite only, and duplicates occur across suites (RESEARCH F2); prv de-duplicates client-side |
@@ -47,7 +47,7 @@
 | team-members | OPT-OUT | not needed: a team request is shown by its slug or as a hidden team; members are not reviewers until they review |
 | review-threads | OPT-OUT | not needed yet: unresolved thread counts are DISP-02 (v2) |
 | repository-pull-request-lookup | OPT-OUT | not needed yet: Phase 4 (WATCH-04, LIST-09) |
-| graphql-mutations | OPT-OUT | explicitly out of scope: prv is watch-only (REQUIREMENTS.md Out of Scope); a grep gate in 03-01 keeps write documents out of internal/github |
+| graphql-mutations | OPT-OUT | explicitly out of scope: prv is watch-only (REQUIREMENTS.md Out of Scope); a grep gate in 03-02 keeps write documents out of internal/github |
 | rest-api | OPT-OUT | explicitly out of scope: GraphQL covers the need in one request per chunk; REST costs several calls per PR |
 | rest-rate-limit-endpoint | OPT-OUT | not needed: every query already returns rateLimit { limit cost remaining resetAt } |
 | conditional-requests-etag | OPT-OUT | explicitly out of scope: GraphQL POSTs cannot use ETag/304 |
@@ -60,9 +60,9 @@
 
 ## Capability notes
 
-- latest-opinionated-review-authors, review-requests, requested-reviewer-union: the discovery query gains `author { login }` decoding and `reviewRequests(first: 20)` with User, Bot, Mannequin, Team and EnterpriseTeam fragments; a null `requestedReviewer` is a hidden team and counts as pending (03-03 Task 2; RESEARCH F6, F7).
-- latest-reviews: read only by the Detail query, only to add COMMENTED and DISMISSED reviewers not otherwise listed; list rows never read it (03-04 Task 1; RESEARCH F8; Phase 1 spike Q1).
-- merge-state-status, mergeable: decided after the PR state and isDraft; UNKNOWN with CONFLICTING is conflicts (03-03 Task 1; D-07 revised; RESEARCH F4, F5).
-- node-batch-lookup: `nodes(ids:)` FailingChecks query, at most 25 ids per request and 100 failing PRs per refresh, only for PRs whose rollup is FAILURE or ERROR (03-01; D-01; spike Q6).
-- status-check-rollup-contexts, check-run-fields, check-suite-ordering, status-context-fields: contexts(first: 100) with name, status, conclusion, databaseId, checkSuite createdAt and app name, and StatusContext context and state; re-runs collapse by (kind, workflow, name), newest suite wins (03-01; D-03; RESEARCH F1-F3).
-- node-lookup, workflow-run-name-and-file, contexts-pagination, check-run-counts-by-state, status-context-counts-by-state: the Detail `node(id:)` query, paged up to 5 x 100 contexts; per-state counts are used only when paging is capped, and the summary then says the counts include re-runs (03-04; D-08, D-10, D-11).
+- latest-opinionated-review-authors, review-requests, requested-reviewer-union: the discovery query gains `author { login }` decoding and `reviewRequests(first: 20)` with User, Bot, Mannequin, Team and EnterpriseTeam fragments; a null `requestedReviewer` is a hidden team and counts as pending (03-04 Task 2; rendered by 03-05 Task 2; RESEARCH F6, F7).
+- latest-reviews: read only by the Detail query, only to add COMMENTED and DISMISSED reviewers not otherwise listed; list rows never read it (03-06 Task 1; RESEARCH F8; Phase 1 spike Q1).
+- merge-state-status, mergeable: decided after the PR state and isDraft; UNKNOWN with CONFLICTING is conflicts (03-04 Task 1; rendered by 03-05 Task 1; D-07 revised; RESEARCH F4, F5).
+- node-batch-lookup: `nodes(ids:)` FailingChecks query, at most 25 ids per request, every failing PR in the list (at most 500, the discovery cap, so at most 20 requests), only for PRs whose rollup is FAILURE or ERROR (03-01, 03-02; D-01; spike Q6).
+- status-check-rollup-contexts, check-run-fields, check-suite-ordering, status-context-fields: contexts(first: 100) with name, status, conclusion, databaseId, checkSuite createdAt and app name, and StatusContext context and state; re-runs collapse by (kind, workflow, name), newest suite wins (03-01, 03-02; D-03; RESEARCH F1-F3).
+- node-lookup, workflow-run-name-and-file, contexts-pagination: the Detail `node(id:)` query, paged up to 5 x 100 contexts; the summary always counts the de-duplicated contexts, and when paging stops early it says how many runs were read of how many exist (03-06, 03-07; D-03, D-08, D-10; refreshed while open by 03-08, D-11).

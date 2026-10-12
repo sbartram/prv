@@ -26,6 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LIST-05**: Each row shows one CI badge: passing, failing, running, or no checks. A PR with no checks never shows as passing
 - [ ] **LIST-06**: Each row shows merge-readiness: mergeable, blocked, behind, or conflicts
 - [ ] **LIST-07**: For failing PRs, the row shows the name of a failing check
+  - v1 limit, accepted by the user on 2026-10-12 (Phase 3 CONTEXT D-02, revised): when a failing PR's checks fill more than one page of 100 contexts, the row shows the plain `✗ failing` badge with no name. prv never guesses a name, so a failed check-name query also leaves the plain badge (Phase 3 CONTEXT, Claude's Discretion).
 - [x] **LIST-08**: List is sorted by need for attention (failing CI / changes requested first) in a stable order that does not shuffle between refreshes
 - [ ] **LIST-09**: A PR that can't be fetched shows as an "unavailable" row with a reason, and the other PRs still display
 

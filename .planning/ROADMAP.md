@@ -106,29 +106,32 @@ Plans:
 **Requirements**: LIST-04, LIST-06, LIST-07, DETL-01, DETL-02, DETL-03, NAV-05
 **Success Criteria** (what must be TRUE):
   1. Each row shows which reviewers approved, which requested changes, and which are still pending, plus merge-readiness: mergeable, blocked, behind, or conflicts.
-  2. The row for a PR with failing CI names one of its failing checks.
+  2. The row for a PR with failing CI names one of its failing checks. (v1 limit accepted by the user on 2026-10-12, CONTEXT D-02: a PR whose checks fill more than one page of 100 contexts shows the plain failing badge; see LIST-07 in REQUIREMENTS.md.)
   3. Selecting a PR opens a detail view that lists every check/job with its status, failing first, and every reviewer with their review state. Returning to the list keeps the same PR selected, also when a refresh happened while the detail view was open.
   4. In a narrow pane, and after a terminal resize, the list and the detail view drop or truncate columns and stay readable and navigable.
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 5 plans
+**Plans**: 8 plans
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Tracer: a failing PR's row names its failing check (✗ lint +2) through the D-01 two-step fetch; re-runs collapsed, cancelled-only marker, never a guessed name (D-01..D-04)
+- [ ] 03-01-PLAN.md — Tracer: a failing PR's row names its failing check (✗ lint +2) through the D-01 two-step fetch; every check kind classified, cancelled-only marker, '+N' counts only what fails, never a guessed name (D-01..D-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03-02-PLAN.md — Narrow panes for the list: pure layoutColumns with the D-13 drop order, compact rows below 40 cells, resize and never-overflow property test, 60x15 goldens (D-13, D-14)
+- [ ] 03-02-PLAN.md — Failing names on messy real data: re-runs, truncated pages, partial errors, every failing PR looked up in chunks of 25, rate limits; long and CJK names shortened, never the suffix (D-01..D-03)
+- [ ] 03-03-PLAN.md — Narrow panes for the list: pure layoutColumns with the D-13 drop order, compact rows below 40 cells, resize and never-overflow property test, 60x15 goldens (D-13, D-14)
+- [ ] 03-04-PLAN.md — Merge readiness and reviewers reach every PR through the github seam: DeriveMerge (state and draft first, UNKNOWN+CONFLICTING) and MergeReviewers (pending wins, hidden teams, bots) (D-06, D-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-03-PLAN.md — MERGE column (state and draft first, UNKNOWN+CONFLICTING) and REVIEWERS column (pending wins, hidden teams, +N), both in the D-13 drop order (D-05..D-07)
+- [ ] 03-05-PLAN.md — MERGE and REVIEWERS columns in every row (+N, me, hidden teams), in the D-13 drop order and the compact glyphs, with help legends (D-05..D-07, D-13)
+- [ ] 03-06-PLAN.md — Detail data: one paged Detail query per PR with de-duplicated sorted checks, every reviewer incl. commented and dismissed, counts de-duplicated at every size with a partial read reported (D-01, D-03, D-08, D-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 03-04-PLAN.md — enter opens a full-screen detail: every check failing first, every reviewer, fold with e, paged contexts and an honest summary; esc returns to the same PR (D-08..D-10)
+- [ ] 03-07-PLAN.md — enter opens a full-screen detail: every check failing first, every reviewer, fold with e, honest summary ("read N of M runs" on a partial read); esc returns to the same PR (D-08..D-10)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 03-05-PLAN.md — The open detail refreshes with the list, drops stale results, respects pauses, says "no longer in list" when its PR leaves; fits any pane and every detail state has goldens (D-11, D-12, D-14)
+- [ ] 03-08-PLAN.md — The open detail refreshes with the list, drops stale results, respects pauses, says "no longer in list" when its PR leaves; fits any pane and every detail state has goldens (D-11, D-12, D-14)
 
 **UI hint**: yes
 
