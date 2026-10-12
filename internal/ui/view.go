@@ -379,6 +379,9 @@ func (m Model) renderList() string {
 	sz.min[colCI] = min(minCI, sz.natural[colCI])
 
 	lay := layoutColumns(sz, m.w)
+	if lay.compact {
+		return m.renderCompact()
+	}
 	var vis []int // the shown columns, in display order
 	for c := range lay.show {
 		if lay.show[c] {
@@ -443,11 +446,97 @@ func (m Model) renderList() string {
 			return s
 		})
 
-	lines := []string{m.header()}
-	lines = append(lines, strings.Split(t.String(), "\n")...)
-	lines = append(lines, m.bottom())
+	tableLines := strings.Split(t.String(), "\n")
+	return m.stack(tableLines[0], tableLines[1:])
+}
+
+// stack joins the header line, the column-header line, the rows and the
+// bottom line of a list screen. A pane shorter than that drops the
+// column-header line first, then the bottom line, then the header line, so
+// the selected row is always on screen and the output never has more lines
+// than the pane. Every line is cut to the pane width.
+func (m Model) stack(colHeader string, rows []string) string {
+	showColHeader, showBottom, showHeader := true, true, true
+	if excess := 3 + len(rows) - m.h; m.h > 0 && excess > 0 {
+		showColHeader = false
+		if excess > 1 {
+			showBottom = false
+		}
+		if excess > 2 {
+			showHeader = false
+		}
+	}
+	var lines []string
+	if showHeader {
+		lines = append(lines, m.header())
+	}
+	if showColHeader {
+		lines = append(lines, colHeader)
+	}
+	lines = append(lines, rows...)
+	if showBottom {
+		lines = append(lines, m.bottom())
+	}
 	for i, l := range lines {
 		lines[i] = m.cut(l)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// shortRef is a PR's ref without the owner: the repository name, then "#" and
+// the number.
+func shortRef(r domain.Ref) string {
+	repo := r.Repo
+	if i := strings.LastIndex(repo, "/"); i >= 0 {
+		repo = repo[i+1:]
+	}
+	return repo + "#" + strconv.Itoa(r.Number)
+}
+
+// renderCompact is the list of a pane under compactBelow cells (D-14): a
+// marker, the short ref and the REVIEW and CI glyphs on every row. The
+// column-header line carries the hint to widen the pane.
+func (m Model) renderCompact() string {
+	end := min(len(m.rows), m.offset+m.visibleRows())
+	rows := make([]string, 0, end-m.offset)
+	for i := m.offset; i < end; i++ {
+		rows = append(rows, m.compactRow(i))
+	}
+	return m.stack(headerStyle.Render("  PR")+faintStyle.Render("  widen for columns"), rows)
+}
+
+// compactRow draws row i as "> ref ✓✓". Each segment is styled on its own and
+// the selected row's segments each carry the reverse style, so a style never
+// wraps text that already holds escape codes. A ref that does not fit is cut
+// from the left and keeps its number; when there is no room for even one cell
+// of it, only the marker and the glyphs are drawn.
+func (m Model) compactRow(i int) string {
+	pr := m.rows[i]
+	marker := "  "
+	if i == m.cursor {
+		marker = "> "
+	}
+	review, ci := pr.Review.Glyph(), pr.CI.Glyph()
+	ref := shortRef(pr.Ref)
+	if budget := m.w - lipgloss.Width(marker) - 1 - lipgloss.Width(review) - lipgloss.Width(ci); m.w > 0 {
+		if budget < 1 {
+			ref = ""
+		} else {
+			ref = trimLeft(ref, budget)
+		}
+	}
+	text := marker
+	if ref != "" {
+		text += ref + " "
+	}
+	base := lipgloss.NewStyle()
+	if dimmed(pr) {
+		base = base.Faint(true)
+	}
+	if i == m.cursor {
+		base = base.Inherit(selectedStyle)
+	}
+	return m.cut(base.Render(text) +
+		base.Inherit(reviewStyle(pr.Review)).Render(review) +
+		base.Inherit(ciStyle(pr.CI)).Render(ci))
 }

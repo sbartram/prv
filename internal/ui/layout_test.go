@@ -41,6 +41,9 @@ func TestLayoutColumns(t *testing.T) {
 	shortTitle := testSizes()
 	shortTitle.natural[colTitle], shortTitle.min[colTitle] = 7, 7
 
+	bigPR := testSizes()
+	bigPR.natural[colPR], bigPR.min[colPR] = 30, 30
+
 	bigCI := testSizes()
 	bigCI.natural[colPR], bigCI.min[colPR] = 40, 40
 	bigCI.natural[colCI], bigCI.min[colCI] = 24, 11
@@ -64,10 +67,10 @@ func TestLayoutColumns(t *testing.T) {
 		{"STATE drops second", testSizes(), 52, noState, 16, 12, 9},
 		{"STATE gone, TITLE at its minimum", testSizes(), 46, noState, 10, 12, 9},
 		{"TITLE drops last", testSizes(), 45, noTitle, 0, 12, 9},
-		{"only the four columns left, exactly fitting", testSizes(), 35, noTitle, 0, 12, 9},
+		{"only the four columns left, exactly fitting", bigPR, 53, noTitle, 0, 30, 9},
 		{"a short TITLE does not force a drop", shortTitle, 57, all, 7, 12, 9},
 		{"a short TITLE still drops AUTHOR when it must", shortTitle, 56, noAuthor, 7, 12, 9},
-		{"PR narrows when nothing else can", testSizes(), 34, noTitle, 0, 11, 9},
+		{"PR narrows when nothing else can", bigPR, 40, noTitle, 0, 17, 9},
 		{"CI narrows to its minimum, then PR", bigCI, 40, noTitle, 0, 15, 11},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -361,8 +364,8 @@ func TestTinyHeights(t *testing.T) {
 	for _, w := range []int{80, 36} {
 		for h, want := range map[int][]string{
 			1: {">"},
-			2: {"@octo", ">"},
-			3: {"@octo", ">", "j/k"},
+			2: {"PRs", ">"},
+			3: {"PRs", ">", "j/k"},
 		} {
 			ls := lines(newTestModel(t, fixtureSix(), w, h).View().Content)
 			if len(ls) != len(want) {

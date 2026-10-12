@@ -23,6 +23,9 @@ const (
 	maxPRColW    = 40 // cap for the PR column
 	maxAuthorCol = 16 // cap for the AUTHOR column
 	minPRColW    = 8  // the PR column is never cut below this
+	// compactBelow is the pane width under which the list shows compact rows
+	// (D-14).
+	compactBelow = 40
 	// chromeLines are the lines around the rows: the "prv · @login" line, the
 	// table's column-header row and the footer line.
 	chromeLines = 3
@@ -80,7 +83,9 @@ var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colTitle}}
 
 // layoutColumns decides which columns are shown and how wide each one is
 // for a pane total cells wide. A total of 0 or less means the pane has not
-// reported its size yet: every column is shown uncut (D-14 revised).
+// reported its size yet: every column is shown uncut and the list is never
+// compact (D-14 revised). Below compactBelow cells the layout is compact: no
+// columns, the caller draws compact rows.
 //
 // The pane narrows in the D-13 order. TITLE is the flexible column: it gets
 // what is left, down to minTitleW cells. When it cannot keep that, the next
@@ -98,6 +103,9 @@ func layoutColumns(sz sizes, total int) layout {
 	l.width[colMarker] = 1
 	if total <= 0 {
 		return l
+	}
+	if total < compactBelow {
+		return layout{compact: true}
 	}
 	// need is the width of the shown columns other than TITLE, gaps included.
 	need := func() int {
