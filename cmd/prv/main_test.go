@@ -570,3 +570,107 @@ func TestLiveEndToEnd(t *testing.T) {
 		t.Errorf("view has no list header:\n%s", view)
 	}
 }
+
+// routedTransport answers by GraphQL operation: "query Watch" gets the
+// discovery body and "query FailingChecks" the step-2 body (D-01). It records
+// every FailingChecks request.
+type routedTransport struct {
+	t          *testing.T
+	watch      string
+	failing    string
+	failVars   []map[string]any
+	failQuerys []string
+}
+
+func (r *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	raw, _ := io.ReadAll(req.Body)
+	var payload struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+	_ = json.Unmarshal(raw, &payload)
+	body := ""
+	switch {
+	case strings.HasPrefix(payload.Query, "query Watch"):
+		body = r.watch
+	case strings.HasPrefix(payload.Query, "query FailingChecks"):
+		body = r.failing
+		r.failVars = append(r.failVars, payload.Variables)
+		r.failQuerys = append(r.failQuerys, payload.Query)
+	default:
+		r.t.Errorf("unexpected operation: %.40q", payload.Query)
+	}
+	return &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}, nil
+}
+
+const failingWatchBody = fixtureHead + `
+{"__typename":"PullRequest","id":"PR_7","number":7,"title":"Add retries","url":"https://github.com/acme/api/pull/7",
+ "isDraft":false,"state":"OPEN","closedAt":null,"mergedAt":null,"updatedAt":"2026-10-11T08:00:00Z",
+ "repository":{"nameWithOwner":"acme/api"},"author":{"login":"octo"},
+ "reviewDecision":null,"latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":{"state":"FAILURE"}},
+{"__typename":"PullRequest","id":"PR_8","number":8,"title":"Docs","url":"https://github.com/acme/web/pull/8",
+ "isDraft":false,"state":"OPEN","closedAt":null,"mergedAt":null,"updatedAt":"2026-10-11T07:00:00Z",
+ "repository":{"nameWithOwner":"acme/web"},"author":{"login":"octo"},
+ "reviewDecision":null,"latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}` + fixtureTail
+
+// run builds one CheckRun context in the GitHub Actions workflow "ci".
+func ctxRun(id int, name, conclusion, suiteAt string) string {
+	return `{"__typename":"CheckRun","name":"` + name + `","status":"COMPLETED","conclusion":"` + conclusion +
+		`","databaseId":` + strconv.Itoa(id) + `,"checkSuite":{"createdAt":"` + suiteAt +
+		`","app":{"name":"GitHub Actions"},"workflowRun":{"workflow":{"name":"ci"}}}}`
+}
+
+// failingStepBody is PR_7 with lint, test (ubuntu) and vet failing in the newer
+// suite, and build failing in an older suite but passing in the newer one: the
+// superseded build run must neither be named nor counted (D-03).
+var failingStepBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4987,"resetAt":"2026-10-11T13:00:00Z"},"nodes":[` +
+	`{"__typename":"PullRequest","id":"PR_7","statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":5,"pageInfo":{"hasNextPage":false,"endCursor":"x"},"nodes":[` +
+	strings.Join([]string{
+		ctxRun(4, "build", "FAILURE", "2026-10-11T08:00:00Z"),
+		ctxRun(11, "lint", "FAILURE", "2026-10-11T09:00:00Z"),
+		ctxRun(12, "test (ubuntu)", "FAILURE", "2026-10-11T09:00:00Z"),
+		ctxRun(13, "vet", "FAILURE", "2026-10-11T09:00:00Z"),
+		ctxRun(14, "build", "SUCCESS", "2026-10-11T09:00:00Z"),
+	}, ",") + `]}}}]}}`
+
+// TestFailingNameEndToEnd is the phase tracer: a real github.Client over a
+// routed transport and the real ui.Model name the failing check in the CI cell
+// of the failing PR, with one FailingChecks request for the failing PRs only.
+func TestFailingNameEndToEnd(t *testing.T) {
+	rt := &routedTransport{t: t, watch: failingWatchBody, failing: failingStepBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	view := plain(m)
+	if got := lineWith(view, "acme/api#7"); !strings.Contains(got, "✗ lint +2") {
+		t.Errorf("acme/api#7 row = %q, want it to contain %q\n%s", got, "✗ lint +2", view)
+	}
+	if got := lineWith(view, "acme/web#8"); !strings.Contains(got, "✓ passing") {
+		t.Errorf("acme/web#8 row = %q, want it to contain %q", got, "✓ passing")
+	}
+	if len(rt.failVars) != 1 {
+		t.Fatalf("FailingChecks requests = %d, want exactly 1", len(rt.failVars))
+	}
+	ids, _ := rt.failVars[0]["ids"].([]any)
+	if len(ids) != 1 || ids[0] != "PR_7" {
+		t.Errorf("variables.ids = %v, want [PR_7]", rt.failVars[0]["ids"])
+	}
+	if strings.Contains(rt.failQuerys[0], "PR_7") {
+		t.Error("the FailingChecks query text must not contain a PR id: ids travel only as a variable")
+	}
+}
