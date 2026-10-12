@@ -76,6 +76,7 @@ const discoveryQuery = `query Watch($q: String!, $after: String) {
         repository { nameWithOwner }
         author { login }
         reviewDecision
+        mergeStateStatus mergeable
         latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
         statusCheckRollup { state }
       }
@@ -129,6 +130,10 @@ type wireNode struct {
 	Repository     struct{ NameWithOwner string }
 	Author         *struct{ Login string }
 	ReviewDecision *string
+	// MergeStateStatus is "UNKNOWN" while GitHub computes it; DeriveMerge
+	// decides state and draft first (RESEARCH F4).
+	MergeStateStatus string
+	Mergeable        string
 	// Only the opinionated-review connection is requested on purpose: in the
 	// non-opinionated one a later COMMENTED review hides an earlier approval
 	// (01-SPIKE.md Q1).
@@ -264,6 +269,7 @@ func mapResponse(resp wireResp) domain.Snapshot {
 		if n.StatusCheckRollup != nil {
 			rollup = &n.StatusCheckRollup.State
 		}
+		state := domain.ParseState(n.State)
 		snap.PRs = append(snap.PRs, domain.PR{
 			ID:        n.ID,
 			Ref:       domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
@@ -271,9 +277,10 @@ func mapResponse(resp wireResp) domain.Snapshot {
 			URL:       n.URL,
 			Author:    author,
 			IsDraft:   n.IsDraft,
-			State:     domain.ParseState(n.State),
+			State:     state,
 			Review:    domain.DeriveReview(decision, reviewStates),
 			CI:        domain.ClassifyRollup(rollup),
+			Merge:     domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
 			CreatedAt: n.CreatedAt,
 			UpdatedAt: n.UpdatedAt,
 			ClosedAt:  n.ClosedAt,
