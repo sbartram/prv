@@ -227,3 +227,38 @@ func TestSort(t *testing.T) {
 		Sort([]PR{})
 	})
 }
+
+func TestBucket(t *testing.T) {
+	tests := []struct {
+		name string
+		pr   PR
+		want int
+	}{
+		{"D-01 failing CI, approved", PR{State: StateOpen, CI: CIFailing, Review: ReviewApproved}, 1},
+		{"D-01 failing CI, changes requested", PR{State: StateOpen, CI: CIFailing, Review: ReviewChangesRequested}, 1},
+		{"D-01 changes requested, CI running", PR{State: StateOpen, Review: ReviewChangesRequested, CI: CIRunning}, 2},
+		{"D-01 changes requested, CI passing", PR{State: StateOpen, Review: ReviewChangesRequested, CI: CIPassing}, 2},
+		{"D-01 approved and passing is ready to merge", PR{State: StateOpen, Review: ReviewApproved, CI: CIPassing}, 3},
+		{"D-01 approved, CI running", PR{State: StateOpen, Review: ReviewApproved, CI: CIRunning}, 4},
+		{"D-01 review required, CI running", PR{State: StateOpen, Review: ReviewRequired, CI: CIRunning}, 4},
+		{"A3 approved with no checks is not ready", PR{State: StateOpen, Review: ReviewApproved, CI: CINone}, 5},
+		{"A3 approved with unknown CI is not ready", PR{State: StateOpen, Review: ReviewApproved, CI: CIUnknown}, 5},
+		{"D-01 review required, CI passing", PR{State: StateOpen, Review: ReviewRequired, CI: CIPassing}, 5},
+		{"D-01 no review, no checks", PR{State: StateOpen, Review: ReviewNone, CI: CINone}, 5},
+		{"D-04 open draft with failing CI", PR{State: StateOpen, IsDraft: true, CI: CIFailing}, 6},
+		{"D-04 open draft, approved and passing", PR{State: StateOpen, IsDraft: true, Review: ReviewApproved, CI: CIPassing}, 6},
+		{"D-01 merged", PR{State: StateMerged}, 7},
+		{"D-01 merged with failing CI", PR{State: StateMerged, CI: CIFailing}, 7},
+		{"D-04 clarified: merged draft sorts as merged", PR{State: StateMerged, IsDraft: true}, 7},
+		{"D-01 closed", PR{State: StateClosed}, 8},
+		{"D-04 clarified: closed draft sorts as closed", PR{State: StateClosed, IsDraft: true}, 8},
+		{"D-01 unknown state sorts last", PR{State: StateUnknown}, 9},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Bucket(tt.pr); got != tt.want {
+				t.Errorf("Bucket = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
