@@ -6,6 +6,7 @@ package ui
 import (
 	"context"
 	"errors"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -18,9 +19,15 @@ type Fetcher interface {
 	Fetch(ctx context.Context) (domain.Snapshot, error)
 }
 
+// defaultInterval is the refresh interval when Options.Interval is zero. The
+// 15 s floor is the config package's job, so tests can use short intervals.
+const defaultInterval = 60 * time.Second
+
 // Options configures the model.
 type Options struct {
 	ClosedDays int
+	Interval   time.Duration    // zero means defaultInterval
+	Now        func() time.Time // nil means time.Now
 }
 
 type viewState int
@@ -38,54 +45,58 @@ type Model struct {
 	fetcher Fetcher
 	opts    Options
 
-	state   viewState
-	loading bool
-	spin    spinner.Model
-	snap    domain.Snapshot
-	err     error
-	cursor  int
-	offset  int // index of the first visible row
-	w, h    int
+	state  viewState
+	spin   spinner.Model
+	snap   domain.Snapshot
+	err    error
+	cursor int
+	offset int // index of the first visible row
+	w, h   int
+
+	// Refresh state. gen is bumped when a manual retry orphans the pending
+	// tick. Exactly one tick is pending: it is armed only from a fetch result
+	// of the current generation.
+	gen      int
+	inFlight bool
+	interval time.Duration
+	now      func() time.Time
+	after    func(time.Duration, tea.Msg) tea.Cmd
+	lastOK   time.Time // time of the last successful fetch
+	nextAt   time.Time // when the pending tick is due
+	failedAt time.Time // time of the last failed refresh while data is shown
 }
 
-// New builds a Model that starts in the loading state.
+// New builds a Model that starts in the loading state. Init starts the first
+// fetch, so the model starts with a fetch in flight.
 func New(ctx context.Context, f Fetcher, opts Options) Model {
 	if opts.ClosedDays <= 0 {
 		opts.ClosedDays = domain.DefaultClosedDays
 	}
+	interval := opts.Interval
+	if interval <= 0 {
+		interval = defaultInterval
+	}
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
 	return Model{
-		ctx:     ctx,
-		fetcher: f,
-		opts:    opts,
-		state:   stateLoading,
-		loading: true,
-		spin:    spinner.New(spinner.WithSpinner(spinner.Dot)),
+		ctx:      ctx,
+		fetcher:  f,
+		opts:     opts,
+		state:    stateLoading,
+		inFlight: true,
+		spin:     spinner.New(spinner.WithSpinner(spinner.Dot)),
+		interval: interval,
+		now:      now,
+		after:    afterTick,
 	}
 }
 
-type fetchedMsg struct {
-	snap domain.Snapshot
-	err  error
-}
-
-// fetchCmd runs one fetch. A panic inside the fetcher becomes an error with a
-// fixed message: the panic value is never shown, and the terminal is not left
-// in the alt screen.
-func (m Model) fetchCmd() tea.Cmd {
-	return func() (msg tea.Msg) {
-		defer func() {
-			if recover() != nil {
-				msg = fetchedMsg{err: errors.New("unexpected internal error while loading PRs")}
-			}
-		}()
-		snap, err := m.fetcher.Fetch(m.ctx)
-		return fetchedMsg{snap: snap, err: err}
-	}
-}
-
-// Init starts the spinner and the first fetch.
+// Init starts the spinner and the first fetch. It arms no tick: the first
+// result arms it.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, m.fetchCmd())
+	return tea.Batch(m.spin.Tick, fetch(m.ctx, m.fetcher, m.gen))
 }
 
 // Update handles messages.
@@ -96,10 +107,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "r":
-			if m.state == stateError && !m.loading {
+			if m.state == stateError && !m.inFlight {
+				m.gen++ // orphans the pending tick
 				m.state = stateLoading
-				m.loading = true
-				return m, tea.Batch(m.spin.Tick, m.fetchCmd())
+				return m, m.beginFetch()
 			}
 		case "j", "down":
 			if m.state == stateList && m.cursor < len(m.snap.PRs)-1 {
@@ -121,24 +132,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.spin, cmd = m.spin.Update(msg)
 			return m, cmd
 		}
+	case tickMsg:
+		if msg.gen != m.gen || m.inFlight {
+			return m, nil
+		}
+		return m, m.beginFetch()
 	case fetchedMsg:
 		if errors.Is(msg.err, context.Canceled) {
 			return m, nil // the program is quitting
 		}
-		m.loading = false
-		m.cursor, m.offset = 0, 0
+		if msg.gen != m.gen {
+			return m, nil
+		}
+		m.inFlight = false
 		if msg.err != nil {
+			m.cursor, m.offset = 0, 0
 			m.state = stateError
 			m.err = msg.err
-			return m, nil
+			return m, m.arm(m.interval)
 		}
+		m.cursor, m.offset = 0, 0
 		m.err = nil
 		m.snap = msg.snap
+		m.lastOK = m.now()
 		if len(msg.snap.PRs) == 0 {
 			m.state = stateEmpty
-			return m, nil
+		} else {
+			m.state = stateList
 		}
-		m.state = stateList
+		return m, m.arm(m.interval)
 	}
 	return m, nil
 }

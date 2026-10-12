@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +22,27 @@ import (
 	"github.com/sbartram/prv/internal/ui"
 )
 
+// useConfig points prv at a config file in a temp dir so no test reads the
+// developer's real config. An empty body leaves the file absent.
+func useConfig(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "prv", "config.toml")
+	if body != "" {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orig := configPath
+	configPath = func() (string, error) { return path, nil }
+	t.Cleanup(func() { configPath = orig })
+	return path
+}
+
 func TestVersionFlag(t *testing.T) {
+	useConfig(t, "")
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"--version"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)
@@ -34,6 +56,7 @@ func TestVersionFlag(t *testing.T) {
 }
 
 func TestNoToken(t *testing.T) {
+	useConfig(t, "")
 	orig := tokenForHost
 	tokenForHost = func(string) (string, string) { return "", "default" }
 	t.Cleanup(func() { tokenForHost = orig })
@@ -52,6 +75,7 @@ func TestNoToken(t *testing.T) {
 }
 
 func TestHiddenClosedDaysFlag(t *testing.T) {
+	useConfig(t, "")
 	var stdout, stderr bytes.Buffer
 	if code := run([]string{"-h"}, &stdout, &stderr); code != 0 {
 		t.Errorf("-h exit code = %d, want 0", code)
@@ -62,6 +86,87 @@ func TestHiddenClosedDaysFlag(t *testing.T) {
 	stderr.Reset()
 	if code := run([]string{"--closed-days", "0"}, &stdout, &stderr); code != 2 {
 		t.Errorf("--closed-days 0 exit code = %d, want 2", code)
+	}
+}
+
+func TestBrokenConfigExitsBeforeToken(t *testing.T) {
+	path := useConfig(t, `refresh_interval = "soon"`)
+	orig := tokenForHost
+	tokenForHost = func(string) (string, string) {
+		t.Error("tokenForHost was called with a broken config")
+		return "", ""
+	}
+	t.Cleanup(func() { tokenForHost = orig })
+
+	var stdout, stderr bytes.Buffer
+	if code := run(nil, &stdout, &stderr); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.HasPrefix(stderr.String(), "prv: ") || !strings.Contains(stderr.String(), path) {
+		t.Errorf("stderr = %q, want a line starting 'prv: ' that contains %q", stderr.String(), path)
+	}
+}
+
+func TestVersionIgnoresBrokenConfig(t *testing.T) {
+	useConfig(t, `refresh_interval = "soon"`)
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--version"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+}
+
+// countingTransport serves the fixture body and counts requests. It is safe
+// for concurrent use.
+type countingTransport struct{ n atomic.Int64 }
+
+func (c *countingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	c.n.Add(1)
+	return &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(fixtureHead + fixtureNodes + fixtureTail)),
+		Request:    req,
+	}, nil
+}
+
+// TestRefreshEndToEnd runs a real tea.Program over the real github client and
+// checks that prv keeps re-fetching and that quitting returns cleanly.
+func TestRefreshEndToEnd(t *testing.T) {
+	ct := &countingTransport{}
+	client, err := github.NewClient(github.Options{Token: "test-token-not-real", ClosedDays: 14, Transport: ct})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	p := tea.NewProgram(
+		ui.New(ctx, client, ui.Options{ClosedDays: 14, Interval: 20 * time.Millisecond}),
+		tea.WithContext(ctx), tea.WithInput(nil), tea.WithOutput(io.Discard),
+	)
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Run()
+		done <- err
+	}()
+
+	deadline := time.After(5 * time.Second)
+	for ct.n.Load() < 3 {
+		select {
+		case err := <-done:
+			t.Fatalf("program ended early with %v after %d requests", err, ct.n.Load())
+		case <-deadline:
+			t.Fatalf("only %d requests in 5 s, want at least 3", ct.n.Load())
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	p.Quit()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("program did not return within 5 s of Quit")
 	}
 }
 

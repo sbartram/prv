@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/cli/go-gh/v2/pkg/auth"
 
+	"github.com/sbartram/prv/internal/config"
 	"github.com/sbartram/prv/internal/domain"
 	"github.com/sbartram/prv/internal/github"
 	"github.com/sbartram/prv/internal/ui"
@@ -23,6 +24,9 @@ var version = "dev"
 
 // tokenForHost is a variable so tests can replace it.
 var tokenForHost = auth.TokenForHost
+
+// configPath is a variable so tests can replace it.
+var configPath = config.Path
 
 const noTokenMessage = "prv needs a GitHub token. Run `gh auth login`, or set GH_TOKEN / GITHUB_TOKEN."
 
@@ -63,6 +67,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	// A broken config stops prv before the token lookup and the TUI. When the
+	// path itself cannot be found there is no config to read: keep the defaults.
+	cfg := config.Default()
+	if path, err := configPath(); err == nil {
+		cfg, err = config.Load(path)
+		if err != nil {
+			fmt.Fprintln(stderr, "prv: "+err.Error())
+			return 2
+		}
+	}
+
 	// The token goes only into github.Options.Token. It is never printed,
 	// logged or written. Missing means exactly the empty string.
 	token, _ := tokenForHost("github.com")
@@ -78,7 +93,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	p := tea.NewProgram(ui.New(ctx, client, ui.Options{ClosedDays: *closedDays}), tea.WithContext(ctx))
+	p := tea.NewProgram(ui.New(ctx, client, ui.Options{ClosedDays: *closedDays, Interval: cfg.Interval}), tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, "prv: "+err.Error())
 		return 1
