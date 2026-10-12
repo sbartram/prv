@@ -158,8 +158,9 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 			err = classify(err, c.capture.latest())
 			var ce *Error
 			isErr := errors.As(err, &ce)
-			if page == 1 && isErr && ce.Kind == KindRateLimited {
-				// Never show partial data while rate limited.
+			if isErr && ce.Kind == KindRateLimited {
+				// On any page: never show a partial or truncated list while
+				// rate limited. The previous data stays and the model pauses.
 				return domain.Snapshot{}, err
 			}
 			if page > 1 {
