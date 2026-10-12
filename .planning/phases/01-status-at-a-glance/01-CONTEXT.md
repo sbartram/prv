@@ -39,6 +39,13 @@ Requirements: AUTH-01, AUTH-02, AUTH-03, CONF-02, WATCH-01, WATCH-02, WATCH-03, 
 - **D-13:** A draft PR shows its true REVIEW and CI values. The dimmed row plus the `draft` tag is the only treatment.
 - **D-14:** The CI badge follows `statusCheckRollup.state` as GitHub reports it (FAILURE/ERROR → failing, PENDING/EXPECTED → running, SUCCESS → passing). A null rollup → `no checks`. CI must match github.com (success criterion 4), so there is no client-side override of the precedence.
 
+### Plan-time decisions (2026-10-11, answers to RESEARCH open questions and plan-check findings)
+- [informational] A hidden `--closed-days N` flag (default 14) is added for live row UAT, because the user's account has no PRs in the 14-day window.
+- [informational] Closed and merged PRs show GitHub's review status unchanged (REVIEW_REQUIRED stays). The row is dimmed.
+- [informational] CONF-02 `go install ...@latest` is a user-gated `checkpoint:human-verify`. Nothing is pushed automatically.
+- [informational] Exit 0 when the user quits from the error panel. `rateLimit` is decoded but not shown.
+- [informational] Discovery is capped at 500 results (5 pages of 100). The user accepts this as a known Phase 1 limit, which is the only exception to success criterion 2's "every open PR". When the cap is reached, the footer says "list truncated".
+
 ### Carried forward (already decided upstream; do not re-litigate)
 - Token resolution: go-gh `auth.TokenForHost("github.com")`, which checks GH_TOKEN, then GITHUB_TOKEN, then the gh login. The token is never logged, shown or persisted (`LogIgnoreEnv: true`).
 - Discovery: a single `ISSUE_ADVANCED` search `is:pr (author:@me OR assignee:@me) (is:open OR closed:>=DATE)` with a fixed 14-day window, deduplicated by node ID. Fallback is separate queries or `viewer.pullRequests`, if spike Q4/Q8 shows missing PRs.
