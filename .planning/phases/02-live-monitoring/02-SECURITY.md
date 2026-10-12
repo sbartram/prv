@@ -46,7 +46,7 @@ created: "2026-10-12"
 | T-02-05 | Information disclosure | Error.Short() in the header | low | mitigate | Fixed strings per Kind (errors.go:70-86; TestShortReason) | closed |
 | T-02-27 | Tampering | footer notes / empty screen over partial load | medium | mitigate | Notes before hints, truncated not dropped; honest empty screen (view.go:85-87,137-184; TestFooterNotesFirst, TestEmptyStateShowsNotes). Residual: at ≤ 9-cell width only `api N` fits — unusable width, informational | closed |
 | T-02-29 | Tampering | api budget display | low | mitigate | Rendered only when `Limit > 0`; snapshot kept through failures (view.go:140,299, help.go:48-53; TestApiFooter, TestRateWarning) | closed |
-| T-02-08 | Denial of service (self) | server-supplied delays inside NextDelay | medium | mitigate | All server-derived delays clamped to [1 s, 65 min]. Audit found the success-path pacing branch unbounded (reset a year away → 796 h wait); fixed in f134a24 with `min(..., MaxServerWait)` and RED test 0d661db (TestNextDelay pacing rows) | closed |
+| T-02-08 | Denial of service (self) | server-supplied delays inside NextDelay | medium | mitigate | All server-derived delays clamped to [1 s, 65 min]. Audit found the success-path pacing branch unbounded (reset a year away → 796 h wait); fixed in f134a24 with `min(..., MaxServerWait)` and RED test 0d661db (TestNextDelay pacing rows). Code review WR-01 then found the rate-limited and reserve-pause branches wrapped a saturated `Time.Sub` + 1 s to a 1 s pause; fixed in 60a2197 (`resetWait`, RED 2159e20) | closed |
 | T-02-09 | Denial of service | refresh loop while limited | high | mitigate | Pause until retry-after/reset; `r` refused; tick during a pause re-arms without fetching (model.go:228-231,279-283, backoff.go; TestSimulatedHour) | closed |
 | T-02-07 | Information disclosure | captureTransport | high | mitigate | 3-field record, only `resp.Header.Get` of three names, no request header read (ratelimit.go:14-44; TestCaptureHeadersOnly) | closed |
 | T-02-25 | Tampering / DoS | malformed Retry-After / X-RateLimit-Reset | medium | mitigate | Strict parsers, saturation at 2^31 s (ratelimit.go:58-76; TestParseRetryAfter, TestParseReset) | closed |
@@ -87,6 +87,7 @@ created: "2026-10-12"
 |------------|---------------|--------|------|--------|
 | 2026-10-12 | 30 | 28 | 2 (non-blocking: T-02-08, T-02-21) | gsd-security-auditor (ASVS L1, block_on high) |
 | 2026-10-12 | 30 | 30 | 0 | orchestrator — T-02-08 fixed (0d661db, f134a24), T-02-21 logged as AR-02-01 |
+| 2026-10-12 | 30 | 30 | 0 | orchestrator — T-02-08 residual from code review WR-01 fixed (2159e20, 60a2197) |
 
 ---
 
