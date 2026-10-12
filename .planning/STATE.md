@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Monitoring
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-10-12T15:35:39.955Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-10-12T15:39:20.344Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 02 execution started
-state_head: cebd78bf075f486b363f90696dba5bf51f4b5694
+state_head: a139f7d8041031791efb7ab670009b137c5f6be8
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 6
+  completed_plans: 7
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 02 (Live Monitoring) — EXECUTING
-Plan: 3 of 10
+Plan: 4 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 02 execution started
 
@@ -62,6 +62,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01 P04 | 40min | 2 tasks | 2 files |
 | Phase 02 P01 | 15min | 2 tasks | 9 files |
 | Phase 02 P02 | 12min | 3 tasks | 12 files |
+| Phase 02 P03 | 6 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-01: unresolved config path keeps defaults; a broken config.toml exits 2 before the token lookup, and --version ignores it
 - [Phase 02]: 02-02: bubbles/key is imported as bkey in internal/ui because the test helper key() owns that package-level name
 - [Phase 02]: 02-02: selected domain.Ref is the source of truth; rebuild() derives rows and cursor; nearest neighbour looks below first, then above
+- [Phase 02]: A merged or closed draft PR sorts as merged (7) or closed (8); only an open draft is bucket 6 (D-04 as clarified 2026-10-12)
+- [Phase 02]: Approved PR with no checks or unknown CI sorts in bucket 5, never ready to merge; updatedAt is not a sort key (D-02)
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T15:35:39.927Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-10-12T15:39:20.315Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
