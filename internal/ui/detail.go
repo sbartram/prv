@@ -338,6 +338,15 @@ func (m Model) checkLines(width int) []string {
 		checks = shown
 	}
 
+	if width > 0 && width < compactBelow {
+		// D-14: a pane this narrow keeps the glyph and the name only.
+		for _, c := range checks {
+			faint := c.State == domain.CheckNeutral || c.State == domain.CheckOther
+			lines = append(lines, glyphLine(checkStyle(c.State), c.State.Glyph(), c.Name, width, faint))
+		}
+		return appendFold(lines, folded)
+	}
+
 	nameW, wordW, srcW := 0, 0, 0
 	for _, c := range checks {
 		nameW = max(nameW, lipgloss.Width(c.Name))
@@ -374,10 +383,25 @@ func (m Model) checkLines(width int) []string {
 		}
 		lines = append(lines, line)
 	}
+	return appendFold(lines, folded)
+}
+
+// appendFold adds the faint fold line when checks are folded away (D-10).
+func appendFold(lines []string, folded int) []string {
 	if folded > 0 {
 		lines = append(lines, faintStyle.Render("  … +"+strconv.Itoa(folded)+" more passing"))
 	}
 	return lines
+}
+
+// glyphLine is a line of a narrow pane: the indent, the glyph and the name cut
+// to the room that is left. faint draws the whole line faint.
+func glyphLine(st lipgloss.Style, glyph, name string, width int, faint bool) string {
+	line := "  " + st.Render(glyph) + " " + ansi.Truncate(name, max(width-4, 0), "…")
+	if faint {
+		line = faintStyle.Render(ansi.Strip(line))
+	}
+	return line
 }
 
 // reviewerName is how a reviewer reads in the detail view: the viewer as "me",
@@ -428,8 +452,13 @@ func (m Model) reviewerLines(width int) []string {
 			}
 			hiddenDone, name = true, hiddenText
 		}
-		pad := strings.Repeat(" ", max(0, nameW-lipgloss.Width(name)))
 		st := reviewerStyle(r.State)
+		if width > 0 && width < compactBelow {
+			faint := r.State == domain.ReviewerCommented || r.State == domain.ReviewerDismissed
+			lines = append(lines, glyphLine(st, r.State.Glyph(), name, width, faint))
+			continue
+		}
+		pad := strings.Repeat(" ", max(0, nameW-lipgloss.Width(name)))
 		line := "  " + st.Render(r.State.Glyph()) + " " + name + pad + "  " + st.Render(r.State.Word())
 		if r.State == domain.ReviewerCommented || r.State == domain.ReviewerDismissed {
 			line = faintStyle.Render(ansi.Strip(line))
