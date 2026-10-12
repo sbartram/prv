@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -30,6 +31,12 @@ func (m Model) render() string {
 			m.snap.Viewer, m.opts.ClosedDays))
 	}
 	return m.renderList()
+}
+
+// clock formats t in the zone of the model's clock: the local zone in
+// production, whatever zone the test clock uses in tests.
+func (m Model) clock(t time.Time, layout string) string {
+	return t.In(m.now().Location()).Format(layout)
 }
 
 // wrap word-wraps a message screen to the pane width, so no line is wider than
@@ -146,7 +153,15 @@ func (m Model) renderList() string {
 		footer += " · some data could not be loaded"
 	}
 
-	lines := []string{"prv · @" + m.snap.Viewer + " · " + strconv.Itoa(len(m.snap.PRs)) + " PRs"}
+	header := "prv · @" + m.snap.Viewer + " · " + strconv.Itoa(len(m.snap.PRs)) + " PRs"
+	if !m.lastOK.IsZero() {
+		// A clock time, not "5s ago": nothing redraws once a second (D-05).
+		header += " · updated " + m.clock(m.lastOK, "15:04:05")
+		if m.inFlight {
+			header += " " + m.spin.View()
+		}
+	}
+	lines := []string{header}
 	lines = append(lines, strings.Split(t.String(), "\n")...)
 	lines = append(lines, footer)
 	for i, l := range lines {

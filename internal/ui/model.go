@@ -133,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 		m.clampOffset()
 	case spinner.TickMsg:
-		if m.state == stateLoading {
+		if m.inFlight || m.state == stateLoading {
 			var cmd tea.Cmd
 			m.spin, cmd = m.spin.Update(msg)
 			return m, cmd
