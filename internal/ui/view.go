@@ -12,6 +12,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/sbartram/prv/internal/domain"
 )
 
 // View renders the current state. The alt screen is declared here in v2.
@@ -30,7 +32,32 @@ func (m Model) render() string {
 	case stateEmpty:
 		return m.renderEmpty()
 	}
+	if len(m.rows) == 0 && len(m.snap.PRs) > 0 {
+		return m.renderFilteredEmpty()
+	}
 	return m.renderList()
+}
+
+// stateIndicator shows which states are visible, one slot per state: the name
+// when visible and "·" when hidden, as "[open merged ·]" (D-10).
+func (m Model) stateIndicator() string {
+	slot := func(st domain.State) string {
+		if m.show.Has(st) {
+			return st.String()
+		}
+		return "·"
+	}
+	return "[" + slot(domain.StateOpen) + " " + slot(domain.StateMerged) + " " + slot(domain.StateClosed) + "]"
+}
+
+// renderFilteredEmpty is the screen for a snapshot that has PRs when the
+// filters hide every one of them (D-13). It must not read like an empty
+// account: it names the filters and how many PRs they hide. The footer still
+// carries the integrity notes (WR-02).
+func (m Model) renderFilteredEmpty() string {
+	msg := "No PRs match: " + m.stateIndicator() +
+		" — " + strconv.Itoa(len(m.snap.PRs)-len(m.rows)) + " hidden by filters · 1/2/3 toggle"
+	return m.header() + "\n" + m.wrap(msg) + "\n\n" + m.footer()
 }
 
 // renderEmpty is the screen for a snapshot with no PRs. When the snapshot is
@@ -176,13 +203,20 @@ func fit(segs []segment, sep string, width int) string {
 	return line
 }
 
-// header builds the first line of the list view. Prio 3 is left free for the
-// filter segment (plan 02-08). The rate warning takes 6.
+// header builds the first line of the list view. The filter segment takes
+// prio 3 and the rate warning 6.
 func (m Model) header() string {
+	count := strconv.Itoa(len(m.rows)) + " PRs"
+	if len(m.rows) != len(m.snap.PRs) {
+		// Filters hide some PRs: say so, so that a filter never looks like
+		// data loss.
+		count = strconv.Itoa(len(m.rows)) + " of " + strconv.Itoa(len(m.snap.PRs)) + " PRs"
+	}
 	segs := []segment{
 		{"prv", 1},
 		{"@" + m.snap.Viewer, 2},
-		{strconv.Itoa(len(m.rows)) + " PRs", 4},
+		{m.stateIndicator(), 3},
+		{count, 4},
 	}
 	if !m.lastOK.IsZero() {
 		// Clock times, not "5s ago": nothing redraws once a second (D-05).

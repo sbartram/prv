@@ -3,6 +3,8 @@ package domain
 import (
 	"cmp"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -80,4 +82,38 @@ func Sort(prs []PR) {
 		}
 		return cmp.Compare(a.Ref.Number, b.Ref.Number)
 	})
+}
+
+// StateSet is a set of the lifecycle states the user wants to see (D-10). The
+// unknown state has no bit: a PR in an unknown state is never filtered out.
+type StateSet uint8
+
+// AllStates shows open, merged and closed PRs.
+const AllStates = StateSet(1<<StateOpen | 1<<StateMerged | 1<<StateClosed)
+
+// Has reports whether st is in the set.
+func (s StateSet) Has(st State) bool { return s&(1<<uint(st)) != 0 }
+
+// Toggle returns the set with st added when it was absent and removed when it
+// was present.
+func (s StateSet) Toggle(st State) StateSet { return s ^ (1 << uint(st)) }
+
+// Visible returns the PRs the filters let through, in input order, as a new
+// slice; prs is not changed. A PR passes when its state is in show and, if
+// number is not empty, its PR number starts with the digits in number (so "12"
+// keeps #12, #120 and #1234, never #312). A PR in an unknown state is never
+// hidden by show (same rule as InWindow): it must not vanish silently. The
+// number filter still applies to it.
+func Visible(prs []PR, show StateSet, number string) []PR {
+	out := make([]PR, 0, len(prs))
+	for _, pr := range prs {
+		if pr.State != StateUnknown && !show.Has(pr.State) {
+			continue
+		}
+		if number != "" && !strings.HasPrefix(strconv.Itoa(pr.Ref.Number), number) {
+			continue
+		}
+		out = append(out, pr)
+	}
+	return out
 }

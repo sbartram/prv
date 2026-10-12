@@ -2,6 +2,7 @@ package domain
 
 import (
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -322,4 +323,63 @@ func TestBucket(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStateSet(t *testing.T) {
+	for _, st := range []State{StateOpen, StateMerged, StateClosed} {
+		if !AllStates.Has(st) {
+			t.Errorf("AllStates lacks %v", st)
+		}
+	}
+	if AllStates.Has(StateUnknown) {
+		t.Error("AllStates must not claim the unknown state")
+	}
+	s := AllStates.Toggle(StateMerged)
+	if s.Has(StateMerged) || !s.Has(StateOpen) || !s.Has(StateClosed) {
+		t.Errorf("Toggle(merged) = %b, want open and closed only", s)
+	}
+	if got := s.Toggle(StateMerged); got != AllStates {
+		t.Errorf("toggling merged twice = %b, want AllStates %b", got, AllStates)
+	}
+}
+
+func TestVisible(t *testing.T) {
+	mk := func(n int, st State) PR { return PR{ID: strconv.Itoa(n), State: st, Ref: Ref{Repo: "a/b", Number: n}} }
+	nums := func(prs []PR) []int {
+		out := []int{}
+		for _, p := range prs {
+			out = append(out, p.Ref.Number)
+		}
+		return out
+	}
+	states := []PR{mk(1, StateOpen), mk(2, StateMerged), mk(3, StateClosed), mk(4, StateUnknown)}
+	tests := []struct {
+		name   string
+		prs    []PR
+		show   StateSet
+		number string
+		want   []int
+	}{
+		{"all states keep every PR in order", states, AllStates, "", []int{1, 2, 3, 4}},
+		{"open only keeps open and unknown", states, 1 << StateOpen, "", []int{1, 4}},
+		{"empty set keeps only unknown", states, 0, "", []int{4}},
+		{"prefix 12 is adjacent-safe", []PR{mk(12, 0), mk(120, 0), mk(1234, 0), mk(312, 0), mk(21, 0)}, AllStates, "12", []int{12, 120, 1234}},
+		{"leading zero matches nothing", []PR{mk(1, 0), mk(10, 0)}, AllStates, "01", []int{}},
+		{"number filter and toggles combine", states, 1 << StateMerged, "2", []int{2}},
+		{"nil input gives an empty result", nil, AllStates, "", []int{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nums(Visible(tt.prs, tt.show, tt.number)); !slices.Equal(got, tt.want) {
+				t.Errorf("Visible = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	t.Run("input is not modified", func(t *testing.T) {
+		in := slices.Clone(states)
+		_ = Visible(in, 0, "9")
+		if !slices.Equal(in, states) {
+			t.Error("Visible changed its input")
+		}
+	})
 }

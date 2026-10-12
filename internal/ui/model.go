@@ -28,6 +28,7 @@ const defaultInterval = 60 * time.Second
 // Options configures the model.
 type Options struct {
 	ClosedDays int
+	Show       domain.StateSet  // states visible at launch; zero means domain.AllStates (D-12)
 	Interval   time.Duration    // zero means defaultInterval
 	Now        func() time.Time // nil means time.Now
 }
@@ -55,9 +56,13 @@ type Model struct {
 	err   error
 	w, h  int
 
+	// show is which lifecycle states are visible (D-10). It lasts for the
+	// session only: nothing is written to disk (D-12).
+	show domain.StateSet
+
 	// Selection is tracked by PR ref (D-03). selected is the source of truth;
 	// rebuild derives cursor from it after every snapshot. rows is what is on
-	// screen; plan 02-08 makes it a filtered view of snap.PRs.
+	// screen: snap.PRs after the filters.
 	selected domain.Ref
 	rows     []domain.PR
 	cursor   int // index of selected in rows; 0 when there are no rows
@@ -109,7 +114,12 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 	h := help.New()
 	h.ShortSeparator = " · "
 	h.Styles = helpStyles()
+	show := opts.Show
+	if show == 0 {
+		show = domain.AllStates
+	}
 	return Model{
+		show:     show,
 		ctx:      ctx,
 		fetcher:  f,
 		opts:     opts,
@@ -150,6 +160,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = stateLoading
 			}
 			return m, m.beginFetch()
+		case bkey.Matches(msg, m.keys.ToggleOpen):
+			m.show = m.show.Toggle(domain.StateOpen)
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.ToggleMerged):
+			m.show = m.show.Toggle(domain.StateMerged)
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.ToggleClosed):
+			m.show = m.show.Toggle(domain.StateClosed)
+			m.rebuild()
 		case bkey.Matches(msg, m.keys.Down):
 			if m.state == stateList && m.cursor < len(m.rows)-1 {
 				m.cursor++
@@ -239,13 +258,13 @@ func (m *Model) schedule(err error) tea.Cmd {
 	return m.arm(d.Wait)
 }
 
-// rebuild derives the rows on screen and the cursor from the snapshot and the
-// selected ref. A refresh that moves the selected PR moves the cursor with it;
+// rebuild derives the rows on screen and the cursor from the snapshot, the
+// filters and the selected ref. A refresh that moves the selected PR moves the cursor with it;
 // when the PR left the list the cursor lands on its nearest surviving
 // neighbour in the old order (D-03).
 func (m *Model) rebuild() {
 	oldRows, oldCur := m.rows, m.cursor
-	m.rows = m.snap.PRs
+	m.rows = domain.Visible(m.snap.PRs, m.show, "")
 	switch {
 	case len(m.rows) == 0:
 		// Keep m.selected: the PR may come back.
