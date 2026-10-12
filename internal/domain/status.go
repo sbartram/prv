@@ -82,3 +82,9 @@ func (c CI) Badge() string {
 	}
 	return "– no checks"
 }
+
+// Glyph is a stub (RED).
+func (r Review) Glyph() string { return "" }
+
+// Glyph is a stub (RED).
+func (c CI) Glyph() string { return "" }

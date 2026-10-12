@@ -263,6 +263,12 @@ func TestGolden(t *testing.T) {
 	}
 }
 
+// TestGoldenCompact is the compact list of a 36-cell pane (D-14).
+func TestGoldenCompact(t *testing.T) {
+	m := newTestModel(t, fixtureSix(), 36, 12)
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
 func itoa(n int) string { return strconv.Itoa(n) }
 
 func lines(s string) []string { return strings.Split(ansi.Strip(s), "\n") }

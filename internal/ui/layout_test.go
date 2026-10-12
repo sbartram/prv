@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
@@ -173,5 +176,247 @@ func TestTrimLeft(t *testing.T) {
 	}
 	if got := trimLeft("acme-corporation/backend-service#4321", 20); !strings.HasPrefix(got, "…") || !strings.HasSuffix(got, "#4321") {
 		t.Errorf("a cut ref must start with … and keep its number: %q", got)
+	}
+}
+
+// TestLayoutCompact: below 40 cells the list turns into compact rows; an
+// unsized pane never does (D-14).
+func TestLayoutCompact(t *testing.T) {
+	for _, tt := range []struct {
+		total   int
+		compact bool
+	}{{-1, false}, {0, false}, {1, true}, {20, true}, {39, true}, {40, false}, {41, false}, {120, false}} {
+		if got := layoutColumns(testSizes(), tt.total).compact; got != tt.compact {
+			t.Errorf("layoutColumns(total=%d).compact = %v, want %v", tt.total, got, tt.compact)
+		}
+	}
+}
+
+// compactSnap has three open PRs with github.com URLs, so o can open them.
+func compactSnap() domain.Snapshot {
+	snap := fixtureSix()
+	for i := range snap.PRs {
+		snap.PRs[i].URL = fmt.Sprintf("https://github.com/%s/pull/%d", snap.PRs[i].Ref.Repo, snap.PRs[i].Ref.Number)
+	}
+	return snap
+}
+
+func TestCompactRows(t *testing.T) {
+	ls := lines(newTestModel(t, fixtureSix(), 36, 12).View().Content)
+	want := map[string]string{
+		"api#101": "> api#101 ✓✓",
+		"api#102": "  api#102 ✗✗",
+		"web#7":   "  web#7 –●",
+		"docs#3":  "  docs#3 ○–",
+		"docs#2":  "  docs#2 –?",
+		"web#6":   "  web#6 ✓✓",
+	}
+	for ref, row := range want {
+		var found string
+		for _, l := range ls {
+			if strings.Contains(l, ref) {
+				found = l
+			}
+		}
+		if found != row {
+			t.Errorf("row of %s = %q, want %q", ref, found, row)
+		}
+	}
+	for _, l := range ls {
+		if strings.Contains(l, "acme/") {
+			t.Errorf("a compact row shows the owner: %q", l)
+		}
+	}
+
+	t.Run("a ref that does not fit is cut from the left and keeps both glyphs", func(t *testing.T) {
+		snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{{
+			ID: "1", Ref: domain.Ref{Repo: "acme/long-repository-name", Number: 1234}, Title: "t", Author: "octo",
+			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing,
+		}}}
+		for _, w := range []int{12, 11, 10, 8, 7} {
+			row := lines(newTestModel(t, snap, w, 12).View().Content)[2]
+			if !strings.HasSuffix(row, " ✗✗") || !strings.Contains(row, "…") {
+				t.Errorf("w=%d: row = %q, want a left-cut ref, then \" ✗✗\"", w, row)
+			}
+			if w >= 11 && !strings.Contains(row, "#1234") {
+				t.Errorf("w=%d: row = %q, want the cut ref to keep #1234", w, row)
+			}
+			if lipgloss.Width(row) > w {
+				t.Errorf("w=%d: row is %d cells wide: %q", w, lipgloss.Width(row), row)
+			}
+		}
+	})
+
+	t.Run("the selected row is reversed segment by segment", func(t *testing.T) {
+		raw := strings.Split(newTestModel(t, fixtureSix(), 36, 12).View().Content, "\n")[2]
+		reverse := regexp.MustCompile(`\x1b\[(?:[0-9]+;)*7(?:;[0-9]+)*m`)
+		if got := len(reverse.FindAllString(raw, -1)); got < 3 {
+			t.Errorf("the selected compact row has %d reverse-video segments, want 3 (ref, review glyph, CI glyph): %q", got, raw)
+		}
+	})
+}
+
+func TestCompactHeaderHint(t *testing.T) {
+	for _, w := range []int{20, 36, 39} {
+		ls := lines(newTestModel(t, fixtureSix(), w, 12).View().Content)
+		if want := "  PR  widen for columns"; !strings.HasPrefix(want, ls[1]) && ls[1] != want {
+			t.Errorf("w=%d: column-header line = %q, want %q cut to the width", w, ls[1], want)
+		}
+		if strings.Contains(ls[0], "widen") {
+			t.Errorf("w=%d: the header line carries the hint: %q", w, ls[0])
+		}
+	}
+	if got := lines(newTestModel(t, fixtureSix(), 36, 12).View().Content)[1]; got != "  PR  widen for columns" {
+		t.Errorf("w=36: column-header line = %q", got)
+	}
+	for _, w := range []int{40, 41, 80} {
+		if out := newTestModel(t, fixtureSix(), w, 12).View().Content; strings.Contains(out, "widen for columns") {
+			t.Errorf("w=%d: the hint is shown at 40 cells or more", w)
+		}
+	}
+}
+
+// markedLine is the one line that starts with the marker, or "".
+func markedLine(t *testing.T, m tea.Model) string {
+	t.Helper()
+	var found []string
+	for _, l := range strings.Split(plain(m), "\n") {
+		if strings.HasPrefix(l, ">") {
+			found = append(found, l)
+		}
+	}
+	if len(found) > 1 {
+		t.Fatalf("%d rows are marked: %q", len(found), found)
+	}
+	if len(found) == 0 {
+		return ""
+	}
+	return found[0]
+}
+
+func TestCompactNavigation(t *testing.T) {
+	o := &fakeOpener{}
+	var m tea.Model = filterModelOpts(36, 12, compactSnap(), Options{ClosedDays: 14, Now: fixedNow, Opener: o})
+	first := markedLine(t, m)
+	if first != "> api#101 ✓✓" {
+		t.Fatalf("first marked row = %q", first)
+	}
+	m = press(m, "j")
+	second := markedLine(t, m)
+	if second == first || second == "" {
+		t.Errorf("j did not move the marker: %q", second)
+	}
+	m = press(m, "k")
+	if got := markedLine(t, m); got != first {
+		t.Errorf("k did not move the marker back: %q", got)
+	}
+
+	// o opens the selected PR.
+	m, cmd := m.Update(key("o"))
+	if cmd == nil {
+		t.Fatal("o returned no command in the compact list")
+	}
+	cmd()
+	if len(o.urls) != 1 || o.urls[0] != "https://github.com/acme/api/pull/101" {
+		t.Errorf("opened %v, want the selected PR", o.urls)
+	}
+
+	// 1/2/3 and / keep working.
+	m = press(m, "1")
+	if strings.Contains(plain(m), "api#101") {
+		t.Errorf("1 did not hide the open PRs in the compact list:\n%s", plain(m))
+	}
+	m = press(m, "1", "/", "1", "0", "2")
+	if got := lastLine(m); !strings.HasPrefix(got, "/ 102█") {
+		t.Errorf("the number prompt line = %q", got)
+	}
+	if got := markedLine(t, m); got != "> api#102 ✗✗" {
+		t.Errorf("filtering by 102 left %q marked", got)
+	}
+}
+
+func TestResizeKeepsSelection(t *testing.T) {
+	var m tea.Model = selModel(120, 40, rangeInts(1, 30)...)
+	m = press(m, strings.Split(strings.Repeat("j", 20), "")...)
+	for _, sz := range [][2]int{{120, 40}, {60, 15}, {30, 10}, {120, 40}, {36, 6}, {80, 24}} {
+		m, _ = m.Update(tea.WindowSizeMsg{Width: sz[0], Height: sz[1]})
+		if got := markedLine(t, m); !strings.Contains(got, "#21") {
+			t.Errorf("after resizing to %dx%d the marked row is %q, want PR #21", sz[0], sz[1], got)
+		}
+		if n := len(strings.Split(plain(m), "\n")); n > sz[1] {
+			t.Errorf("%dx%d: %d lines", sz[0], sz[1], n)
+		}
+	}
+}
+
+func rangeInts(from, to int) []int {
+	var out []int
+	for i := from; i <= to; i++ {
+		out = append(out, i)
+	}
+	return out
+}
+
+func TestTinyHeights(t *testing.T) {
+	for _, w := range []int{80, 36} {
+		for h, want := range map[int][]string{
+			1: {">"},
+			2: {"@octo", ">"},
+			3: {"@octo", ">", "j/k"},
+		} {
+			ls := lines(newTestModel(t, fixtureSix(), w, h).View().Content)
+			if len(ls) != len(want) {
+				t.Errorf("w=%d h=%d: %d lines, want %d: %q", w, h, len(ls), len(want), ls)
+				continue
+			}
+			for i, part := range want {
+				ok := strings.Contains(ls[i], part)
+				if part == ">" {
+					ok = strings.HasPrefix(ls[i], ">")
+				}
+				if !ok {
+					t.Errorf("w=%d h=%d: line %d = %q, want it to hold %q", w, h, i, ls[i], part)
+				}
+			}
+		}
+	}
+}
+
+// TestNeverOverflows renders the list at every width and height the property
+// covers, prompt closed and open: no panic, no line wider than the pane, no
+// more lines than the pane.
+func TestNeverOverflows(t *testing.T) {
+	check := func(w, h int, prompt bool) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("%dx%d prompt=%v: panic: %v", w, h, prompt, r)
+			}
+		}()
+		var m tea.Model = newTestModel(t, fixtureThirty(), w, h)
+		if prompt {
+			m = press(m, "/", "1")
+		}
+		ls := lines(m.View().Content)
+		if len(ls) > h {
+			t.Errorf("%dx%d prompt=%v: %d lines, want at most %d", w, h, prompt, len(ls), h)
+		}
+		for _, l := range ls {
+			if lipgloss.Width(l) > w {
+				t.Errorf("%dx%d prompt=%v: line is %d cells wide: %q", w, h, prompt, lipgloss.Width(l), l)
+				break
+			}
+		}
+	}
+	for _, prompt := range []bool{false, true} {
+		for _, h := range []int{3, 15, 50} {
+			for w := 1; w <= 200; w++ {
+				check(w, h, prompt)
+			}
+		}
+		for _, w := range []int{30, 60, 120} {
+			for h := 1; h <= 50; h++ {
+				check(w, h, prompt)
+			}
+		}
 	}
 }

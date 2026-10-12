@@ -3,6 +3,7 @@ package domain
 import (
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -118,6 +119,29 @@ func TestBadge(t *testing.T) {
 	for c, want := range cis {
 		if got := c.Badge(); got != want {
 			t.Errorf("CI(%d).Badge() = %q, want %q", c, got, want)
+		}
+	}
+}
+
+// TestGlyphPrefix keeps the one-cell glyphs of the compact rows from drifting
+// away from the badges (RESEARCH Pitfall 11).
+func TestGlyphPrefix(t *testing.T) {
+	reviews := map[Review]string{ReviewApproved: "✓", ReviewChangesRequested: "✗", ReviewRequired: "○", ReviewNone: "–"}
+	for r, want := range reviews {
+		if got := r.Glyph(); got != want {
+			t.Errorf("Review(%d).Glyph() = %q, want %q", r, got, want)
+		}
+		if !strings.HasPrefix(r.Badge(), r.Glyph()) {
+			t.Errorf("Review(%d).Badge() = %q does not start with Glyph() %q", r, r.Badge(), r.Glyph())
+		}
+	}
+	cis := map[CI]string{CIPassing: "✓", CIFailing: "✗", CIRunning: "●", CINone: "–", CIUnknown: "?"}
+	for c, want := range cis {
+		if got := c.Glyph(); got != want {
+			t.Errorf("CI(%d).Glyph() = %q, want %q", c, got, want)
+		}
+		if !strings.HasPrefix(c.Badge(), c.Glyph()) {
+			t.Errorf("CI(%d).Badge() = %q does not start with Glyph() %q", c, c.Badge(), c.Glyph())
 		}
 	}
 }
