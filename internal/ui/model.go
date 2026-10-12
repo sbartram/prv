@@ -104,14 +104,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "j", "down":
 			if m.state == stateList && m.cursor < len(m.snap.PRs)-1 {
 				m.cursor++
+				m.clampOffset()
 			}
 		case "k", "up":
 			if m.state == stateList && m.cursor > 0 {
 				m.cursor--
+				m.clampOffset()
 			}
 		}
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
+		m.clampOffset()
 	case spinner.TickMsg:
 		if m.state == stateLoading {
 			var cmd tea.Cmd
@@ -123,7 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil // the program is quitting
 		}
 		m.loading = false
-		m.cursor = 0
+		m.cursor, m.offset = 0, 0
 		if msg.err != nil {
 			m.state = stateError
 			m.err = msg.err
