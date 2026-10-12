@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Monitoring
 status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-10-12T15:50:16.339Z"
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-10-12T15:53:29.330Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 02 execution started
-state_head: 93f53472a52a3c6075d28dc64ddb02418fec18a5
+state_head: e9388dd1c6d3828532b3c0a12b7eac9dd5aced57
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 8
+  completed_plans: 9
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 02 (Live Monitoring) — EXECUTING
-Plan: 5 of 10
+Plan: 6 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 02 execution started
 
@@ -64,6 +64,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P02 | 12min | 3 tasks | 12 files |
 | Phase 02 P03 | 6 min | 2 tasks | 7 files |
 | Phase 02 P04 | 3 min | 2 tasks | 18 files |
+| Phase 02 P05 | 4 min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Approved PR with no checks or unknown CI sorts in bucket 5, never ready to merge; updatedAt is not a sort key (D-02)
 - [Phase 02]: 02-04: header segments carry priorities (prv 1, @login 2, N PRs 4, updated 5, failure marker 7); prio 3 and 6 are reserved for the filter segment (02-08) and rate warning (02-05)
 - [Phase 02]: 02-04: footer shows integrity notes before key hints; notes are cut with an ellipsis, never dropped; hints need at least 8 cells and come from keyMap.ShortHelp()
+- [Phase 02]: D-06 'always shows' read as 'from the first successful response on': api segment absent while Limit is 0, last value kept through failed refreshes
+- [Phase 02]: Rate warning boundary is Remaining*5 < Limit (999/5000 warns, 1000/5000 does not); header prio 6, footer drops hints before notes or api
 
 ### Pending Todos
 
@@ -114,6 +117,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T15:50:16.309Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-10-12T15:53:29.301Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None
