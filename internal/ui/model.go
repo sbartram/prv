@@ -146,13 +146,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.inFlight = false
 		if msg.err != nil {
+			m.err = msg.err
+			if !m.lastOK.IsZero() {
+				// Data has been shown: keep the rows and the state, undimmed.
+				m.failedAt = m.now()
+				return m, m.arm(m.interval)
+			}
+			// No data yet: the error panel, and the tick retries on its own.
 			m.cursor, m.offset = 0, 0
 			m.state = stateError
-			m.err = msg.err
 			return m, m.arm(m.interval)
 		}
 		m.cursor, m.offset = 0, 0
 		m.err = nil
+		m.failedAt = time.Time{}
 		m.snap = msg.snap
 		m.lastOK = m.now()
 		if len(msg.snap.PRs) == 0 {
