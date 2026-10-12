@@ -437,13 +437,28 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 	case "filtered":
 		var m tea.Model = newTestModel(t, fixtureSix(), w, h)
 		return press(m, "1", "2", "3").(Model)
-	case "detail", "detail-expanded":
+	case "detail", "detail-expanded", "detail-loading", "detail-error", "detail-gone", "detail-scrolled":
 		var m tea.Model = New(t.Context(), newDetailFake(bigDetail()), Options{ClosedDays: 14, Now: fixedNow})
 		m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 		m, _ = m.Update(fetchedMsg{snap: fixtureThirty()})
+		if state == "detail-loading" {
+			m, _ = m.Update(key("enter")) // the Cmd is not run: the result never arrives
+			return m.(Model)
+		}
 		m = runDetailOpen(t, m)
-		if state == "detail-expanded" {
+		switch state {
+		case "detail-expanded", "detail-scrolled":
 			m = press(m, "e")
+			if state == "detail-scrolled" {
+				m = press(m, "j", "j", "j", "j")
+			}
+		case "detail-error":
+			mm := m.(Model)
+			m, _ = m.Update(detailMsg{seq: mm.detailSeq, ref: mm.detail.ref, err: &shortErr{short: "network"}})
+		case "detail-gone":
+			snap := fixtureThirty()
+			snap.PRs = snap.PRs[1:] // the open PR is the first row
+			m, _ = m.Update(fetchedMsg{snap: snap})
 		}
 		return m.(Model)
 	}
@@ -453,7 +468,8 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 
 func TestGolden(t *testing.T) {
 	sizes := [][2]int{{60, 15}, {80, 24}, {120, 40}, {0, 0}}
-	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded"} {
+	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
+		"detail-loading", "detail-error", "detail-gone", "detail-scrolled"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
 			t.Run(name, func(t *testing.T) {
@@ -638,7 +654,8 @@ func TestScrollFollowsCursor(t *testing.T) {
 
 func TestViewFitsScreen(t *testing.T) {
 	for _, sz := range [][2]int{{60, 15}, {80, 24}, {120, 40}} {
-		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded"} {
+		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
+			"detail-loading", "detail-error", "detail-gone", "detail-scrolled"} {
 			t.Run(state+"_"+itoa(sz[0])+"x"+itoa(sz[1]), func(t *testing.T) {
 				ls := lines(stateModel(t, state, sz[0], sz[1]).View().Content)
 				if len(ls) > sz[1] {
@@ -653,7 +670,8 @@ func TestViewFitsScreen(t *testing.T) {
 		}
 	}
 	t.Run("not sized does not panic", func(t *testing.T) {
-		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded"} {
+		for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
+			"detail-loading", "detail-error", "detail-gone", "detail-scrolled"} {
 			_ = stateModel(t, state, 0, 0).View()
 		}
 	})

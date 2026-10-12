@@ -468,3 +468,38 @@ func TestNeverOverflows(t *testing.T) {
 		}
 	}
 }
+
+// TestNeverOverflowsDetail is the same property for the detail view in each of
+// its states: no panic, no line wider than the pane, no more lines than the
+// pane.
+func TestNeverOverflowsDetail(t *testing.T) {
+	check := func(state string, w, h int) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("%s %dx%d: panic: %v", state, w, h, r)
+			}
+		}()
+		ls := lines(stateModel(t, state, w, h).View().Content)
+		if len(ls) > h {
+			t.Errorf("%s %dx%d: %d lines, want at most %d", state, w, h, len(ls), h)
+		}
+		for _, l := range ls {
+			if lipgloss.Width(l) > w {
+				t.Errorf("%s %dx%d: line is %d cells wide: %q", state, w, h, lipgloss.Width(l), l)
+				break
+			}
+		}
+	}
+	for _, state := range []string{"detail", "detail-expanded", "detail-gone", "detail-error"} {
+		for _, h := range []int{3, 15, 50} {
+			for w := 1; w <= 200; w++ {
+				check(state, w, h)
+			}
+		}
+		for _, w := range []int{30, 60, 120} {
+			for h := 1; h <= 50; h++ {
+				check(state, w, h)
+			}
+		}
+	}
+}

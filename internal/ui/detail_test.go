@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
 )
@@ -958,5 +959,162 @@ func TestDetailStaleAfterSwitch(t *testing.T) {
 	m, _ = m.Update(detailMsg{seq: mm.detailSeq, ref: mm.detail.ref, data: fixtureDetail()})
 	if m.(Model).detail.data == nil {
 		t.Error("the current result was dropped")
+	}
+}
+
+// ---- narrow panes, resizes and tiny heights (plan 03-08 task 2) ----
+
+// narrowDetail is fixtureDetail with two long names added: a check whose name
+// does not fit 36 cells, and one whose line only fits without its source.
+func narrowDetail() domain.Detail {
+	d := fixtureDetail()
+	d.Checks = append(d.Checks,
+		domain.Check{Name: "a-very-long-check-name-that-never-ends-ok", Source: "ci-very-long-workflow.yml", State: domain.CheckFailing, Word: "timed out"},
+	)
+	domain.SortChecks(d.Checks)
+	d.Counts, d.Read, d.Total = domain.CountChecks(d.Checks), len(d.Checks), len(d.Checks)
+	return d
+}
+
+func TestDetailNarrow(t *testing.T) {
+	open := func(w int) []string {
+		m := press(runDetailOpen(t, detailModel(t, newDetailFake(narrowDetail()), Options{}, w, 40)), "e")
+		return strings.Split(plain(m), "\n")
+	}
+	lineWithText := func(ls []string, text string) string {
+		for _, l := range ls {
+			if strings.Contains(l, text) {
+				return l
+			}
+		}
+		return ""
+	}
+
+	t.Run("36 cells keep only the glyph and the name", func(t *testing.T) {
+		ls := open(36)
+		for _, want := range []string{
+			"  ✗ lint", "  ✗ unit", "  ⊘ integration", "  ● e2e", "  ✓ build", "  – preview",
+			"  ✗ bob", "  … carol", "  ✓ alice", "  · dave", "  – erin", "  … 2 teams (names hidden)",
+		} {
+			found := false
+			for _, l := range ls {
+				if l == want {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("no line is exactly %q:\n%s", want, strings.Join(ls, "\n"))
+			}
+		}
+		for _, word := range []string{"timed out", "failure", "ci.yml", "changes requested", "approved", "pending", "commented"} {
+			for _, l := range ls { // the indented lines are the checks and the reviewers
+				if strings.HasPrefix(l, "  ") && strings.Contains(l, word) {
+					t.Errorf("the word %q is still drawn: %q", word, l)
+				}
+			}
+		}
+		long := lineWithText(ls, "a-very-long")
+		if !strings.HasPrefix(long, "  ✗ a-very-long") || !strings.HasSuffix(long, "…") || lipgloss.Width(long) > 36 {
+			t.Errorf("the long name should be cut with an ellipsis within 36 cells: %q", long)
+		}
+		for _, l := range ls {
+			if lipgloss.Width(l) > 36 {
+				t.Errorf("line is %d cells wide: %q", lipgloss.Width(l), l)
+			}
+		}
+		if sum := lineWithText(ls, "CHECKS"); lipgloss.Width(sum) > 36 || !strings.HasPrefix(sum, "CHECKS  3 failing") {
+			t.Errorf("the summary should be cut to 36 cells: %q", sum)
+		}
+	})
+	t.Run("60 cells drop the source before the word", func(t *testing.T) {
+		ls := open(60)
+		long := lineWithText(ls, "a-very-long")
+		if !strings.Contains(long, "timed out") || strings.Contains(long, "ci-very") {
+			t.Errorf("the long line should keep the word and lose the source: %q", long)
+		}
+		if l := lineWithText(ls, "✗ unit"); strings.Contains(l, "ci.yml") || !strings.Contains(l, "failure") {
+			t.Errorf("the source column should go for every line at once: %q", l)
+		}
+		for _, l := range ls {
+			if lipgloss.Width(l) > 60 {
+				t.Errorf("line is %d cells wide: %q", lipgloss.Width(l), l)
+			}
+		}
+	})
+	t.Run("120 cells keep the source", func(t *testing.T) {
+		if l := lineWithText(open(120), "✗ unit"); !strings.Contains(l, "ci.yml") {
+			t.Errorf("the source column is gone at 120 cells: %q", l)
+		}
+	})
+}
+
+func TestDetailResize(t *testing.T) {
+	m := press(runDetailOpen(t, detailModel(t, newDetailFake(bigDetail()), Options{}, 120, 40)), "e")
+	for range 60 {
+		m = press(m, "j")
+	}
+	ref := m.(Model).detail.ref
+
+	valid := func(step string, w, h int) {
+		t.Helper()
+		ls := strings.Split(plain(m), "\n")
+		if len(ls) > h {
+			t.Errorf("%s: %d lines, want at most %d", step, len(ls), h)
+		}
+		for _, l := range ls {
+			if lipgloss.Width(l) > w {
+				t.Errorf("%s: line is %d cells wide, want at most %d: %q", step, lipgloss.Width(l), w, l)
+				break
+			}
+		}
+		if last := ls[len(ls)-1]; !strings.Contains(last, "esc back") {
+			t.Errorf("%s: the last line is %q, want the footer", step, last)
+		}
+		vp := m.(Model).detail.vp
+		if limit := max(0, vp.TotalLineCount()-vp.Height()); vp.YOffset() > limit {
+			t.Errorf("%s: offset %d is past the end (max %d)", step, vp.YOffset(), limit)
+		}
+	}
+	for _, sz := range [][2]int{{60, 15}, {36, 12}, {120, 40}, {30, 6}} {
+		m, _ = m.Update(tea.WindowSizeMsg{Width: sz[0], Height: sz[1]})
+		for range 60 {
+			m = press(m, "j") // to the bottom at this size
+		}
+		valid(itoa(sz[0])+"x"+itoa(sz[1]), sz[0], sz[1])
+		if sz[0] < 40 {
+			if v := plain(m); strings.Contains(v, "ci.yml") || strings.Contains(v, "success") {
+				t.Errorf("%dx%d: the body was not laid out again at the new width:\n%s", sz[0], sz[1], v)
+			}
+		}
+	}
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	valid("120x40 again", 120, 40)
+	if v := plain(m); !strings.Contains(v, "ci.yml") {
+		t.Errorf("the source column did not come back at 120 cells:\n%s", v)
+	}
+	m = press(m, "esc")
+	if mm := m.(Model); mm.detail.open || mm.selected != ref {
+		t.Errorf("open=%v selected=%v after esc, want the list with %v", mm.detail.open, mm.selected, ref)
+	}
+}
+
+func TestDetailTinyHeights(t *testing.T) {
+	for _, w := range []int{80, 36} {
+		for h, want := range map[int][]string{
+			1: {"prv · "},
+			2: {"prv · ", "esc"},
+			3: {"prv · ", "", "esc"}, // header, one body line (the title), footer
+		} {
+			ls := lines(stateModel(t, "detail", w, h).View().Content)
+			if len(ls) != len(want) {
+				t.Errorf("w=%d h=%d: %d lines, want %d: %q", w, h, len(ls), len(want), ls)
+				continue
+			}
+			for i, part := range want {
+				if !strings.Contains(ls[i], part) {
+					t.Errorf("w=%d h=%d: line %d = %q, want it to hold %q", w, h, i, ls[i], part)
+				}
+			}
+		}
 	}
 }
