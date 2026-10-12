@@ -576,20 +576,21 @@ func safeURL(raw string) (string, bool) {
 | A11 | `github.com/BurntSushi/toml` is legitimate; the seam cannot verify Go modules | Package Legitimacy Audit | Low: locked in CLAUDE.md, proxy `Origin` matches |
 | A12 | No logging in this phase (D-16 forbids new CLI flags, so `--debug` cannot be added) | Open Questions | Low |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Logging in Phase 2?**
+1. **Logging in Phase 2?** RESOLVED: no logging in Phase 2. Settled by plan 02-01 (RESEARCH A12 note): D-16 adds no CLI flags, so there is no `--debug`, and CONTEXT Claude's Discretion makes logging optional. "Logs go to a file only" holds because nothing logs.
    - What we know: CONTEXT allows logging "if added", suggests `$XDG_STATE_HOME/prv/prv.log` gated by `--debug`; D-16 says "No other CLI flags are added".
    - What's unclear: whether a `--debug` flag (or an env var) is wanted.
    - Recommendation: add no logging in Phase 2. The status line already shows `api N`, last-ok, and the failure reason. If wanted, gate on `PRV_LOG=<path>` (an env var is not a CLI flag) and write with `slog` to that file only.
 
-2. **Flag out of range: reject or clamp?** (A6)
+2. **Flag out of range: reject or clamp?** (A6) RESOLVED: the flag is rejected outside 1..365 with exit 2 and the config value is clamped to 1..365. Settled by plan 02-09 (RESEARCH A6 note, D-16 must-have truth, TestHiddenClosedDaysFlag and TestClampClosedDays).
    - Recommendation: keep exit 2 for the flag (the existing test pins `--closed-days 0` to 2); clamp only config values.
 
-3. **Literal D-04 for closed/merged drafts?** (A5)
+3. **Literal D-04 for closed/merged drafts?** (A5) RESOLVED by the user on 2026-10-12: the D-04 clarification in 02-CONTEXT.md (commit ea6b159) says lifecycle state is checked first, so a merged or closed draft sorts with merged or closed PRs. Plan 02-03 Task 1 implements it and TestBucket pins a merged draft (7) and a closed draft (8).
    - Recommendation: state first, then draft. Confirm during planning if the user cares.
 
-4. **Config warnings display.** "One-time warning in the TUI": recommended as an 8 s transient message plus a permanent line in the help overlay's settings block.
+4. **Config warnings display.** RESOLVED: plan 02-09 Task 2 shows each unknown-key warning in its own footer segment for 8 s from the first fetch result, with a redraw at expiry (D-15). Plan 02-10 Task 1 lists the warnings in the help overlay for the whole session.
+   - Original recommendation: "One-time warning in the TUI" as an 8 s transient message plus a permanent line in the help overlay's settings block.
 
 ## Environment Availability
 
