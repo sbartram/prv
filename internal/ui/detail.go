@@ -49,10 +49,11 @@ func (m *Model) openDetail(pr domain.PR) tea.Cmd {
 }
 
 // startDetailFetch starts a detail fetch for the open PR. It returns nil when
-// the fetcher has no detail method or a detail fetch is already running.
+// the fetcher has no detail method, a detail fetch is already running, the PR
+// left the list (D-12) or a rate-limit pause is running (Phase 2 D-08).
 func (m *Model) startDetailFetch() tea.Cmd {
 	df, ok := m.fetcher.(DetailFetcher)
-	if !ok || m.detailInFlight {
+	if !ok || m.detailInFlight || m.detail.gone || m.now().Before(m.pausedUntil) {
 		return nil
 	}
 	m.detailSeq++
@@ -68,6 +69,24 @@ func (m *Model) closeDetail() {
 	m.detailSeq++
 	m.detailInFlight = false
 	m.clampOffset()
+}
+
+// refreshDetail runs after each successful list refresh while the detail view
+// is open (D-11). It looks the open PR up in the rows on screen: found, the
+// view takes the fresh copy and the selection follows the PR, so esc returns
+// to it even when it left the list and came back; not found, the view keeps its
+// last data and says so (D-12). It returns the Cmd of the next detail fetch, or
+// nil when none may start.
+func (m *Model) refreshDetail() tea.Cmd {
+	if i := indexOf(m.rows, m.detail.ref); i >= 0 {
+		m.detail.pr, m.detail.gone = m.rows[i], false
+		m.selected, m.cursor = m.detail.ref, i
+		m.clampOffset()
+	} else {
+		m.detail.gone = true
+	}
+	m.syncDetail()
+	return m.startDetailFetch()
 }
 
 // detailKey handles one key press while the detail view is open (D-09). Keys
@@ -113,12 +132,45 @@ func (m *Model) applyDetail(msg detailMsg) {
 	}
 	m.detailInFlight = false
 	if msg.err != nil {
-		m.detail.err = msg.err
+		m.detail.err, m.detail.errAt = msg.err, m.now()
+		m.pauseForRateLimit(msg.err)
 	} else {
 		data := msg.data
 		m.detail.data, m.detail.err, m.detail.at = &data, nil, m.now()
 	}
 	m.syncDetail()
+}
+
+// pauseForRateLimit moves the refresh pause to the reset time of a rate-limited
+// error, or to now plus its Retry-After when the reset time is unknown. The
+// pause never moves earlier. No tick is armed: the one pending tick re-arms
+// itself to the end of the pause.
+func (m *Model) pauseForRateLimit(err error) {
+	var b backoffer
+	if !errors.As(err, &b) {
+		return
+	}
+	after, reset, limited := b.Backoff()
+	if !limited {
+		return
+	}
+	until := reset
+	if until.IsZero() && after > 0 {
+		until = m.now().Add(after)
+	}
+	if until.After(m.pausedUntil) {
+		m.pausedUntil = until
+	}
+}
+
+// errReason is the short reason of err for the screen. The message of an error
+// can hold a secret and is never shown.
+func errReason(err error) string {
+	var sh shorter
+	if errors.As(err, &sh) {
+		return sh.Short()
+	}
+	return "error"
 }
 
 // syncDetail gives the viewport its size and its lines. The body is the pane
@@ -169,6 +221,7 @@ func (m Model) renderDetail() string {
 // the REVIEWERS section. A width of 0 or less (not sized yet) cuts nothing.
 func (m Model) detailLines(width int) []string {
 	lines := m.detailTitle(width)
+	lines = append(lines, m.detailNotes()...)
 	lines = append(lines, "")
 	lines = append(lines, m.checkLines(width)...)
 	lines = append(lines, "")
@@ -211,6 +264,20 @@ func (m Model) detailTitle(width int) []string {
 	}
 }
 
+// detailNotes are the lines right under the title: the PR left the list (D-12),
+// and the last detail refresh failed while older data is still on screen (D-11).
+func (m Model) detailNotes() []string {
+	var notes []string
+	if m.detail.gone {
+		notes = append(notes, faintStyle.Render("no longer in list"))
+	}
+	if d := m.detail; d.err != nil && d.data != nil {
+		notes = append(notes, warnStyle.Render("✗ refresh failed "+m.clock(d.errAt, "15:04")+
+			" ("+errReason(d.err)+") · details from "+m.clock(d.at, "15:04:05")))
+	}
+	return notes
+}
+
 // checksSummary is the text after "CHECKS": the counts of the de-duplicated
 // checks (D-03, D-08), or why there are none to count.
 func (m Model) checksSummary() string {
@@ -220,12 +287,10 @@ func (m Model) checksSummary() string {
 			return "details not available"
 		}
 		if d.err != nil {
-			reason := "error"
-			var sh shorter
-			if errors.As(d.err, &sh) {
-				reason = sh.Short()
-			}
-			return checkStyle(domain.CheckFailing).Render("✗ could not load checks ("+reason+")") + " · r retry"
+			return checkStyle(domain.CheckFailing).Render("✗ could not load checks ("+errReason(d.err)+")") + " · r retry"
+		}
+		if m.now().Before(m.pausedUntil) {
+			return "paused until " + m.clock(m.pausedUntil, "15:04") + " (rate limit)"
 		}
 		return "loading…"
 	}

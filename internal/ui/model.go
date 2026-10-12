@@ -336,8 +336,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = stateList
 		}
-		cmd := tea.Batch(m.schedule(nil), m.startWarning())
-		return m, cmd
+		cmds := []tea.Cmd{m.schedule(nil), m.startWarning()}
+		if m.detail.open {
+			// D-11: the open detail follows the list, as its own Cmd.
+			cmds = append(cmds, m.refreshDetail())
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m, nil
 }
@@ -423,7 +427,11 @@ func (m *Model) schedule(err error) tea.Cmd {
 		}
 	}
 	d := domain.NextDelay(m.now(), m.interval, m.failures, m.snap.RateLimit, out)
+	prev := m.pausedUntil
 	m.pausedUntil = d.PausedUntil
+	if m.now().Before(prev) && prev.After(m.pausedUntil) {
+		m.pausedUntil = prev // a pause that a detail rate limit extended is still running
+	}
 	return m.arm(d.Wait)
 }
 
