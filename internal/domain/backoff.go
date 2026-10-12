@@ -76,10 +76,11 @@ func NextDelay(now time.Time, interval time.Duration, failures int, rl RateLimit
 	if rl.Remaining <= ReservePerCost*cost {
 		return paused(now, clamp(untilReset+time.Second))
 	}
-	// Pacing: division only, so no interval can overflow.
+	// Pacing: division only, so no interval can overflow. The reset time came
+	// from the server, so the paced wait is bounded like every server delay.
 	left := rl.Remaining / cost
 	if int64(untilReset/interval) > int64(left) {
-		d.Wait = max(interval, untilReset/time.Duration(left))
+		d.Wait = max(interval, min(untilReset/time.Duration(left), MaxServerWait))
 	}
 	return d
 }
