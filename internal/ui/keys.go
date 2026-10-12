@@ -10,8 +10,9 @@ import bkey "charm.land/bubbles/v2/key"
 type keyMap struct {
 	Up, Down, Move, Refresh, Quit bkey.Binding
 
-	// Help opens the full-screen help overlay (D-17).
-	Help bkey.Binding
+	// Help opens the full-screen help overlay (D-17); Open opens the selected
+	// PR in the browser (NAV-02).
+	Help, Open bkey.Binding
 
 	// State visibility (D-10). States is help text only; nothing matches on it.
 	ToggleOpen, ToggleMerged, ToggleClosed, States bkey.Binding
@@ -43,6 +44,7 @@ func defaultKeys() keyMap {
 		Refresh: bkey.NewBinding(bkey.WithKeys("r"), bkey.WithHelp("r", "refresh")),
 		Quit:    bkey.NewBinding(bkey.WithKeys("q", "ctrl+c"), bkey.WithHelp("q", "quit")),
 		Help:    bkey.NewBinding(bkey.WithKeys("?"), bkey.WithHelp("?", "help")),
+		Open:    bkey.NewBinding(bkey.WithKeys("o"), bkey.WithHelp("o", "open")),
 
 		ToggleOpen:   bkey.NewBinding(bkey.WithKeys("1"), bkey.WithHelp("1", "open")),
 		ToggleMerged: bkey.NewBinding(bkey.WithKeys("2"), bkey.WithHelp("2", "merged")),
@@ -56,10 +58,10 @@ func defaultKeys() keyMap {
 
 // ShortHelp implements help.KeyMap.
 func (k keyMap) ShortHelp() []bkey.Binding {
-	return []bkey.Binding{k.Move, k.Refresh, k.Filter, k.States, k.Help, k.Quit}
+	return []bkey.Binding{k.Move, k.Refresh, k.Open, k.Filter, k.States, k.Help, k.Quit}
 }
 
 // FullHelp implements help.KeyMap.
 func (k keyMap) FullHelp() [][]bkey.Binding {
-	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Help, k.Quit}}
+	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh, k.Open}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Help, k.Quit}}
 }

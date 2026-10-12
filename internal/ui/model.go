@@ -39,6 +39,7 @@ type Options struct {
 	Show       domain.StateSet  // states visible at launch; zero means domain.AllStates (D-12)
 	ConfigPath string           // display form of the config path, for the help overlay
 	Warnings   []string         // config warnings, shown for warnFor from the first fetch result (D-15)
+	Opener     Opener           // opens a PR URL in the browser; nil means "no browser available"
 	Interval   time.Duration    // zero means defaultInterval
 	Now        func() time.Time // nil means time.Now
 }
@@ -59,6 +60,7 @@ type Model struct {
 	opts    Options
 	keys    keyMap
 	help    help.Model // footer key hints, rendered from keys (D-17)
+	opener  Opener     // opens the selected PR in the browser (NAV-02)
 
 	state viewState
 	spin  spinner.Model
@@ -156,6 +158,7 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 		keys:       defaultKeys(),
 		pkeys:      defaultPromptKeys(),
 		help:       h,
+		opener:     opts.Opener,
 		state:      stateLoading,
 		inFlight:   true,
 		spin:       spinner.New(spinner.WithSpinner(spinner.Dot)),
@@ -206,6 +209,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case bkey.Matches(msg, m.keys.Help):
 			m.showHelp = true
+		case bkey.Matches(msg, m.keys.Open):
+			if len(m.rows) == 0 {
+				return m, nil
+			}
+			u, ok := safeURL(m.rows[m.cursor].URL)
+			switch {
+			case !ok:
+				return m, m.setFlash("not a github.com link — not opened", flashFor)
+			case m.opener == nil:
+				return m, m.setFlash("no browser available", flashFor)
+			}
+			return m, openCmd(m.opener, u) // the launch happens in the Cmd, never here
 		case bkey.Matches(msg, m.keys.Refresh):
 			if m.inFlight {
 				return m, nil // merges with the running refresh
@@ -266,6 +281,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.arm(m.pausedUntil.Sub(now))
 		}
 		return m, m.beginFetch()
+	case openedMsg:
+		if msg.err != nil && !errors.Is(msg.err, context.Canceled) {
+			return m, m.setFlash("could not open the browser", flashFor)
+		}
 	case redrawMsg:
 		// Nothing to change: Bubble Tea redraws after every Update, which
 		// lets an expired flash leave the footer.

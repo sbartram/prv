@@ -67,7 +67,7 @@ func TestStateToggles(t *testing.T) {
 			t.Errorf("after %v rows = %v, want %v", tt.keys, refs, tt.refs)
 		}
 	}
-	for _, k := range []string{"m", "o", "c"} {
+	for _, k := range []string{"m", "x", "c"} { // "o" is the open key since plan 02-10
 		before := plain(m)
 		if after := plain(press(m, k)); after != before {
 			t.Errorf("letter %q changed the screen", k)

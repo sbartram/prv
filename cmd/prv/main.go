@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/cli/go-gh/v2/pkg/browser"
 
 	"github.com/sbartram/prv/internal/config"
 	"github.com/sbartram/prv/internal/domain"
@@ -30,6 +31,15 @@ var tokenForHost = auth.TokenForHost
 var configPath = config.Path
 
 const noTokenMessage = "prv needs a GitHub token. Run `gh auth login`, or set GH_TOKEN / GITHUB_TOKEN."
+
+// browserOpener opens URLs through go-gh's browser, which honours GH_BROWSER,
+// the gh config and BROWSER like `gh pr view --web` does. ui only sees the
+// ui.Opener interface and checks every URL before it gets here.
+type browserOpener struct{ b *browser.Browser }
+
+var _ ui.Opener = browserOpener{}
+
+func (o browserOpener) Open(url string) error { return o.b.Browse(url) }
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -97,9 +107,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	// io.Discard keeps a launcher from writing over the TUI.
+	opener := browserOpener{b: browser.New("", io.Discard, io.Discard)}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	p := tea.NewProgram(ui.New(ctx, client, ui.Options{
+		Opener:     opener,
 		ClosedDays: days,
 		Interval:   cfg.Interval,
 		Show:       cfg.Show,

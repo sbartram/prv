@@ -3,7 +3,7 @@ prv — keys and badges
 k/↑ up         /   PR #       ? help
 j/↓ down       esc clear #    q quit
 r   refresh    1   open
-               2   merged
+o   open       2   merged
                3   closed
 
 Badges
