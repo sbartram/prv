@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
-status: executing
-stopped_at: Completed 03-07-PLAN.md
-last_updated: "2026-10-12T23:43:13.806Z"
+status: verifying
+stopped_at: Completed 03-08-PLAN.md
+last_updated: "2026-10-12T23:53:10.907Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: 16869944bcf25e649f1566c60b8dd5f1743af604
+state_head: a253086de92db9e1571661887e5e41b491940c4d
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 22
-  completed_plans: 21
+  completed_plans: 22
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 
 Phase: 03 (Blocker Detail) — EXECUTING
 Plan: 8 of 8
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-12 — Phase 03 execution started
 
 Progress: [█████░░░░░] 50%
@@ -78,6 +78,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P05 | 8 min | 2 tasks | 20 files |
 | Phase 03 P06 | 9 min | 2 tasks | 8 files |
 | Phase 03 P07 | 30 min | 2 tasks | 35 files |
+| Phase 03 P08 | 6 min | 2 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,10 @@ Recent decisions affecting current work:
 - [Phase 03]: A later Detail page that fails (not rate limit or cancel) keeps the earlier pages and sets Truncated; a rate limit or cancel on any page is returned
 - [Phase 03]: 03-07: openDetail takes the PR from Update so detail.go never reads the list row at the cursor
 - [Phase 03]: 03-07: r in the detail also refetches the detail when it failed with no data; footer drops whole hints from the end when help would overflow
+- [Phase 03]: D-12 'the list' is the rows on screen after the filters, so the no-longer-in-list note and the esc landing spot agree
+- [Phase 03]: A rate-limited detail error extends pausedUntil directly and arms no tick; the pending tick re-arms to the end of the pause
+- [Phase 03]: schedule() keeps a still-running pause, so a list result cannot end a pause a detail error set
+- [Phase 03]: A gone PR is not refetched; o still opens the detail PR's own URL
 
 ### Pending Todos
 
@@ -154,6 +159,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:43:13.764Z
-Stopped at: Completed 03-07-PLAN.md
+Last session: 2026-10-12T23:53:10.864Z
+Stopped at: Completed 03-08-PLAN.md
 Resume file: None

@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **DETL-01**: Selecting a PR opens a detail view listing every check/job with its status, failing first
 - [x] **DETL-02**: Detail view lists each reviewer and their review state
-- [ ] **DETL-03**: Returning from the detail view keeps the same PR selected
+- [x] **DETL-03**: Returning from the detail view keeps the same PR selected
 
 ### Refresh
 
@@ -57,7 +57,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **NAV-02**: User can press `o` to open the selected PR in the browser
 - [x] **NAV-03**: User can press `?` to see key bindings
 - [x] **NAV-04**: User can quit with `q`
-- [ ] **NAV-05**: Layout adapts to terminal resizes and stays usable in narrow panes
+- [x] **NAV-05**: Layout adapts to terminal resizes and stays usable in narrow panes
 
 ### Auth & config
 
@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-03 | Phase 2 | Complete |
 | DETL-01 | Phase 3 | Complete |
 | DETL-02 | Phase 3 | Complete |
-| DETL-03 | Phase 3 | Pending |
+| DETL-03 | Phase 3 | Complete |
 | RFSH-01 | Phase 2 | Complete |
 | RFSH-02 | Phase 2 | Complete |
 | RFSH-03 | Phase 2 | Complete |
@@ -155,7 +155,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-02 | Phase 2 | Complete |
 | NAV-03 | Phase 2 | Complete |
 | NAV-04 | Phase 1 | Complete |
-| NAV-05 | Phase 3 | Pending |
+| NAV-05 | Phase 3 | Complete |
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Complete |

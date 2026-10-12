@@ -258,7 +258,7 @@ The plan type is `execute` with `tdd="true"` tasks, so there is no plan-level ga
 
 ## Issues Encountered
 
-- A first draft of the stale-test guard text assumed `faintStyle` lines would be matched with the status line; `TestDetailNarrow` first flagged the title status line `✓ approved` as a leaked word. The test now checks only indented lines (checks and reviewers).
+- The first draft of `TestDetailNarrow` flagged the title status line (`✓ approved`) as a leaked reviewer word. The test now checks only the indented lines (checks and reviewers).
 - The detail footer at 60 cells still cuts to `j/k scroll …` (03-07 behaviour, unchanged).
 
 ## Known Stubs
