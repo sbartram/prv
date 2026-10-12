@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Monitoring
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-10-12T15:39:20.344Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-10-12T15:50:16.339Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 02 execution started
-state_head: a139f7d8041031791efb7ab670009b137c5f6be8
+state_head: 93f53472a52a3c6075d28dc64ddb02418fec18a5
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 7
+  completed_plans: 8
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 02 (Live Monitoring) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 02 execution started
 
@@ -63,6 +63,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P01 | 15min | 2 tasks | 9 files |
 | Phase 02 P02 | 12min | 3 tasks | 12 files |
 | Phase 02 P03 | 6 min | 2 tasks | 7 files |
+| Phase 02 P04 | 3 min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-02: selected domain.Ref is the source of truth; rebuild() derives rows and cursor; nearest neighbour looks below first, then above
 - [Phase 02]: A merged or closed draft PR sorts as merged (7) or closed (8); only an open draft is bucket 6 (D-04 as clarified 2026-10-12)
 - [Phase 02]: Approved PR with no checks or unknown CI sorts in bucket 5, never ready to merge; updatedAt is not a sort key (D-02)
+- [Phase 02]: 02-04: header segments carry priorities (prv 1, @login 2, N PRs 4, updated 5, failure marker 7); prio 3 and 6 are reserved for the filter segment (02-08) and rate warning (02-05)
+- [Phase 02]: 02-04: footer shows integrity notes before key hints; notes are cut with an ellipsis, never dropped; hints need at least 8 cells and come from keyMap.ShortHelp()
 
 ### Pending Todos
 
@@ -111,6 +114,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T15:39:20.315Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-10-12T15:50:16.309Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None

@@ -65,7 +65,7 @@ Plans:
   5. User can press `o` to open the selected PR in the browser and `?` to see the key bindings screen.
 
 **Pitfalls first addressed here**: Single-flight refresh with one tick chain that re-arms after each result. A generation counter drops stale ticks and results, and a manual `r` coalesces with an in-flight refresh. Selection is tracked by PR ref (owner/repo#n), not by row index, with a nearest-neighbour fallback. The sort is stable on a key that polling does not change. Every query includes `rateLimit { cost remaining resetAt }`. Backoff honours retry-after, then resetAt, then a bounded exponential. Cancel the context on quit. Wrap Cmds so that a panic is caught. Logs go to a file only. Open only `https://github.com` URLs, through go-gh `pkg/browser` in a `tea.Cmd`. Verify with a counting fake client over a simulated hour with `-race`.
-**Plans**: 3/10 plans executed
+**Plans**: 4/10 plans executed
 
 Plans:
 **Wave 1**
@@ -76,7 +76,7 @@ Plans:
 - [x] 02-03-PLAN.md — Attention sort: Bucket (D-01, D-04 as clarified: merged/closed drafts by lifecycle) and createdAt-then-ref tie-break (D-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-04-PLAN.md — Header/footer truth on any width: D-07 failure marker with short reason, D-09 "retrying at", priority composer, notes before keymap hints (WR-03), honest empty screen (WR-02)
+- [x] 02-04-PLAN.md — Header/footer truth on any width: D-07 failure marker with short reason, D-09 "retrying at", priority composer, notes before keymap hints (WR-03), honest empty screen (WR-02)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 02-05-PLAN.md — Rate limit visible: limit in the query, faint "api N" footer, yellow <20% header warning (D-06)
@@ -139,6 +139,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
-| 2. Live Monitoring | 3/10 | In Progress | - |
+| 2. Live Monitoring | 4/10 | In Progress | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |
