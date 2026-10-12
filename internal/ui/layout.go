@@ -28,35 +28,6 @@ const (
 	chromeLines = 3
 )
 
-// columnWidths returns the width in terminal cells of each column. cells holds
-// every row, header included, so each fixed column gets the widest of its
-// header and its cells (PR and AUTHOR are capped). TITLE is the flexible
-// column (D-02): it gets what is left of total after the fixed columns and the
-// gaps, at least minTitleW and at most its widest cell. When total is 0 (the
-// terminal has not reported its size yet) TITLE gets its widest cell.
-// Widths are cells, never bytes or runes.
-func columnWidths(cells [][]string, total int) []int {
-	ws := make([]int, colCount)
-	for _, row := range cells {
-		for c := 0; c < colCount && c < len(row); c++ {
-			ws[c] = max(ws[c], lipgloss.Width(row[c]))
-		}
-	}
-	ws[colPR] = min(ws[colPR], maxPRColW)
-	ws[colAuthor] = min(ws[colAuthor], maxAuthorCol)
-	if total <= 0 {
-		return ws
-	}
-	avail := total - (colCount-1)*columnGap
-	for c, w := range ws {
-		if c != colTitle {
-			avail -= w
-		}
-	}
-	ws[colTitle] = max(minTitleW, min(ws[colTitle], avail))
-	return ws
-}
-
 // truncateCell cuts s to w terminal cells, ending in "…", when it is wider.
 func truncateCell(s string, w int) string {
 	if lipgloss.Width(s) > w {
@@ -103,11 +74,78 @@ type dropStep struct {
 	collapse bool
 }
 
-// dropSteps is the D-13 order in which a narrowing pane loses columns.
+// dropSteps is the D-13 order in which a narrowing pane loses columns. Plan
+// 03-05 inserts REVIEWERS and MERGE before colTitle.
 var dropSteps = []dropStep{{col: colAuthor}, {col: colState}, {col: colTitle}}
 
-// layoutColumns is a stub (RED).
-func layoutColumns(sz sizes, total int) layout { return layout{} }
+// layoutColumns decides which columns are shown and how wide each one is
+// for a pane total cells wide. A total of 0 or less means the pane has not
+// reported its size yet: every column is shown uncut (D-14 revised).
+//
+// The pane narrows in the D-13 order. TITLE is the flexible column: it gets
+// what is left, down to minTitleW cells. When it cannot keep that, the next
+// column of dropSteps is dropped and TITLE gets another try; once TITLE
+// itself is dropped, the CI cell narrows to its bare badge and then the PR
+// column narrows (never below minPRColW). A column never comes back at a
+// smaller width, because each step only adds to the set of dropped columns.
+// Widths are terminal cells.
+func layoutColumns(sz sizes, total int) layout {
+	var l layout
+	for c := range l.show {
+		l.show[c] = true
+		l.width[c] = sz.natural[c]
+	}
+	l.width[colMarker] = 1
+	if total <= 0 {
+		return l
+	}
+	// need is the width of the shown columns other than TITLE, gaps included.
+	need := func() int {
+		sum, n := 0, 0
+		for c := range l.show {
+			if !l.show[c] {
+				continue
+			}
+			n++
+			if c != colTitle {
+				sum += l.width[c]
+			}
+		}
+		return sum + columnGap*(n-1)
+	}
+	for k := 0; ; k++ {
+		if l.show[colTitle] {
+			if n := need(); n+min(sz.natural[colTitle], minTitleW) <= total {
+				l.width[colTitle] = min(sz.natural[colTitle], total-n)
+				return l
+			}
+		} else if need() <= total {
+			return l
+		}
+		if k >= len(dropSteps) {
+			break
+		}
+		l.show[dropSteps[k].col] = false
+		l.width[dropSteps[k].col] = 0
+	}
+	// Even PR, REVIEW and CI at their natural widths do not fit. The CI cell
+	// drops its check name first, then the PR ref is cut from the left.
+	l.width[colCI] = max(sz.min[colCI], total-(need()-l.width[colCI]))
+	if n := need(); n > total {
+		l.width[colPR] = max(minPRColW, total-(n-l.width[colPR]))
+	}
+	return l
+}
 
-// trimLeft is a stub (RED).
-func trimLeft(s string, w int) string { return s }
+// trimLeft cuts s to w terminal cells from the left, putting "…" in front,
+// so that the end of a PR ref (its "#number") stays. A string that fits is
+// returned unchanged; for w of 1 or less there is no room for the "…".
+func trimLeft(s string, w int) string {
+	if lipgloss.Width(s) <= w {
+		return s
+	}
+	if w <= 1 {
+		return ansi.Truncate(s, max(w, 0), "")
+	}
+	return "…" + ansi.TruncateLeft(s, lipgloss.Width(s)-(w-1), "")
+}

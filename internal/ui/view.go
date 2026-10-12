@@ -339,8 +339,14 @@ func (m Model) cut(line string) string {
 
 func (m Model) renderList() string {
 	// Build every cell first, so column widths stay the same while scrolling.
-	cells := make([][]string, 0, len(m.rows)+1)
-	cells = append(cells, []string{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI"})
+	headers := []string{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI"}
+	cells := make([][]string, 0, len(m.rows))
+	var sz sizes
+	for c, h := range headers {
+		sz.natural[c] = lipgloss.Width(h)
+	}
+	sz.natural[colMarker] = 1
+	minCI := lipgloss.Width(headers[colCI])
 	for i, pr := range m.rows {
 		marker := " "
 		if i == m.cursor {
@@ -354,16 +360,49 @@ func (m Model) renderList() string {
 		if strings.EqualFold(pr.Author, m.snap.Viewer) {
 			author = "me"
 		}
-		cells = append(cells, []string{
+		row := []string{
 			marker, pr.Ref.String(), title, author, pr.State.String(),
 			pr.Review.Badge(),
 			ciCell(pr, maxCIColW),
-		})
+		}
+		cells = append(cells, row)
+		for c, text := range row {
+			sz.natural[c] = max(sz.natural[c], lipgloss.Width(text))
+		}
+		// The CI cell can shrink to its bare badge and no further.
+		minCI = max(minCI, lipgloss.Width(pr.CI.Badge()))
 	}
-	widths := columnWidths(cells, m.w)
-	for _, row := range cells {
-		for c := range row {
-			row[c] = truncateCell(row[c], widths[c])
+	sz.natural[colPR] = min(sz.natural[colPR], maxPRColW)
+	sz.natural[colAuthor] = min(sz.natural[colAuthor], maxAuthorCol)
+	sz.natural[colCI] = min(sz.natural[colCI], maxCIColW)
+	sz.min = sz.natural
+	sz.min[colCI] = min(minCI, sz.natural[colCI])
+
+	lay := layoutColumns(sz, m.w)
+	var vis []int // the shown columns, in display order
+	for c := range lay.show {
+		if lay.show[c] {
+			vis = append(vis, c)
+		}
+	}
+	shownHeaders := make([]string, len(vis))
+	for i, c := range vis {
+		shownHeaders[i] = truncateCell(headers[c], lay.width[c])
+	}
+	shownRows := make([][]string, len(cells))
+	for r, pr := range m.rows {
+		shownRows[r] = make([]string, len(vis))
+		for i, c := range vis {
+			text := cells[r][c]
+			switch c {
+			case colPR:
+				text = trimLeft(text, lay.width[c])
+			case colCI:
+				text = ciCell(pr, lay.width[c])
+			default:
+				text = truncateCell(text, lay.width[c])
+			}
+			shownRows[r][i] = text
 		}
 	}
 
@@ -374,14 +413,15 @@ func (m Model) renderList() string {
 		Border(lipgloss.HiddenBorder()).
 		BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
 		BorderColumn(false).BorderHeader(false).BorderRow(false).
-		Headers(cells[0]...).
-		Rows(cells[1+m.offset : 1+end]...).
+		Headers(shownHeaders...).
+		Rows(shownRows[m.offset:end]...).
 		StyleFunc(func(row, col int) lipgloss.Style {
+			c := vis[col]
 			// Width includes padding in Lip Gloss v2: every column but the
-			// last carries one cell of gap.
-			s := lipgloss.NewStyle().Width(widths[col])
-			if col < colCount-1 {
-				s = s.Width(widths[col] + columnGap).PaddingRight(columnGap)
+			// last shown one carries one cell of gap.
+			s := lipgloss.NewStyle().Width(lay.width[c])
+			if col < len(vis)-1 {
+				s = s.Width(lay.width[c] + columnGap).PaddingRight(columnGap)
 			}
 			if row == table.HeaderRow {
 				return s.Inherit(headerStyle)
@@ -391,7 +431,7 @@ func (m Model) renderList() string {
 			if dimmed(pr) {
 				s = s.Faint(true)
 			}
-			switch col {
+			switch c {
 			case colReview:
 				s = s.Inherit(reviewStyle(pr.Review))
 			case colCI:
