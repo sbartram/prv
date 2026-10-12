@@ -354,16 +354,24 @@ func TestTruncatedAfterFivePages(t *testing.T) {
 }
 
 func TestRateLimitDecoded(t *testing.T) {
-	c, _ := newFixtureClient(t, "search_page1.json", "search_page2.json")
+	c, tr := newFixtureClient(t, "search_page1.json", "search_page2.json")
 	snap, err := c.Fetch(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	rl := snap.RateLimit
-	if rl.Cost != 2 || rl.Remaining != 4989 {
-		t.Errorf("RateLimit cost/remaining = %d/%d, want 2/4989", rl.Cost, rl.Remaining)
+	if rl.Limit != 5000 || rl.Cost != 2 || rl.Remaining != 4989 {
+		t.Errorf("RateLimit limit/cost/remaining = %d/%d/%d, want 5000/2/4989", rl.Limit, rl.Cost, rl.Remaining)
 	}
 	if want := time.Date(2026, 10, 11, 13, 0, 0, 0, time.UTC); !rl.ResetAt.Equal(want) {
 		t.Errorf("ResetAt = %v, want %v", rl.ResetAt, want)
+	}
+	if len(tr.bodies) == 0 || !strings.Contains(string(tr.bodies[0]), "rateLimit { limit cost remaining resetAt }") {
+		t.Error("the discovery query must request rateLimit { limit cost remaining resetAt }")
+	}
+	// status.json carries no limit field on purpose: it decodes as 0.
+	snap, _ = fetchStatus(t)
+	if snap.RateLimit.Limit != 0 {
+		t.Errorf("Limit without a limit field = %d, want 0", snap.RateLimit.Limit)
 	}
 }

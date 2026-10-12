@@ -4,6 +4,7 @@
    "login": "octo"
   },
   "rateLimit": {
+   "limit": 5000,
    "cost": 1,
    "remaining": 4989,
    "resetAt": "2026-10-11T13:00:00Z"
