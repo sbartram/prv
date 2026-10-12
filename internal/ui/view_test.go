@@ -35,17 +35,17 @@ func fixtureSix() domain.Snapshot {
 	at := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
 	return domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
 		{ID: "1", Ref: domain.Ref{Repo: "acme/api", Number: 101}, Title: "Add retry to the client", Author: "octo",
-			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, Merge: domain.MergeMergeable, UpdatedAt: at},
 		{ID: "2", Ref: domain.Ref{Repo: "acme/api", Number: 102}, Title: "Rework the cache layer", Author: "alice",
-			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, Merge: domain.MergeBlocked, UpdatedAt: at},
 		{ID: "3", Ref: domain.Ref{Repo: "acme/web", Number: 7}, Title: "Spike a new sidebar", Author: "octo", IsDraft: true,
-			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIRunning, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIRunning, Merge: domain.MergeUnknown, UpdatedAt: at},
 		{ID: "4", Ref: domain.Ref{Repo: "acme/web", Number: 6}, Title: "Fix the login redirect", Author: "bob",
 			State: domain.StateMerged, Review: domain.ReviewApproved, CI: domain.CIPassing, UpdatedAt: at, ClosedAt: at},
 		{ID: "5", Ref: domain.Ref{Repo: "acme/docs", Number: 3}, Title: "Drop the old guide", Author: "octo",
 			State: domain.StateClosed, Review: domain.ReviewRequired, CI: domain.CINone, UpdatedAt: at, ClosedAt: at},
 		{ID: "6", Ref: domain.Ref{Repo: "acme/docs", Number: 2}, Title: "Typo in the readme", Author: "carol",
-			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIUnknown, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIUnknown, Merge: domain.MergeBehind, UpdatedAt: at},
 	}}
 }
 
@@ -60,6 +60,7 @@ func TestBadgesReadWithoutColour(t *testing.T) {
 	for _, want := range []string{
 		"✓ approved", "✗ changes", "○ required", "– none",
 		"✓ passing", "✗ failing", "● running", "– no checks", "? unknown",
+		"✓ mergeable", "⊘ blocked", "↓ behind",
 		"[draft]",
 	} {
 		if !strings.Contains(v, want) {
@@ -106,6 +107,75 @@ func TestReviewAndCIColours(t *testing.T) {
 		}
 		if s.GetForeground() != want {
 			t.Errorf("ciStyle(%v) foreground = %v, want %v", c, s.GetForeground(), want)
+		}
+	}
+}
+
+// TestMergeColumn: the MERGE column sits between REVIEW and CI and shows one
+// value per row (LIST-06, D-07): a badge for open PRs, a dash for drafts and
+// unknown states, nothing for merged and closed PRs.
+func TestMergeColumn(t *testing.T) {
+	ls := lines(newTestModel(t, fixtureSix(), 120, 40).View().Content)
+	header := ls[1]
+	if got := strings.Join(strings.Fields(header), ","); got != "PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI" {
+		t.Fatalf("header = %q, want PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI", header)
+	}
+	from := lipgloss.Width(header[:strings.Index(header, "MERGE")])
+	to := lipgloss.Width(header[:strings.Index(header, "CI")])
+	for ref, want := range map[string]string{
+		"acme/api#101": "✓ mergeable",
+		"acme/api#102": "⊘ blocked",
+		"acme/web#7":   "–",
+		"acme/web#6":   "",
+		"acme/docs#3":  "",
+		"acme/docs#2":  "↓ behind",
+	} {
+		var row string
+		for _, l := range ls {
+			if strings.Contains(l, ref+" ") {
+				row = l
+			}
+		}
+		if row == "" {
+			t.Fatalf("no row for %s in:\n%s", ref, strings.Join(ls, "\n"))
+		}
+		if got := strings.TrimSpace(ansi.Cut(row, from, to)); got != want {
+			t.Errorf("MERGE of %s = %q, want %q (row %q)", ref, got, want, row)
+		}
+	}
+}
+
+// TestMergeColours: mergeable is green, blocked and behind are yellow,
+// conflicts are red, a dash and a blank are faint; ANSI-16 only (D-05).
+func TestMergeColours(t *testing.T) {
+	green, red, yellow := lipgloss.Green, lipgloss.Red, lipgloss.Yellow
+	for m, want := range map[domain.Merge]any{
+		domain.MergeMergeable: green, domain.MergeBlocked: yellow, domain.MergeBehind: yellow,
+		domain.MergeConflicts: red, domain.MergeUnknown: nil, domain.MergeNone: nil,
+	} {
+		s := mergeStyle(m)
+		if want == nil {
+			if !s.GetFaint() {
+				t.Errorf("mergeStyle(%v) should be faint", m)
+			}
+			continue
+		}
+		if s.GetForeground() != want {
+			t.Errorf("mergeStyle(%v) foreground = %v, want %v", m, s.GetForeground(), want)
+		}
+	}
+	// The colours reach the screen: the row of #102 (not selected, not dimmed)
+	// holds its badge in yellow, the row of #101 in green.
+	raw := strings.Split(newTestModel(t, fixtureSix(), 120, 40).View().Content, "\n")
+	for ref, seq := range map[string]string{"acme/api#102": "\x1b[33m⊘ blocked", "acme/docs#2": "\x1b[33m↓ behind"} {
+		var row string
+		for _, l := range raw {
+			if strings.Contains(ansi.Strip(l), ref+" ") {
+				row = l
+			}
+		}
+		if !strings.Contains(row, seq) {
+			t.Errorf("row of %s lacks %q: %q", ref, seq, row)
 		}
 	}
 }
@@ -196,9 +266,13 @@ func fixtureThirty() domain.Snapshot {
 		pr := domain.PR{
 			ID: "N" + strings.Repeat("x", i%3), Ref: domain.Ref{Repo: "acme/api", Number: i},
 			Title: "Change number " + string(rune('A'+i%26)), Author: "alice", UpdatedAt: at,
-			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing,
+			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, Merge: domain.MergeMergeable,
 		}
 		switch i {
+		case 4:
+			pr.Merge = domain.MergeConflicts
+		case 8:
+			pr.Merge = domain.MergeBehind
 		case 5:
 			pr.Title = strings.Repeat("long title ", 11) + "end!" // 120 characters
 		case 7:
@@ -207,8 +281,10 @@ func fixtureThirty() domain.Snapshot {
 			pr.Title = "Family 👨‍👩‍👧‍👦 sync and a long tail of words after it"
 		case 11:
 			pr.IsDraft = true
+			pr.Merge = domain.MergeUnknown
 		case 12:
 			pr.State, pr.ClosedAt = domain.StateMerged, at
+			pr.Merge = domain.MergeNone
 		}
 		snap.PRs = append(snap.PRs, pr)
 	}
@@ -292,7 +368,7 @@ func TestTitleTruncatesFirst(t *testing.T) {
 				row = l
 			}
 		}
-		if got := strings.Fields(header); strings.Join(got, ",") != "PR,TITLE,AUTHOR,STATE,REVIEW,CI" {
+		if got := strings.Fields(header); strings.Join(got, ",") != "PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI" {
 			t.Errorf("w=%d header = %q, want every column header whole", w, header)
 		}
 		if !strings.Contains(row, "…") {

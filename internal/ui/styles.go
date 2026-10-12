@@ -65,3 +65,8 @@ func helpStyles() help.Styles {
 		FullSeparator:  faintStyle,
 	}
 }
+
+// mergeStyle colours the MERGE badge.
+func mergeStyle(m domain.Merge) lipgloss.Style {
+	return lipgloss.NewStyle()
+}

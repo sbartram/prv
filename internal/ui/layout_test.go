@@ -109,15 +109,15 @@ func TestLayoutColumns(t *testing.T) {
 
 // TestDropOrder renders the list at every width from 120 down to 40 and
 // reads the column-header row: PR, REVIEW and CI stay, the other columns only
-// ever disappear, in the order AUTHOR, STATE, TITLE.
+// ever disappear, in the order AUTHOR, STATE, MERGE, TITLE.
 func TestDropOrder(t *testing.T) {
 	snap := fixtureSix()
 	snap.PRs = append(snap.PRs, domain.PR{
 		ID: "7", Ref: domain.Ref{Repo: "acme/api", Number: 999}, Title: strings.Repeat("0123456789", 12), Author: "dave",
 		State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing,
 	})
-	order := []string{"AUTHOR", "STATE", "TITLE"}
-	prev := map[string]bool{"AUTHOR": true, "STATE": true, "TITLE": true}
+	order := []string{"AUTHOR", "STATE", "MERGE", "TITLE"}
+	prev := map[string]bool{"AUTHOR": true, "STATE": true, "MERGE": true, "TITLE": true}
 	for w := 120; w >= 40; w-- {
 		ls := lines(newTestModel(t, snap, w, 40).View().Content)
 		for _, l := range ls {
@@ -151,7 +151,7 @@ func TestDropOrder(t *testing.T) {
 		}
 		prev = has
 	}
-	if prev["TITLE"] || prev["AUTHOR"] || prev["STATE"] {
+	if prev["TITLE"] || prev["AUTHOR"] || prev["STATE"] || prev["MERGE"] {
 		t.Errorf("at 40 cells the header is %v, want only PR, REVIEW and CI", prev)
 	}
 }
@@ -207,12 +207,12 @@ func compactSnap() domain.Snapshot {
 func TestCompactRows(t *testing.T) {
 	ls := lines(newTestModel(t, fixtureSix(), 36, 12).View().Content)
 	want := map[string]string{
-		"api#101": "> api#101 ✓✓",
-		"api#102": "  api#102 ✗✗",
-		"web#7":   "  web#7 –●",
-		"docs#3":  "  docs#3 ○–",
-		"docs#2":  "  docs#2 –?",
-		"web#6":   "  web#6 ✓✓",
+		"api#101": "> api#101 ✓✓✓",
+		"api#102": "  api#102 ✗⊘✗",
+		"web#7":   "  web#7 ––●",
+		"docs#3":  "  docs#3 ○ –",
+		"docs#2":  "  docs#2 –↓?",
+		"web#6":   "  web#6 ✓ ✓",
 	}
 	for ref, row := range want {
 		var found string
@@ -231,17 +231,17 @@ func TestCompactRows(t *testing.T) {
 		}
 	}
 
-	t.Run("a ref that does not fit is cut from the left and keeps both glyphs", func(t *testing.T) {
+	t.Run("a ref that does not fit is cut from the left and keeps all three glyphs", func(t *testing.T) {
 		snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{{
 			ID: "1", Ref: domain.Ref{Repo: "acme/long-repository-name", Number: 1234}, Title: "t", Author: "octo",
-			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing,
+			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, Merge: domain.MergeBlocked,
 		}}}
-		for _, w := range []int{12, 11, 10, 8, 7} {
+		for _, w := range []int{13, 12, 10, 9, 8} {
 			row := lines(newTestModel(t, snap, w, 12).View().Content)[2]
-			if !strings.HasSuffix(row, " ✗✗") || !strings.Contains(row, "…") {
-				t.Errorf("w=%d: row = %q, want a left-cut ref, then \" ✗✗\"", w, row)
+			if !strings.HasSuffix(row, " ✗⊘✗") || !strings.Contains(row, "…") {
+				t.Errorf("w=%d: row = %q, want a left-cut ref, then \" ✗⊘✗\"", w, row)
 			}
-			if w >= 11 && !strings.Contains(row, "#1234") {
+			if w >= 12 && !strings.Contains(row, "#1234") {
 				t.Errorf("w=%d: row = %q, want the cut ref to keep #1234", w, row)
 			}
 			if lipgloss.Width(row) > w {
@@ -253,8 +253,8 @@ func TestCompactRows(t *testing.T) {
 	t.Run("the selected row is reversed segment by segment", func(t *testing.T) {
 		raw := strings.Split(newTestModel(t, fixtureSix(), 36, 12).View().Content, "\n")[2]
 		reverse := regexp.MustCompile(`\x1b\[(?:[0-9]+;)*7(?:;[0-9]+)*m`)
-		if got := len(reverse.FindAllString(raw, -1)); got < 3 {
-			t.Errorf("the selected compact row has %d reverse-video segments, want 3 (ref, review glyph, CI glyph): %q", got, raw)
+		if got := len(reverse.FindAllString(raw, -1)); got < 4 {
+			t.Errorf("the selected compact row has %d reverse-video segments, want 4 (ref, review glyph, merge glyph, CI glyph): %q", got, raw)
 		}
 	})
 }
@@ -301,7 +301,7 @@ func TestCompactNavigation(t *testing.T) {
 	o := &fakeOpener{}
 	var m tea.Model = filterModelOpts(36, 12, compactSnap(), Options{ClosedDays: 14, Now: fixedNow, Opener: o})
 	first := markedLine(t, m)
-	if first != "> api#101 ✓✓" {
+	if first != "> api#101 ✓✓✓" {
 		t.Fatalf("first marked row = %q", first)
 	}
 	m = press(m, "j")
@@ -333,7 +333,7 @@ func TestCompactNavigation(t *testing.T) {
 	if got := lastLine(m); !strings.HasPrefix(got, "/ 102█") {
 		t.Errorf("the number prompt line = %q", got)
 	}
-	if got := markedLine(t, m); got != "> api#102 ✗✗" {
+	if got := markedLine(t, m); got != "> api#102 ✗⊘✗" {
 		t.Errorf("filtering by 102 left %q marked", got)
 	}
 }
