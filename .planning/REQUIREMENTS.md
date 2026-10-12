@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Refresh
 
-- [ ] **RFSH-01**: Data refreshes automatically on a configurable interval (default 60s, minimum 15s)
+- [x] **RFSH-01**: Data refreshes automatically on a configurable interval (default 60s, minimum 15s)
 - [ ] **RFSH-02**: User can press `r` to refresh immediately
 - [ ] **RFSH-03**: The time of the last successful update is shown
 - [ ] **RFSH-04**: If a refresh fails, the last data stays on screen with an error indicator
@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DETL-01 | Phase 3 | Pending |
 | DETL-02 | Phase 3 | Pending |
 | DETL-03 | Phase 3 | Pending |
-| RFSH-01 | Phase 2 | Pending |
+| RFSH-01 | Phase 2 | Complete |
 | RFSH-02 | Phase 2 | Pending |
 | RFSH-03 | Phase 2 | Pending |
 | RFSH-04 | Phase 2 | Pending |

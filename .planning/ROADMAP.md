@@ -65,11 +65,11 @@ Plans:
   5. User can press `o` to open the selected PR in the browser and `?` to see the key bindings screen.
 
 **Pitfalls first addressed here**: Single-flight refresh with one tick chain that re-arms after each result. A generation counter drops stale ticks and results, and a manual `r` coalesces with an in-flight refresh. Selection is tracked by PR ref (owner/repo#n), not by row index, with a nearest-neighbour fallback. The sort is stable on a key that polling does not change. Every query includes `rateLimit { cost remaining resetAt }`. Backoff honours retry-after, then resetAt, then a bounded exponential. Cancel the context on quit. Wrap Cmds so that a panic is caught. Logs go to a file only. Open only `https://github.com` URLs, through go-gh `pkg/browser` in a `tea.Cmd`. Verify with a counting fake client over a simulated hour with `-race`.
-**Plans**: 10 plans
+**Plans**: 1/10 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md — Tracer: auto-refresh on the config.toml refresh_interval through one generation-stamped tick chain (config → cmd → ui → github client); a failed refresh keeps the rows, a failed first fetch keeps the panel and retries (D-07, D-09)
+- [x] 02-01-PLAN.md — Tracer: auto-refresh on the config.toml refresh_interval through one generation-stamped tick chain (config → cmd → ui → github client); a failed refresh keeps the rows, a failed first fetch keeps the panel and retries (D-07, D-09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 02-02-PLAN.md — r refreshes from any screen, single-flight with a keymap; header "updated HH:MM:SS" with spinner; selection follows the PR by ref with a nearest-neighbour fallback (D-03, D-05)
@@ -95,6 +95,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [ ] 02-10-PLAN.md — ? help overlay from the keymap with badges, settings, API budget and config warnings (D-17); o opens the selected PR on github.com only
+
 **UI hint**: yes
 
 ### Phase 3: Blocker Detail
@@ -138,6 +139,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
-| 2. Live Monitoring | 0/5 | Planned | - |
+| 2. Live Monitoring | 1/10 | In Progress | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |

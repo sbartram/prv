@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
 current_phase: 02
-current_phase_name: live-monitoring
+current_phase_name: Live Monitoring
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-10-12T12:14:16.759Z"
-last_activity: 2026-10-11
-last_activity_desc: Phase 01 complete, transitioned to Phase 2
-state_head: ca5dc14117a950cadc17ddd12349951e034bf907
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-10-12T15:30:13.348Z"
+last_activity: 2026-10-12
+last_activity_desc: Phase 02 execution started
+state_head: 75d5b2d5ab7bc72829173cb40433fdf0504be09d
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 4
+  completed_plans: 5
   percent: 25
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-12)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Phase 2 — Live Monitoring
+**Current focus:** Phase 02 — Live Monitoring
 
 ## Current Position
 
-Phase: 02 (live-monitoring) — READY TO EXECUTE
-Plan: Not started
+Phase: 02 (Live Monitoring) — EXECUTING
+Plan: 2 of 10
 Status: Ready to execute
-Last activity: 2026-10-11 — Phase 01 complete, transitioned to Phase 2
+Last activity: 2026-10-12 — Phase 02 execution started
 
 Progress: [███░░░░░░░] 25%
 
@@ -60,6 +60,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 01 P02 | 4 min | 2 tasks | 11 files |
 | Phase 01 P03 | 12min | 2 tasks | 17 files |
 | Phase 01 P04 | 40min | 2 tasks | 2 files |
+| Phase 02 P01 | 15min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-03: TITLE width is max(10, min(widest title, space left)); narrow panes cut at the right edge until NAV-05
 - [Phase 01]: 01-03: list view has no blank lines (header, column row, rows, footer) so visible rows = height - 3
 - [Phase 01]: 01-04: GSD runtime files .planning/state.json and .planning/milestone.lock are gitignored; .planning stays tracked
+- [Phase 02]: 02-01: refresh interval floor (15 s) lives in config.Load, not the model; generation numbering starts at 0 in New()
+- [Phase 02]: 02-01: unresolved config path keeps defaults; a broken config.toml exits 2 before the token lookup, and --version ignores it
 
 ### Pending Todos
 
@@ -102,6 +105,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T02:47:42.963Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-live-monitoring/02-CONTEXT.md
+Last session: 2026-10-12T15:30:08.784Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
