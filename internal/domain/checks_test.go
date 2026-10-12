@@ -179,3 +179,85 @@ func TestSummarizeLatestRerun(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckGlyph(t *testing.T) {
+	tests := []struct {
+		state CheckState
+		want  string
+	}{
+		{CheckFailing, "✗"},
+		{CheckCancelled, "⊘"},
+		{CheckRunning, "●"},
+		{CheckPassing, "✓"},
+		{CheckNeutral, "–"},
+		{CheckOther, "?"},
+	}
+	for _, tt := range tests {
+		if got := tt.state.Glyph(); got != tt.want {
+			t.Errorf("CheckState(%d).Glyph() = %q, want %q", tt.state, got, tt.want)
+		}
+	}
+}
+
+// detailList is the mixed list of the SortChecks and CountChecks tests.
+func detailList() []Check {
+	return []Check{
+		{Name: "docs", State: CheckNeutral},
+		{Name: "build", State: CheckPassing},
+		{Name: "e2e", State: CheckRunning},
+		{Name: "deploy", State: CheckCancelled},
+		{Name: "Test", State: CheckFailing},
+		{Name: "lint", State: CheckFailing},
+		{Name: "x", State: CheckOther},
+	}
+}
+
+func checkNames(checks []Check) []string {
+	var out []string
+	for _, c := range checks {
+		out = append(out, c.Name)
+	}
+	return out
+}
+
+func TestSortChecks(t *testing.T) {
+	want := []string{"lint", "Test", "deploy", "e2e", "build", "docs", "x"}
+	in := detailList()
+	SortChecks(in)
+	if got := checkNames(in); !slices.Equal(got, want) {
+		t.Errorf("order = %q, want %q", got, want)
+	}
+	rev := detailList()
+	slices.Reverse(rev)
+	SortChecks(rev)
+	if got := checkNames(rev); !slices.Equal(got, want) {
+		t.Errorf("reversed input order = %q, want %q", got, want)
+	}
+
+	t.Run("same name sorts by workflow", func(t *testing.T) {
+		in := []Check{
+			{Name: "build", Workflow: "b", State: CheckPassing},
+			{Name: "Build", Workflow: "z", State: CheckPassing},
+			{Name: "build", Workflow: "a", State: CheckPassing},
+		}
+		SortChecks(in)
+		var got []string
+		for _, c := range in {
+			got = append(got, c.Name+"/"+c.Workflow)
+		}
+		want := []string{"build/a", "build/b", "Build/z"}
+		if !slices.Equal(got, want) {
+			t.Errorf("order = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestCountChecks(t *testing.T) {
+	want := CheckCounts{Failing: 2, Cancelled: 1, Running: 1, Passing: 1, Neutral: 2}
+	if got := CountChecks(detailList()); got != want {
+		t.Errorf("CountChecks = %+v, want %+v", got, want)
+	}
+	if got := CountChecks(nil); got != (CheckCounts{}) {
+		t.Errorf("CountChecks(nil) = %+v, want zero", got)
+	}
+}

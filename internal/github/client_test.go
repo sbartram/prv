@@ -24,7 +24,7 @@ import (
 const failingNoneBody = `{"data":{"nodes":[]}}`
 
 // opName returns the GraphQL operation name of a request body ("Watch",
-// "FailingChecks"), or "" when the body is not a query.
+// "FailingChecks", "Detail"), or "" when the body is not a query.
 func opName(body []byte) string {
 	var payload struct {
 		Query string `json:"query"`
@@ -44,14 +44,17 @@ func opName(body []byte) string {
 
 // fixtureTransport routes by operation. "Watch" requests are served from files
 // in order (only they count in calls and bodies); "FailingChecks" requests are
-// served from failing in order, then with failingNoneBody.
+// served from failing in order, then with failingNoneBody; "Detail" requests
+// are served from detail in order, and a request past the list fails the test.
 type fixtureTransport struct {
-	t          *testing.T
-	files      []string
-	calls      int
-	bodies     [][]byte
-	failing    []string
-	failBodies [][]byte
+	t            *testing.T
+	files        []string
+	calls        int
+	bodies       [][]byte
+	failing      []string
+	failBodies   [][]byte
+	detail       []string
+	detailBodies [][]byte
 }
 
 func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -79,6 +82,17 @@ func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 			if err != nil {
 				f.t.Fatal(err)
 			}
+		}
+	case "Detail":
+		n := len(f.detailBodies)
+		f.detailBodies = append(f.detailBodies, raw)
+		if n >= len(f.detail) {
+			f.t.Fatalf("unexpected Detail request %d; only %d fixtures", n+1, len(f.detail))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.detail[n]))
+		if err != nil {
+			f.t.Fatal(err)
 		}
 	default:
 		f.t.Fatalf("unexpected operation %q", op)

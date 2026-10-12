@@ -184,3 +184,27 @@ func nameLess(a, b string) bool {
 	}
 	return a < b
 }
+
+// Glyph returns the one-cell glyph of the state.
+func (s CheckState) Glyph() string { return "" }
+
+// CheckCounts is how many de-duplicated checks are in each display class.
+type CheckCounts struct {
+	Failing, Cancelled, Running, Passing, Neutral int
+}
+
+// CountChecks counts checks by class. CheckOther counts as neutral.
+func CountChecks(checks []Check) CheckCounts { return CheckCounts{} }
+
+// SortChecks sorts checks in place into the detail view order.
+func SortChecks(checks []Check) {}
+
+// Detail is the full detail of one pull request.
+type Detail struct {
+	Checks    []Check
+	Reviewers []Reviewer
+	Counts    CheckCounts
+	Truncated bool
+	Read      int
+	Total     int
+}

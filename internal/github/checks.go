@@ -189,3 +189,35 @@ func (c *Client) fetchFailing(ctx context.Context, snap *domain.Snapshot) error 
 
 // failingWarning is the snapshot warning when check names could not be loaded.
 const failingWarning = "Check names could not be loaded"
+
+// FetchDetail returns the full detail of one pull request.
+func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
+	return domain.Detail{}, nil
+}
+
+// Wire structs for the Detail response.
+
+type wireDetailResp struct {
+	RateLimit struct {
+		Limit     int
+		Cost      int
+		Remaining int
+		ResetAt   time.Time
+	}
+	Node *wireDetailNode
+}
+
+type wireDetailNode struct {
+	Typename                 string `json:"__typename"`
+	ID                       string
+	LatestOpinionatedReviews struct{ Nodes []*wireReview }
+	LatestReviews            struct{ Nodes []*wireReview }
+	ReviewRequests           struct{ Nodes []*wireRequest }
+	StatusCheckRollup        *struct {
+		State    string
+		Contexts wireContexts
+	}
+}
+
+// detailReviewers maps the reviewers of a Detail node.
+func detailReviewers(n *wireDetailNode) []domain.Reviewer { return nil }
