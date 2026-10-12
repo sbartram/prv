@@ -34,6 +34,8 @@ type detailState struct {
 	err      error          // the last failed fetch; shown only while data is nil
 	at       time.Time      // when data was read
 	expanded bool           // the folded passing checks are listed
+	gone     bool           // the PR left the rows on screen; the last data stays (D-12)
+	errAt    time.Time      // when the last detail fetch failed
 	vp       viewport.Model // scrolls the body; driven only by prv's keymap
 }
 

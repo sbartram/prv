@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -566,5 +567,396 @@ func TestDetailFooterHints(t *testing.T) {
 	}
 	if strings.Contains(last, "enter") || strings.Contains(last, "PR #") {
 		t.Errorf("footer %q holds list hints", last)
+	}
+}
+
+// ---- the open detail stays current (plan 03-08 task 1) ----
+
+// urlSnap is selSnap with a github.com URL on every PR.
+func urlSnap(nums ...int) domain.Snapshot {
+	s := selSnap(nums...)
+	for i := range s.PRs {
+		s.PRs[i].URL = "https://github.com/a/b/pull/" + itoa(s.PRs[i].Ref.Number)
+	}
+	return s
+}
+
+// liveDetail builds a 120 x h model on a test clock whose timers are recorded
+// and never run, with the PRs a/b#nums loaded.
+func liveDetail(t *testing.T, f Fetcher, clk *clock, op Opener, h int, nums ...int) tea.Model {
+	t.Helper()
+	m := New(t.Context(), f, Options{ClosedDays: 14, Now: clk.now, Opener: op})
+	m.after = (&afterRec{}).after
+	var tm tea.Model = m
+	tm, _ = tm.Update(tea.WindowSizeMsg{Width: 120, Height: h})
+	tm, _ = tm.Update(result(tm, urlSnap(nums...), nil))
+	return tm
+}
+
+// openRow moves to the n-th row (1-based), presses enter and delivers the
+// detail result.
+func openRow(t *testing.T, m tea.Model, n int) tea.Model {
+	t.Helper()
+	for range n - 1 {
+		m = press(m, "j")
+	}
+	m, cmd := m.Update(key("enter"))
+	return runCmd(m, cmd)
+}
+
+// refresh delivers a successful list refresh with the PRs a/b#nums and runs
+// the Cmds it returns.
+func refresh(m tea.Model, nums ...int) tea.Model {
+	m, cmd := m.Update(result(m, urlSnap(nums...), nil))
+	return runCmd(m, cmd)
+}
+
+func TestDetailRefreshes(t *testing.T) {
+	f := newDetailFake(fixtureDetail())
+	m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3, 4, 5), 3)
+	if len(f.ids) != 1 || f.ids[0] != "PR_3" {
+		t.Fatalf("FetchDetail ids = %v after enter, want [PR_3]", f.ids)
+	}
+
+	m, cmd := m.Update(result(m, urlSnap(1, 2, 3, 4, 5), nil))
+	if cmd == nil {
+		t.Fatal("a successful refresh returned no commands")
+	}
+	m = runCmd(m, cmd)
+	if len(f.ids) != 2 || f.ids[1] != "PR_3" {
+		t.Errorf("FetchDetail ids = %v after a refresh, want [PR_3 PR_3]", f.ids)
+	}
+
+	m, cmd = m.Update(result(m, domain.Snapshot{}, errors.New("boom")))
+	m = runCmd(m, cmd)
+	if len(f.ids) != 2 {
+		t.Errorf("a failed refresh made a detail call: ids = %v", f.ids)
+	}
+
+	// The r key goes through the same path as the tick.
+	m, cmd = m.Update(key("r"))
+	m = runCmd(m, cmd)
+	m = refresh(m, 1, 2, 3, 4, 5)
+	if len(f.ids) != 3 {
+		t.Errorf("FetchDetail ids = %v after r and a refresh, want 3 calls", f.ids)
+	}
+}
+
+func TestDetailNoFetchWhenClosed(t *testing.T) {
+	f := newDetailFake(fixtureDetail())
+	m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3), 2)
+	m = press(m, "esc")
+	m = refresh(m, 1, 2, 3)
+	m = refresh(m, 1, 2, 3)
+	if len(f.ids) != 1 {
+		t.Errorf("FetchDetail ids = %v, want only the one from enter", f.ids)
+	}
+	if mm := m.(Model); mm.detail.open || mm.detailInFlight {
+		t.Errorf("open=%v inFlight=%v after esc and refreshes", mm.detail.open, mm.detailInFlight)
+	}
+}
+
+func TestDetailNoOverlap(t *testing.T) {
+	f := newDetailFake(fixtureDetail())
+	var m tea.Model = liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3)
+	m, cmd := m.Update(key("enter"))
+	first := cmd() // the request goes out; its result has not come back
+	if len(f.ids) != 1 {
+		t.Fatalf("ids = %v, want one call", f.ids)
+	}
+	m = refresh(m, 1, 2, 3)
+	if len(f.ids) != 1 {
+		t.Errorf("a refresh started a second detail fetch while one was in flight: ids = %v", f.ids)
+	}
+	m, _ = m.Update(first)
+	m = refresh(m, 1, 2, 3)
+	if len(f.ids) != 2 {
+		t.Errorf("ids = %v after the result was applied, want 2 calls", f.ids)
+	}
+}
+
+func TestDetailPausedNoRequest(t *testing.T) {
+	clk := &clock{t: fixedNow()}
+	f := newDetailFake(fixtureDetail())
+	m := liveDetail(t, f, clk, nil, 40, 1, 2, 3)
+	mm := m.(Model)
+	mm.pausedUntil = clk.t.Add(10 * time.Minute)
+	m = mm
+
+	m, cmd := m.Update(key("enter"))
+	if cmd != nil {
+		t.Error("enter during a pause started a request")
+	}
+	if v := plain(m); !strings.Contains(v, "CHECKS  paused until 14:42 (rate limit)") {
+		t.Errorf("no pause line in the CHECKS section:\n%s", v)
+	}
+	m = refresh(m, 1, 2, 3)
+	if len(f.ids) != 0 {
+		t.Errorf("a refresh during the pause made a detail call: %v", f.ids)
+	}
+	clk.t = clk.t.Add(11 * time.Minute)
+	m = refresh(m, 1, 2, 3)
+	if len(f.ids) != 1 {
+		t.Errorf("ids = %v after the pause, want one call", f.ids)
+	}
+	if v := plain(m); !strings.Contains(v, "CHECKS  2 failing") {
+		t.Errorf("the detail was not loaded after the pause:\n%s", v)
+	}
+}
+
+func TestDetailRateLimitExtendsPause(t *testing.T) {
+	clk := &clock{t: fixedNow()}
+	open := func(err error, pause time.Duration) (tea.Model, *detailFake) {
+		f := newDetailFake(fixtureDetail())
+		f.err = err
+		var m tea.Model = liveDetail(t, f, clk, nil, 40, 1, 2, 3)
+		m, cmd := m.Update(key("enter"))
+		if pause != 0 { // a pause that is already running
+			mm := m.(Model)
+			mm.pausedUntil = clk.t.Add(pause)
+			m = mm
+		}
+		return runCmd(m, cmd), f
+	}
+
+	t.Run("a reset time", func(t *testing.T) {
+		reset := clk.t.Add(10 * time.Minute)
+		m, f := open(&limitedErr{reset: reset, limited: true}, 0)
+		if got := m.(Model).pausedUntil; !got.Equal(reset) {
+			t.Fatalf("pausedUntil = %v, want %v", got, reset)
+		}
+		m, cmd := m.Update(key("r"))
+		m = runCmd(m, cmd)
+		if mm := m.(Model); mm.inFlight || f.fakeFetcher.calls != 0 {
+			t.Errorf("r during the pause started a request: inFlight=%v calls=%d", mm.inFlight, f.fakeFetcher.calls)
+		}
+		if v := plain(m); !strings.Contains(v, "rate limited — resumes 14:42") {
+			t.Errorf("r shows no pause flash:\n%s", v)
+		}
+	})
+	t.Run("Retry-After", func(t *testing.T) {
+		m, _ := open(&limitedErr{after: 5 * time.Minute, limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(5*time.Minute); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("never earlier", func(t *testing.T) {
+		m, _ := open(&limitedErr{reset: clk.t.Add(10 * time.Minute), limited: true}, 20*time.Minute)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(20*time.Minute); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want the later %v", got, want)
+		}
+	})
+	t.Run("another error pauses nothing", func(t *testing.T) {
+		m, _ := open(&limitedErr{reset: clk.t.Add(10 * time.Minute)}, 0)
+		if got := m.(Model).pausedUntil; !got.IsZero() {
+			t.Errorf("pausedUntil = %v for an error that is no rate limit", got)
+		}
+	})
+	t.Run("a refresh result does not end the pause", func(t *testing.T) {
+		reset := clk.t.Add(10 * time.Minute)
+		m, f := open(&limitedErr{reset: reset, limited: true}, 0)
+		m = refresh(m, 1, 2, 3)
+		if got := m.(Model).pausedUntil; !got.Equal(reset) {
+			t.Errorf("pausedUntil = %v after a list result, want %v", got, reset)
+		}
+		if len(f.ids) != 1 {
+			t.Errorf("ids = %v: a request went out inside the pause", f.ids)
+		}
+	})
+}
+
+func TestDetailErrorKeepsData(t *testing.T) {
+	clk := &clock{t: fixedNow()}
+	f := newDetailFake(fixtureDetail())
+	m := openRow(t, liveDetail(t, f, clk, nil, 40, 1, 2, 3), 1)
+	if v := plain(m); strings.Contains(v, "refresh failed") {
+		t.Fatalf("a fresh detail shows a failure:\n%s", v)
+	}
+
+	clk.t = time.Date(2026, 10, 11, 14, 33, 10, 0, time.UTC)
+	f.err = &shortErr{short: "network"}
+	m = refresh(m, 1, 2, 3)
+	v := plain(m)
+	if want := "✗ refresh failed 14:33 (network) · details from 14:32:05"; !strings.Contains(v, want) {
+		t.Errorf("view missing %q:\n%s", want, v)
+	}
+	if !strings.Contains(v, "✗ lint") || !strings.Contains(v, "CHECKS  2 failing") {
+		t.Errorf("the last data left the screen:\n%s", v)
+	}
+	if strings.Contains(v, "ghp_SECRET") {
+		t.Errorf("the error message reached the screen:\n%s", v)
+	}
+	ls := strings.Split(v, "\n")
+	if len(ls) < 3 || !strings.HasPrefix(ls[2], "✗ refresh failed") {
+		t.Errorf("the failure line should sit right under the title (line 3):\n%s", v)
+	}
+
+	clk.t = time.Date(2026, 10, 11, 14, 34, 0, 0, time.UTC)
+	f.err = nil
+	m = refresh(m, 1, 2, 3)
+	if v := plain(m); strings.Contains(v, "refresh failed") || strings.Contains(v, "details from") {
+		t.Errorf("a successful detail result left the failure line:\n%s", v)
+	}
+}
+
+func TestDetailKeepsScrollAndExpand(t *testing.T) {
+	f := newDetailFake(bigDetail())
+	m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 10, 1, 2, 3), 1)
+	m = press(m, "e", "j", "j", "j")
+	before := m.(Model)
+	if before.detail.vp.YOffset() != 3 || !before.detail.expanded {
+		t.Fatalf("setup: offset=%d expanded=%v", before.detail.vp.YOffset(), before.detail.expanded)
+	}
+
+	d := bigDetail()
+	d.Checks = append(d.Checks, domain.Check{Name: "pass-11", Source: "ci.yml", State: domain.CheckPassing, Word: "success"})
+	domain.SortChecks(d.Checks)
+	d.Counts, d.Read, d.Total = domain.CountChecks(d.Checks), len(d.Checks), len(d.Checks)
+	f.detail = d
+	m = refresh(m, 1, 2, 3)
+
+	after := m.(Model)
+	if got := after.detail.vp.YOffset(); got != 3 {
+		t.Errorf("offset = %d after the refresh, want 3", got)
+	}
+	if !after.detail.expanded {
+		t.Error("the refresh collapsed the checks")
+	}
+	if got, want := after.detail.vp.TotalLineCount(), before.detail.vp.TotalLineCount()+1; got != want {
+		t.Errorf("content lines = %d, want %d (one more check)", got, want)
+	}
+
+	t.Run("a shorter content clamps the offset", func(t *testing.T) {
+		f.detail = fixtureDetail()
+		m := refresh(m, 1, 2, 3)
+		mm := m.(Model)
+		if mm.detail.vp.YOffset() > max(0, mm.detail.vp.TotalLineCount()-mm.detail.vp.Height()) {
+			t.Errorf("offset %d is past the end of %d lines", mm.detail.vp.YOffset(), mm.detail.vp.TotalLineCount())
+		}
+	})
+}
+
+func TestDetailGone(t *testing.T) {
+	setup := func(t *testing.T) (tea.Model, *detailFake) {
+		f := newDetailFake(fixtureDetail())
+		return openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3, 4, 5), 3), f
+	}
+
+	t.Run("the view stays open with its last data and a note", func(t *testing.T) {
+		m, f := setup(t)
+		m = refresh(m, 1, 2, 4, 5)
+		v := plain(m)
+		if !m.(Model).detail.open {
+			t.Fatal("the detail view closed")
+		}
+		for _, want := range []string{"no longer in list", "a/b#3", "✗ lint", "✗ unit"} {
+			if !strings.Contains(v, want) {
+				t.Errorf("view missing %q:\n%s", want, v)
+			}
+		}
+		ls := strings.Split(v, "\n")
+		if len(ls) < 3 || ls[2] != "no longer in list" {
+			t.Errorf("the note should be line 3, right under the title:\n%s", v)
+		}
+		m = refresh(m, 1, 2, 4, 5)
+		if len(f.ids) != 1 {
+			t.Errorf("ids = %v: a gone PR is still fetched", f.ids)
+		}
+		if m.(Model).detailInFlight {
+			t.Error("a detail fetch is in flight for a gone PR")
+		}
+	})
+	t.Run("esc lands on the nearest neighbour below", func(t *testing.T) {
+		m, _ := setup(t)
+		m = refresh(m, 1, 2, 4, 5)
+		m = press(m, "esc")
+		if got := markedRef(t, m); got != "a/b#4" {
+			t.Errorf("marked row = %q, want a/b#4", got)
+		}
+	})
+	t.Run("the last row falls back to the one above", func(t *testing.T) {
+		f := newDetailFake(fixtureDetail())
+		m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3), 3)
+		m = refresh(m, 1, 2)
+		m = press(m, "esc")
+		if got := markedRef(t, m); got != "a/b#2" {
+			t.Errorf("marked row = %q, want a/b#2", got)
+		}
+	})
+	t.Run("a PR that comes back resumes fetching and is selected again", func(t *testing.T) {
+		m, f := setup(t)
+		m = refresh(m, 1, 2, 4, 5)
+		m = refresh(m, 1, 2, 3, 4, 5)
+		if v := plain(m); strings.Contains(v, "no longer in list") {
+			t.Errorf("the note stayed after the PR came back:\n%s", v)
+		}
+		if len(f.ids) != 2 {
+			t.Errorf("ids = %v, want a second call after the PR came back", f.ids)
+		}
+		m = press(m, "esc")
+		if got := markedRef(t, m); got != "a/b#3" {
+			t.Errorf("marked row = %q, want a/b#3", got)
+		}
+	})
+}
+
+func TestDetailGoneOpensDetailURL(t *testing.T) {
+	op := &fakeOpener{}
+	f := newDetailFake(fixtureDetail())
+	m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, op, 40, 1, 2, 3, 4, 5), 3)
+	m = refresh(m, 1, 2, 4, 5)
+	if got := m.(Model).rows[m.(Model).cursor].Ref.Number; got != 4 {
+		t.Fatalf("setup: the cursor row is #%d, want #4", got)
+	}
+	_, cmd := m.Update(key("o"))
+	if cmd == nil {
+		t.Fatal("o returned no command")
+	}
+	cmd()
+	if len(op.urls) != 1 || op.urls[0] != "https://github.com/a/b/pull/3" {
+		t.Errorf("opened %v, want the URL of #3 and not of the row under the cursor", op.urls)
+	}
+}
+
+func TestDetailEscAfterReorder(t *testing.T) {
+	f := newDetailFake(fixtureDetail())
+	m := openRow(t, liveDetail(t, f, &clock{t: fixedNow()}, nil, 7, 1, 2, 3, 4, 5), 2)
+	m = refresh(m, 5, 4, 3, 2, 1)
+	m = refresh(m, 3, 5, 1, 4, 2)
+	m = refresh(m, 5, 4, 3, 2, 1)
+	if v := plain(m); strings.Contains(v, "no longer in list") {
+		t.Fatalf("a reorder was taken for a PR leaving the list:\n%s", v)
+	}
+	m = press(m, "esc")
+	if got := markedRef(t, m); got != "a/b#2" {
+		t.Errorf("marked row = %q, want a/b#2 marked and on screen", got)
+	}
+}
+
+func TestDetailStaleAfterSwitch(t *testing.T) {
+	f := newDetailFake(fixtureDetail())
+	var m tea.Model = liveDetail(t, f, &clock{t: fixedNow()}, nil, 40, 1, 2, 3)
+	m, _ = m.Update(key("enter")) // PR #1, sequence A
+	seqA := m.(Model).detailSeq
+	refA := m.(Model).detail.ref
+	m = press(m, "esc", "j", "enter") // PR #2, sequence B
+	mm := m.(Model)
+	if mm.detailSeq == seqA || mm.detail.ref == refA {
+		t.Fatalf("setup: seq %d/%d ref %v/%v", seqA, mm.detailSeq, refA, mm.detail.ref)
+	}
+	m, _ = m.Update(detailMsg{seq: seqA, ref: refA, data: fixtureDetail()})
+	if m.(Model).detail.data != nil {
+		t.Error("the result of the first view was applied to the second")
+	}
+	m, _ = m.Update(detailMsg{seq: mm.detailSeq, ref: refA, data: fixtureDetail()})
+	if m.(Model).detail.data != nil {
+		t.Error("a result for another PR was applied")
+	}
+	if !m.(Model).detailInFlight {
+		t.Error("a dropped result cleared detailInFlight")
+	}
+	m, _ = m.Update(detailMsg{seq: mm.detailSeq, ref: mm.detail.ref, data: fixtureDetail()})
+	if m.(Model).detail.data == nil {
+		t.Error("the current result was dropped")
 	}
 }

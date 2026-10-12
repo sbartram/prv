@@ -347,6 +347,10 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyDown}
 	case "up":
 		return tea.KeyPressMsg{Code: tea.KeyUp}
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "esc":
+		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "ctrl+c":
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	}
@@ -572,14 +576,29 @@ func TestLiveEndToEnd(t *testing.T) {
 }
 
 // routedTransport answers by GraphQL operation: "query Watch" gets the
-// discovery body and "query FailingChecks" the step-2 body (D-01). It records
-// every FailingChecks request.
+// discovery body, "query FailingChecks" the step-2 body (D-01) and "query
+// Detail" the detail body. It records every FailingChecks and Detail request,
+// and the order of all operations.
 type routedTransport struct {
 	t          *testing.T
 	watch      string
 	failing    string
+	detail     string
 	failVars   []map[string]any
 	failQuerys []string
+	detailVars []map[string]any
+	ops        []string
+}
+
+// opIndexes returns the positions of op in the order of all requests.
+func (r *routedTransport) opIndexes(op string) []int {
+	var out []int
+	for i, o := range r.ops {
+		if o == op {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 func (r *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -593,10 +612,16 @@ func (r *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
 	case strings.HasPrefix(payload.Query, "query Watch"):
 		body = r.watch
+		r.ops = append(r.ops, "Watch")
 	case strings.HasPrefix(payload.Query, "query FailingChecks"):
 		body = r.failing
 		r.failVars = append(r.failVars, payload.Variables)
 		r.failQuerys = append(r.failQuerys, payload.Query)
+		r.ops = append(r.ops, "FailingChecks")
+	case strings.HasPrefix(payload.Query, "query Detail"):
+		body = r.detail
+		r.detailVars = append(r.detailVars, payload.Variables)
+		r.ops = append(r.ops, "Detail")
 	default:
 		r.t.Errorf("unexpected operation: %.40q", payload.Query)
 	}
@@ -673,4 +698,117 @@ func TestFailingNameEndToEnd(t *testing.T) {
 	if strings.Contains(rt.failQuerys[0], "PR_7") {
 		t.Error("the FailingChecks query text must not contain a PR id: ids travel only as a variable")
 	}
+}
+
+// detailBody is the Detail answer for PR_7: one failing check and one reviewer.
+var detailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4986,"resetAt":"2026-10-11T13:00:00Z"},"node":` +
+	`{"__typename":"PullRequest","id":"PR_7",` +
+	`"latestOpinionatedReviews":{"nodes":[{"state":"APPROVED","author":{"__typename":"User","login":"alice"}}]},` +
+	`"latestReviews":{"nodes":[{"state":"APPROVED","author":{"__typename":"User","login":"alice"}}]},` +
+	`"reviewRequests":{"nodes":[]},` +
+	`"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":"x"},"nodes":[` +
+	ctxRun(11, "lint", "FAILURE", "2026-10-11T09:00:00Z") + `]}}}}}`
+
+// step runs cmd and passes every message it yields to Update once, like
+// runCmd, and returns the commands Update returned. A command that takes longer
+// than 250 ms is a timer (the refresh tick) and is dropped, so no test waits
+// for a 60 s tick.
+func step(m tea.Model, cmd tea.Cmd) (tea.Model, []tea.Cmd) {
+	if cmd == nil {
+		return m, nil
+	}
+	ch := make(chan tea.Msg, 1)
+	go func() { ch <- cmd() }()
+	var msg tea.Msg
+	select {
+	case msg = <-ch:
+	case <-time.After(250 * time.Millisecond):
+		return m, nil
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var next []tea.Cmd
+		for _, c := range batch {
+			var n []tea.Cmd
+			m, n = step(m, c)
+			next = append(next, n...)
+		}
+		return m, next
+	}
+	if msg == nil {
+		return m, nil
+	}
+	m, n := m.Update(msg)
+	return m, []tea.Cmd{n}
+}
+
+// settle runs a Cmd and then the Cmds its messages made, once: for a refresh
+// that is the fetch and then the detail fetch that follows its result.
+func settle(m tea.Model, cmd tea.Cmd) tea.Model {
+	m, next := step(m, cmd)
+	for _, c := range next {
+		m, _ = step(m, c)
+	}
+	return m
+}
+
+// TestDetailEndToEnd runs the real github.Client under the real ui.Model: enter
+// sends one Detail request for the selected PR, the next refresh sends the
+// discovery query and then one more Detail request, and after esc no Detail
+// request goes out.
+func TestDetailEndToEnd(t *testing.T) {
+	rt := &routedTransport{t: t, watch: failingWatchBody, failing: failingStepBody, detail: detailBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	// enter: one Detail request, for the id of the selected PR.
+	m, cmd := send(m, key("enter"))
+	m = settle(m, cmd)
+	if len(rt.detailVars) != 1 || rt.detailVars[0]["id"] != "PR_7" {
+		t.Fatalf("Detail requests = %v, want exactly one with id PR_7", rt.detailVars)
+	}
+	if v := plain(m); !strings.Contains(v, "CHECKS") || !strings.Contains(v, "✗ lint") || !strings.Contains(v, "alice") {
+		t.Errorf("the detail view is not showing the answer:\n%s", v)
+	}
+
+	// r: the discovery query again, then one more Detail request.
+	m, cmd = send(m, key("r"))
+	m = settle(m, cmd)
+	watches, details := rt.opIndexes("Watch"), rt.opIndexes("Detail")
+	if len(watches) != 2 || len(details) != 2 {
+		t.Fatalf("after a refresh: %d Watch and %d Detail requests (%v), want 2 and 2", len(watches), len(details), rt.ops)
+	}
+	if details[1] < watches[1] {
+		t.Errorf("the second Detail request went out before the second Watch request: %v", rt.ops)
+	}
+	if rt.detailVars[1]["id"] != "PR_7" {
+		t.Errorf("second Detail id = %v, want PR_7", rt.detailVars[1]["id"])
+	}
+
+	// esc: a refresh makes no Detail request.
+	m = press(m, "esc")
+	m, cmd = send(m, key("r"))
+	_ = settle(m, cmd)
+	if got := len(rt.opIndexes("Detail")); got != 2 {
+		t.Errorf("Detail requests = %d after esc and a refresh, want still 2 (%v)", got, rt.ops)
+	}
+	if got := len(rt.opIndexes("Watch")); got != 3 {
+		t.Errorf("Watch requests = %d, want 3 (%v)", got, rt.ops)
+	}
+}
+
+func press(m tea.Model, keys ...string) tea.Model {
+	for _, k := range keys {
+		m, _ = send(m, key(k))
+	}
+	return m
 }
