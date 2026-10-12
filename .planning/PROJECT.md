@@ -16,18 +16,18 @@ At a glance, without opening a browser, the user can see which of their watched 
 - ✓ List shows each PR's state: Open / Merged / Closed — Phase 1
 - ✓ List shows one rollup workflow badge per PR (passing / failing / running) — Phase 1
 - ✓ Authenticates with the same token `gh` would use: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login — Phase 1
+- ✓ User can filter the list by any combination of Open / Merged / Closed — Phase 2 (real-terminal UAT deferred)
+- ✓ Auto-found merged/closed PRs only appear if closed within a configurable recent window (default 14 days) — Phase 2 (manual-PR exemption lands with WATCH-07 in a later phase)
+- ✓ Data refreshes automatically on a configurable interval, with failure marker and rate-limit backoff — Phase 2 (real-terminal UAT deferred)
+- ✓ User can open the selected PR in the browser with a key — Phase 2 (real-browser UAT deferred)
 
 ### Active
 
 - [ ] User can add any PR by pasting a github.com PR URL or `owner/repo#123`
 - [ ] Manually added PRs persist across restarts in a local file until the user removes them
 - [ ] User can remove a manually added PR from the watch list
-- [ ] User can filter the list by any combination of Open / Merged / Closed
-- [ ] Auto-found merged/closed PRs only appear if closed within a configurable recent window (default 14 days); manually added PRs are exempt
 - [ ] List shows the overall review decision (approved / changes requested / review required) plus which reviewers approved or requested changes
 - [ ] Selecting a PR shows a detail view with each check/job and its status
-- [ ] Data refreshes automatically on a configurable interval
-- [ ] User can open the selected PR in the browser with a key
 
 ### Out of Scope
 
@@ -85,4 +85,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-12 after Phase 1*
+*Last updated: 2026-10-12 after Phase 2*
