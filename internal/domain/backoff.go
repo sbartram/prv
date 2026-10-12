@@ -60,7 +60,7 @@ func NextDelay(now time.Time, interval time.Duration, failures int, rl RateLimit
 				reset = rl.ResetAt
 			}
 			if reset.After(now) {
-				return paused(now, clamp(reset.Sub(now)+time.Second))
+				return paused(now, resetWait(reset.Sub(now)))
 			}
 			return paused(now, max(RateLimitFloor, failureWait(interval, failures)))
 		}
@@ -74,7 +74,7 @@ func NextDelay(now time.Time, interval time.Duration, failures int, rl RateLimit
 	cost := max(rl.Cost, 1)
 	untilReset := rl.ResetAt.Sub(now)
 	if rl.Remaining <= ReservePerCost*cost {
-		return paused(now, clamp(untilReset+time.Second))
+		return paused(now, resetWait(untilReset))
 	}
 	// Pacing: division only, so no interval can overflow. The reset time came
 	// from the server, so the paced wait is bounded like every server delay.
@@ -91,6 +91,13 @@ func paused(now time.Time, wait time.Duration) Delay {
 
 func clamp(d time.Duration) time.Duration {
 	return min(max(d, MinServerWait), MaxServerWait)
+}
+
+// resetWait is the wait for a span ending at a reset time, plus one second
+// of margin. The span is cut before the second is added: Time.Sub saturates at
+// the largest Duration, and adding to that would wrap negative.
+func resetWait(span time.Duration) time.Duration {
+	return clamp(min(span, MaxServerWait) + time.Second)
 }
 
 // failureWait is the bounded exponential: the base doubled (failures-1) times,
