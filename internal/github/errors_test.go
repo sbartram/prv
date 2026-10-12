@@ -267,3 +267,27 @@ func TestTokenNeverAppears(t *testing.T) {
 		})
 	}
 }
+
+func TestShortReason(t *testing.T) {
+	tests := []struct {
+		kind ErrorKind
+		want string
+	}{
+		{KindAuth, "auth"},
+		{KindForbidden, "forbidden"},
+		{KindServer, "server"},
+		{KindNetwork, "network"},
+		{KindGraphQL, "GitHub error"},
+		{KindUnknown, "error"},
+	}
+	for _, tt := range tests {
+		e := &Error{Kind: tt.kind, Status: 401, Message: "HTTP 401: " + secretToken}
+		got := e.Short()
+		if got != tt.want {
+			t.Errorf("Short() for kind %d = %q, want %q", tt.kind, got, tt.want)
+		}
+		if strings.Contains(got, secretToken) || strings.Contains(got, "HTTP") {
+			t.Errorf("Short() for kind %d leaks the message: %q", tt.kind, got)
+		}
+	}
+}

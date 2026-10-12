@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -408,4 +409,136 @@ func TestViewFitsScreen(t *testing.T) {
 			_ = stateModel(t, state, 0, 0).View()
 		}
 	})
+}
+
+// ---- failure marker, retry line and header fitting (plan 02-04 task 1) ----
+
+// shortErr stands for *github.Error: it carries a Short() reason and an
+// API-style message that must never reach the header.
+type shortErr struct{ short string }
+
+func (e *shortErr) Error() string { return "GitHub request failed: token ghp_SECRET" }
+func (e *shortErr) Short() string { return e.short }
+
+// failedModel returns a w x 24 model that loaded one PR at 14:32:05 and whose
+// refresh failed with err at 14:33:10. The clock is returned for later steps.
+func failedModel(t *testing.T, w int, err error) (tea.Model, *clock) {
+	t.Helper()
+	clk := &clock{t: fixedNow()}
+	var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14, Now: clk.now})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: 24})
+	m, _ = m.Update(fetchedMsg{snap: onePR()})
+	clk.t = time.Date(2026, 10, 11, 14, 33, 10, 0, time.UTC)
+	m, _ = m.Update(fetchedMsg{err: err})
+	return m, clk
+}
+
+func TestFailureMarker(t *testing.T) {
+	m, clk := failedModel(t, 120, &shortErr{"network"})
+	raw := m.View().Content
+	head := strings.Split(raw, "\n")[0]
+	v := plain(m)
+	if want := "✗ refresh failed 14:33 (network) · data from 14:32:05"; !strings.Contains(ansi.Strip(head), want) {
+		t.Errorf("header = %q, want it to contain %q", ansi.Strip(head), want)
+	}
+	if strings.Contains(ansi.Strip(head), "updated") {
+		t.Errorf("header still says updated after a failed refresh: %q", ansi.Strip(head))
+	}
+	if !strings.Contains(head, "\x1b[33m") {
+		t.Errorf("failure marker has no ANSI yellow foreground: %q", head)
+	}
+	if strings.Contains(v, "SECRET") || strings.Contains(v, "GitHub request failed") {
+		t.Errorf("the API message reached the screen:\n%s", v)
+	}
+	if !strings.Contains(v, "acme/api#1") || strings.Contains(v, "Could not load your PRs") {
+		t.Errorf("rows must stay and the error panel must not appear:\n%s", v)
+	}
+
+	t.Run("error without Short", func(t *testing.T) {
+		m, _ := failedModel(t, 120, errors.New("boom"))
+		if h := lines(m.View().Content)[0]; !strings.Contains(h, "(error)") {
+			t.Errorf("header = %q, want the (error) reason", h)
+		}
+	})
+
+	t.Run("next success removes the marker", func(t *testing.T) {
+		clk.t = time.Date(2026, 10, 11, 14, 34, 0, 0, time.UTC)
+		m, _ = m.Update(fetchedMsg{snap: onePR()})
+		h := lines(m.View().Content)[0]
+		if !strings.Contains(h, "updated 14:34:00") || strings.Contains(h, "refresh failed") {
+			t.Errorf("header = %q, want updated 14:34:00 and no marker", h)
+		}
+	})
+}
+
+func TestRetryingAt(t *testing.T) {
+	m := stateModel(t, "error", 80, 24)
+	v := plain(m)
+	for _, want := range []string{"retrying at 14:33", "r retry · q quit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("error panel missing %q:\n%s", want, v)
+		}
+	}
+	// The automatic retry starts: the line changes while it runs.
+	var tm tea.Model = m
+	tm, _ = tm.Update(tickMsg{gen: m.gen})
+	v = plain(tm)
+	if !strings.Contains(v, "retrying now…") || strings.Contains(v, "retrying at") {
+		t.Errorf("while the retry runs the panel should say 'retrying now…':\n%s", v)
+	}
+	if !strings.Contains(v, "r retry · q quit") {
+		t.Errorf("panel lost its key line:\n%s", v)
+	}
+}
+
+func TestHeaderPriority(t *testing.T) {
+	for _, w := range []int{40, 60, 80, 120} {
+		t.Run(itoa(w), func(t *testing.T) {
+			m, _ := failedModel(t, w, &shortErr{"network"})
+			head := lines(m.View().Content)[0]
+			if lipgloss.Width(head) > w {
+				t.Errorf("header is %d cells wide, want at most %d: %q", lipgloss.Width(head), w, head)
+			}
+			switch w {
+			case 40:
+				if !strings.HasPrefix(head, "✗ refresh failed") {
+					t.Errorf("header = %q, want it to start with the failure marker", head)
+				}
+			case 60:
+				if !strings.Contains(head, "data from 14:32:05") || strings.Contains(head, "prv") || strings.Contains(head, "@octo") {
+					t.Errorf("header = %q, want the marker whole and prv and @octo dropped", head)
+				}
+			case 80:
+				if !strings.Contains(head, "data from 14:32:05") {
+					t.Errorf("header = %q, want the marker whole", head)
+				}
+			case 120:
+				if !strings.HasPrefix(head, "prv · @octo") || !strings.Contains(head, "data from 14:32:05") {
+					t.Errorf("header = %q, want every segment", head)
+				}
+			}
+		})
+	}
+}
+
+func TestFitDropsLowestPriorityFirst(t *testing.T) {
+	segs := []segment{{"aaaa", 1}, {"bbbb", 3}, {"cccc", 2}, {"dddd", 4}}
+	tests := []struct {
+		width int
+		want  string
+	}{
+		{0, "aaaa|bbbb|cccc|dddd"},
+		{19, "aaaa|bbbb|cccc|dddd"},
+		{18, "bbbb|cccc|dddd"},
+		{13, "bbbb|cccc|dddd"},
+		{12, "bbbb|dddd"},
+		{8, "bbbb|dddd"},
+		{7, "dddd"},
+		{3, "dd…"},
+	}
+	for _, tt := range tests {
+		if got := fit(segs, "|", tt.width); got != tt.want {
+			t.Errorf("fit(width %d) = %q, want %q", tt.width, got, tt.want)
+		}
+	}
 }

@@ -285,9 +285,12 @@ func TestErrorPanelShowsHint(t *testing.T) {
 		if strings.Contains(v, "gh auth") {
 			t.Errorf("an error without Hint() must show no hint line:\n%s", v)
 		}
-		// Exactly: title, blank, message, blank, footer.
-		if got := strings.Count(strings.TrimRight(v, "\n"), "\n"); got != 4 {
-			t.Errorf("panel has %d line breaks, want 4:\n%s", got, v)
+		if !strings.Contains(v, "retrying at ") {
+			t.Errorf("panel does not say when it retries:\n%s", v)
+		}
+		// Exactly: title, blank, message, blank, retry line, blank, footer.
+		if got := strings.Count(strings.TrimRight(v, "\n"), "\n"); got != 6 {
+			t.Errorf("panel has %d line breaks, want 6:\n%s", got, v)
 		}
 	})
 }

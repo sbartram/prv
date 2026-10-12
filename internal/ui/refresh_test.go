@@ -196,8 +196,10 @@ func TestFailedRefreshKeepsData(t *testing.T) {
 		if strings.Contains(v, "Could not load your PRs") {
 			t.Errorf("failure %d: the error panel replaced the data:\n%s", i, v)
 		}
-		if v != before {
-			t.Errorf("failure %d: the screen changed (rows are not dimmed or marked in this plan):\n%s", i, v)
+		// Only the header line changes (the D-07 marker, tested in
+		// TestFailureMarker); the rows are the same and not dimmed.
+		if got, want := strings.Join(strings.Split(v, "\n")[1:], "\n"), strings.Join(strings.Split(before, "\n")[1:], "\n"); got != want {
+			t.Errorf("failure %d: the rows changed:\n%s", i, v)
 		}
 		if got := m.(Model).lastOK; !got.Equal(loaded) {
 			t.Errorf("failure %d: lastOK = %v, want %v", i, got, loaded)
