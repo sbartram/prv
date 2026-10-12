@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-10-12T22:53:51.458Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-10-12T22:59:07.198Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: 486701bd0b6b7d8eae5f4079d6873fe08fd1b4ab
+state_head: b8ad17559c8b48b40545d06f7dd3aed1bf4c5e4b
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 22
-  completed_plans: 14
+  completed_plans: 15
   percent: 50
 ---
 
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 1 of 8
-Status: Executing Phase 03
+Plan: 2 of 8
+Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
 Progress: [█████░░░░░] 50%
@@ -71,6 +71,7 @@ Progress: [█████░░░░░] 50%
 | Phase 02 P08 | 14min | 2 tasks | 20 files |
 | Phase 02 P09 | 18 min | 2 tasks | 7 files |
 | Phase 02 P10 | 6 min | 2 tasks | 23 files |
+| Phase 03 P01 | 4 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-09: config values are clamped to 1..365 while the --closed-days flag is rejected outside the same range; flag beats config beats default 14
 - [Phase 02]: 02-09: config warnings start their 8 s clock at the first fetch result and sit in their own footer segment, below the flash and notes and above key hints
 - [Phase 02]: 02-10: help overlay keeps 'press any key to return' as the last line when cut to pane height; safeURL refuses whitespace/control runes before parsing
+- [Phase 03]: 03-01: '+N' counts only other failing checks when a failing check is named, and other cancelled checks when the named check is cancelled — Row agrees with the detail summary, which shows failing and cancelled separately (D-10)
+- [Phase 03]: 03-01: truncated contexts page, missing node, null rollup or failed query keeps the plain failing badge; a check name is never guessed — LIST-07 v1 limit accepted in D-02
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T19:01:02.355Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-blocker-detail/03-CONTEXT.md
+Last session: 2026-10-12T22:59:07.158Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
