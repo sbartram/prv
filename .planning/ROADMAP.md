@@ -112,7 +112,7 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 6/8 plans executed
+**Plans**: 7/8 plans executed
 
 Plans:
 **Wave 1**
@@ -128,7 +128,7 @@ Plans:
 - [x] 03-06-PLAN.md — Detail data: one paged Detail query per PR with de-duplicated sorted checks, every reviewer incl. commented and dismissed, counts de-duplicated at every size with a partial read reported (D-01, D-03, D-08, D-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 03-07-PLAN.md — enter opens a full-screen detail: every check failing first, every reviewer, fold with e, honest summary ("read N of M runs" on a partial read); esc returns to the same PR (D-08..D-10)
+- [x] 03-07-PLAN.md — enter opens a full-screen detail: every check failing first, every reviewer, fold with e, honest summary ("read N of M runs" on a partial read); esc returns to the same PR (D-08..D-10)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 03-08-PLAN.md — The open detail refreshes with the list, drops stale results, respects pauses, says "no longer in list" when its PR leaves; fits any pane and every detail state has goldens (D-11, D-12, D-14)
@@ -160,5 +160,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
-| 3. Blocker Detail | 6/8 | In Progress | - |
+| 3. Blocker Detail | 7/8 | In Progress | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |

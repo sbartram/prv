@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Completed 03-06-PLAN.md
-last_updated: "2026-10-12T23:32:49.235Z"
+stopped_at: Completed 03-07-PLAN.md
+last_updated: "2026-10-12T23:43:13.806Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: b453ae1649b071ed4c4be34dfc9d746582b4b706
+state_head: 16869944bcf25e649f1566c60b8dd5f1743af604
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
@@ -77,6 +77,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P04 | 20 min | 2 tasks | 10 files |
 | Phase 03 P05 | 8 min | 2 tasks | 20 files |
 | Phase 03 P06 | 9 min | 2 tasks | 8 files |
+| Phase 03 P07 | 30 min | 2 tasks | 35 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-05: renderList cell and header tables are [colCount]string arrays indexed by column constant, so inserting a column cannot shift another column's data
 - [Phase 03]: Detail counts are the de-duplicated counts at every size (D-03 reading of D-08); paging to 5 pages keeps them exact to 500 runs, past that Read/Total disclose the partial read
 - [Phase 03]: A later Detail page that fails (not rate limit or cancel) keeps the earlier pages and sets Truncated; a rate limit or cancel on any page is returned
+- [Phase 03]: 03-07: openDetail takes the PR from Update so detail.go never reads the list row at the cursor
+- [Phase 03]: 03-07: r in the detail also refetches the detail when it failed with no data; footer drops whole hints from the end when help would overflow
 
 ### Pending Todos
 
@@ -151,6 +154,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:32:49.193Z
-Stopped at: Completed 03-06-PLAN.md
+Last session: 2026-10-12T23:43:13.764Z
+Stopped at: Completed 03-07-PLAN.md
 Resume file: None

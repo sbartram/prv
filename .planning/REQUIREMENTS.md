@@ -38,8 +38,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Detail view
 
-- [ ] **DETL-01**: Selecting a PR opens a detail view listing every check/job with its status, failing first
-- [ ] **DETL-02**: Detail view lists each reviewer and their review state
+- [x] **DETL-01**: Selecting a PR opens a detail view listing every check/job with its status, failing first
+- [x] **DETL-02**: Detail view lists each reviewer and their review state
 - [ ] **DETL-03**: Returning from the detail view keeps the same PR selected
 
 ### Refresh
@@ -142,8 +142,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-01 | Phase 2 | Complete |
 | FILT-02 | Phase 2 | Complete |
 | FILT-03 | Phase 2 | Complete |
-| DETL-01 | Phase 3 | Pending |
-| DETL-02 | Phase 3 | Pending |
+| DETL-01 | Phase 3 | Complete |
+| DETL-02 | Phase 3 | Complete |
 | DETL-03 | Phase 3 | Pending |
 | RFSH-01 | Phase 2 | Complete |
 | RFSH-02 | Phase 2 | Complete |
