@@ -203,9 +203,9 @@ func TestCleanAtSeam(t *testing.T) {
 	if !strings.Contains(pr.Title, "title x") {
 		t.Errorf("Title = %q, want the tab turned into a space", pr.Title)
 	}
-	if got := reviewerNames(pr); !slices.Equal(got, []string{"requser", "reviewer"}) &&
-		!slices.Equal(got, []string{"req^[[2Juser", "rev^[[31miewer"}) {
-		t.Errorf("PR 18 reviewer names = %q, want the two hostile logins with controls removed", got)
+	// go-gh shows the ESC as a visible "^[" (see above); the bidi override is gone.
+	if got := reviewerNames(pr); !slices.Equal(got, []string{"req^[[2Juser", "rev^[[31miewer"}) {
+		t.Errorf("PR 18 reviewer names = %q, want [req^[[2Juser rev^[[31miewer]", got)
 	}
 	all := []string{snap.Viewer}
 	for _, p := range snap.PRs {

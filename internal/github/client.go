@@ -78,6 +78,9 @@ const discoveryQuery = `query Watch($q: String!, $after: String) {
         reviewDecision
         mergeStateStatus mergeable
         latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
+        reviewRequests(first: 20) { nodes { requestedReviewer { __typename
+          ... on User { login } ... on Bot { login } ... on Mannequin { login }
+          ... on Team { combinedSlug } ... on EnterpriseTeam { combinedSlug } } } }
         statusCheckRollup { state }
       }
     }
@@ -137,10 +140,66 @@ type wireNode struct {
 	// Only the opinionated-review connection is requested on purpose: in the
 	// non-opinionated one a later COMMENTED review hides an earlier approval
 	// (01-SPIKE.md Q1).
-	LatestOpinionatedReviews struct {
-		Nodes []*struct{ State string }
+	LatestOpinionatedReviews struct{ Nodes []*wireReview }
+	ReviewRequests           struct{ Nodes []*wireRequest }
+	StatusCheckRollup        *struct{ State string }
+}
+
+// wireReview is one review. Author is null when the account was deleted.
+type wireReview struct {
+	State  string
+	Author *struct{ Login string }
+}
+
+// wireRequest is one review request. RequestedReviewer is a union: it is null
+// for a team the viewer cannot see (RESEARCH F6), a User, Bot or Mannequin has a
+// login, and a Team or EnterpriseTeam has a combinedSlug.
+type wireRequest struct {
+	RequestedReviewer *struct {
+		Typename     string `json:"__typename"`
+		Login        string
+		CombinedSlug string
 	}
-	StatusCheckRollup *struct{ State string }
+}
+
+// reviewInputs maps reviews for domain.MergeReviewers. A nil review is skipped
+// and a null author gives an empty login. Logins are cleaned here, once.
+func reviewInputs(nodes []*wireReview) []domain.ReviewInput {
+	var out []domain.ReviewInput
+	for _, r := range nodes {
+		if r == nil {
+			continue
+		}
+		in := domain.ReviewInput{State: r.State}
+		if r.Author != nil {
+			in.Login = domain.Clean(r.Author.Login)
+		}
+		out = append(out, in)
+	}
+	return out
+}
+
+// requestInputs maps review requests for domain.MergeReviewers. A nil
+// RequestedReviewer maps to the zero RequestInput, a hidden pending reviewer;
+// it is never dropped.
+func requestInputs(nodes []*wireRequest) []domain.RequestInput {
+	var out []domain.RequestInput
+	for _, r := range nodes {
+		if r == nil {
+			continue
+		}
+		q := r.RequestedReviewer
+		if q == nil {
+			out = append(out, domain.RequestInput{})
+			continue
+		}
+		name := q.Login
+		if q.Typename == "Team" || q.Typename == "EnterpriseTeam" {
+			name = q.CombinedSlug
+		}
+		out = append(out, domain.RequestInput{Typename: q.Typename, Name: domain.Clean(name)})
+	}
+	return out
 }
 
 // maxPages caps discovery at 5 pages of 100 results (cost 1 each). When more
@@ -271,16 +330,19 @@ func mapResponse(resp wireResp) domain.Snapshot {
 		}
 		state := domain.ParseState(n.State)
 		snap.PRs = append(snap.PRs, domain.PR{
-			ID:        n.ID,
-			Ref:       domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
-			Title:     domain.Clean(n.Title),
-			URL:       n.URL,
-			Author:    author,
-			IsDraft:   n.IsDraft,
-			State:     state,
-			Review:    domain.DeriveReview(decision, reviewStates),
-			CI:        domain.ClassifyRollup(rollup),
-			Merge:     domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
+			ID:      n.ID,
+			Ref:     domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
+			Title:   domain.Clean(n.Title),
+			URL:     n.URL,
+			Author:  author,
+			IsDraft: n.IsDraft,
+			State:   state,
+			Review:  domain.DeriveReview(decision, reviewStates),
+			CI:      domain.ClassifyRollup(rollup),
+			Merge:   domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
+			// List rows never read latestReviews (RESEARCH F8): the third
+			// argument is for the detail view.
+			Reviewers: domain.MergeReviewers(reviewInputs(n.LatestOpinionatedReviews.Nodes), requestInputs(n.ReviewRequests.Nodes), nil),
 			CreatedAt: n.CreatedAt,
 			UpdatedAt: n.UpdatedAt,
 			ClosedAt:  n.ClosedAt,
