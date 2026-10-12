@@ -39,6 +39,9 @@ type browserOpener struct{ b *browser.Browser }
 
 var _ ui.Opener = browserOpener{}
 
+// The github client supplies the detail view's data.
+var _ ui.DetailFetcher = (*github.Client)(nil)
+
 func (o browserOpener) Open(url string) error { return o.b.Browse(url) }
 
 func main() {

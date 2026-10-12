@@ -219,6 +219,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+		if m.detail.open {
+			return m.detailKey(msg)
+		}
 		switch {
 		case bkey.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
@@ -228,30 +231,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.rows) == 0 {
 				return m, nil
 			}
-			u, ok := safeURL(m.rows[m.cursor].URL)
-			switch {
-			case !ok:
-				cmd := m.setFlash("not a github.com link — not opened", flashFor)
-				return m, cmd
-			case m.opener == nil:
-				cmd := m.setFlash("no browser available", flashFor)
-				return m, cmd
-			}
-			return m, openCmd(m.opener, u) // the launch happens in the Cmd, never here
+			cmd := m.openURL(m.rows[m.cursor].URL)
+			return m, cmd
 		case bkey.Matches(msg, m.keys.Refresh):
-			if m.inFlight {
-				return m, nil // merges with the running refresh
-			}
-			if m.now().Before(m.pausedUntil) {
-				// D-08: no request during a pause; say when refreshing resumes.
-				cmd := m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
-				return m, cmd
-			}
-			m.gen++ // orphans the pending tick
-			if m.state == stateError {
-				m.state = stateLoading
-			}
-			cmd := m.beginFetch()
+			cmd := m.manualRefresh()
 			return m, cmd
 		case bkey.Matches(msg, m.keys.Filter):
 			if m.state == stateList { // the prompt line only exists on the list screens
@@ -269,6 +252,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case bkey.Matches(msg, m.keys.ToggleClosed):
 			m.show = m.show.Toggle(domain.StateClosed)
 			m.rebuild()
+		case bkey.Matches(msg, m.keys.Enter):
+			if m.state == stateList && len(m.rows) > 0 {
+				cmd := m.openDetail(m.rows[m.cursor])
+				return m, cmd
+			}
 		case bkey.Matches(msg, m.keys.Down):
 			if m.state == stateList && m.cursor < len(m.rows)-1 {
 				m.cursor++
@@ -285,6 +273,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.clampOffset()
+		if m.detail.open {
+			m.syncDetail()
+		}
 	case spinner.TickMsg:
 		if m.inFlight || m.state == stateLoading {
 			var cmd tea.Cmd
@@ -307,6 +298,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.setFlash("could not open the browser", flashFor)
 			return m, cmd
 		}
+	case detailMsg:
+		m.applyDetail(msg)
 	case redrawMsg:
 		// Nothing to change: Bubble Tea redraws after every Update, which
 		// lets an expired flash leave the footer.
@@ -347,6 +340,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, nil
+}
+
+// openURL opens raw in the browser, after safeURL has checked it. The launch
+// happens in the returned Cmd, never in Update.
+func (m *Model) openURL(raw string) tea.Cmd {
+	u, ok := safeURL(raw)
+	switch {
+	case !ok:
+		return m.setFlash("not a github.com link — not opened", flashFor)
+	case m.opener == nil:
+		return m.setFlash("no browser available", flashFor)
+	}
+	return openCmd(m.opener, u)
+}
+
+// manualRefresh is the r key: it merges with a running refresh, shows the
+// pause while a rate limit holds requests back, and otherwise orphans the
+// pending tick and starts a fetch.
+func (m *Model) manualRefresh() tea.Cmd {
+	if m.inFlight {
+		return nil // merges with the running refresh
+	}
+	if m.now().Before(m.pausedUntil) {
+		// D-08: no request during a pause; say when refreshing resumes.
+		return m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
+	}
+	m.gen++ // orphans the pending tick
+	if m.state == stateError {
+		m.state = stateLoading
+	}
+	return m.beginFetch()
 }
 
 // startWarning starts the config-warning clock on the first fetch result and

@@ -1,8 +1,8 @@
 prv — keys and badges
 
-k/↑ up         /   PR #       ? help
-j/↓ down       esc clear #    q quit
-r   refresh    1   open
+k/↑ up         /   PR #       enter details    ? help
+j/↓ down       esc clear #    esc   back       q quit
+r   refresh    1   open       j/k   scroll
 o   open       2   merged
                3   closed
 

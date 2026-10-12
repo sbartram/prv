@@ -52,6 +52,21 @@ type detailMsg struct {
 	err  error
 }
 
+// fetchDetail runs one detail fetch. The closure captures only its arguments,
+// never the Model. A panic inside the fetcher becomes an error with a fixed
+// message: the panic value is never shown.
+func fetchDetail(ctx context.Context, f DetailFetcher, id string, ref domain.Ref, seq int) tea.Cmd {
+	return func() (msg tea.Msg) {
+		defer func() {
+			if recover() != nil {
+				msg = detailMsg{seq: seq, ref: ref, err: errors.New("unexpected internal error while loading details")}
+			}
+		}()
+		data, err := f.FetchDetail(ctx, id)
+		return detailMsg{seq: seq, ref: ref, data: data, err: err}
+	}
+}
+
 // afterTick returns a Cmd that delivers msg after d. It uses tea.Tick, whose
 // timer starts when the Cmd is created, not a wall-clock-aligned tick.
 func afterTick(d time.Duration, msg tea.Msg) tea.Cmd {

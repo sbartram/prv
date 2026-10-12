@@ -27,6 +27,9 @@ func (m Model) render() string {
 	if m.showHelp {
 		return m.renderHelp()
 	}
+	if m.detail.open {
+		return m.renderDetail() // D-08: full screen, like the help overlay
+	}
 	switch m.state {
 	case stateLoading:
 		return m.wrap(m.spin.View() + " Fetching your PRs…")
@@ -148,13 +151,17 @@ func (m Model) footer() string {
 	}
 
 	h := m.help // a copy: SetWidth must not change the model
+	hints := m.keys.ShortHelp()
+	if m.detail.open {
+		hints = m.keys.DetailShortHelp() // D-09
+	}
 	if m.w <= 0 {
 		// Not sized yet: nothing is cut or padded.
 		h.SetWidth(0)
 		if w := m.warning(); w != "" {
 			line = join(line, warnStyle.Render(w))
 		}
-		return join(join(line, h.ShortHelpView(m.keys.ShortHelp())), api)
+		return join(join(line, h.ShortHelpView(hints)), api)
 	}
 
 	avail := m.w // cells left for the notes, the warning and the hints
@@ -180,7 +187,13 @@ func (m Model) footer() string {
 		}
 		if room >= 8 { // less is too little room for a useful hint
 			h.SetWidth(room)
-			left = join(left, h.ShortHelpView(m.keys.ShortHelp()))
+			hv := h.ShortHelpView(hints)
+			// help lets an item overflow when its ellipsis would not fit
+			// either: drop whole hints from the end until the line fits.
+			for n := len(hints) - 1; n > 0 && lipgloss.Width(hv) > room; n-- {
+				hv = h.ShortHelpView(hints[:n])
+			}
+			left = join(left, ansi.Truncate(hv, room, "…"))
 		}
 	}
 	if api == "" {
@@ -271,6 +284,14 @@ func (m Model) header() string {
 		{m.filterLabel(), 3},
 		{count, 4},
 	}
+	return fit(append(segs, m.statusSegments()...), " · ", m.w)
+}
+
+// statusSegments are the header segments that tell how fresh the data is: the
+// update time or the failed refresh, the rate-limit pause and the rate
+// warning. The list header and the detail header share them.
+func (m Model) statusSegments() []segment {
+	var segs []segment
 	if !m.lastOK.IsZero() {
 		// Clock times, not "5s ago": nothing redraws once a second (D-05).
 		text, prio := "updated "+m.clock(m.lastOK, "15:04:05"), 5
@@ -300,7 +321,7 @@ func (m Model) header() string {
 		segs = append(segs, segment{warnStyle.Render("api " + strconv.Itoa(rl.Remaining) + "/" +
 			strconv.Itoa(rl.Limit) + " · resets " + m.clock(rl.ResetAt, "15:04")), 6})
 	}
-	return fit(segs, " · ", m.w)
+	return segs
 }
 
 func (m Model) renderError() string {

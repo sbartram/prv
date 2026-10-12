@@ -78,3 +78,33 @@ func mergeStyle(m domain.Merge) lipgloss.Style {
 	}
 	return faintStyle
 }
+
+// checkStyle colours a check's glyph and word in the detail view. A cancelled
+// check keeps the default colour: it is not red, and the word tells it apart
+// from "blocked" in MERGE, which shares its glyph.
+func checkStyle(s domain.CheckState) lipgloss.Style {
+	switch s {
+	case domain.CheckFailing:
+		return lipgloss.NewStyle().Foreground(lipgloss.Red)
+	case domain.CheckRunning:
+		return lipgloss.NewStyle().Foreground(lipgloss.Yellow)
+	case domain.CheckPassing:
+		return lipgloss.NewStyle().Foreground(lipgloss.Green)
+	case domain.CheckCancelled:
+		return lipgloss.NewStyle()
+	}
+	return faintStyle
+}
+
+// reviewerStyle colours a reviewer's glyph and word in the detail view.
+func reviewerStyle(s domain.ReviewerState) lipgloss.Style {
+	switch s {
+	case domain.ReviewerChangesRequested:
+		return lipgloss.NewStyle().Foreground(lipgloss.Red)
+	case domain.ReviewerPending:
+		return lipgloss.NewStyle().Foreground(lipgloss.Yellow)
+	case domain.ReviewerApproved:
+		return lipgloss.NewStyle().Foreground(lipgloss.Green)
+	}
+	return faintStyle
+}
