@@ -112,7 +112,7 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 2/8 plans executed
+**Plans**: 3/8 plans executed
 
 Plans:
 **Wave 1**
@@ -120,7 +120,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 03-02-PLAN.md — Failing names on messy real data: re-runs, truncated pages, partial errors, every failing PR looked up in chunks of 25, rate limits; long and CJK names shortened, never the suffix (D-01..D-03)
-- [ ] 03-03-PLAN.md — Narrow panes for the list: pure layoutColumns with the D-13 drop order, compact rows below 40 cells, resize and never-overflow property test, 60x15 goldens (D-13, D-14)
+- [x] 03-03-PLAN.md — Narrow panes for the list: pure layoutColumns with the D-13 drop order, compact rows below 40 cells, resize and never-overflow property test, 60x15 goldens (D-13, D-14)
 - [ ] 03-04-PLAN.md — Merge readiness and reviewers reach every PR through the github seam: DeriveMerge (state and draft first, UNKNOWN+CONFLICTING) and MergeReviewers (pending wins, hidden teams, bots) (D-06, D-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -160,5 +160,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
-| 3. Blocker Detail | 2/8 | In Progress | - |
+| 3. Blocker Detail | 3/8 | In Progress | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |

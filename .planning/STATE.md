@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-10-12T23:04:09.962Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-10-12T23:11:42.597Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: a14d0e9670b2cbb3527c8faf7a996615c25120bd
+state_head: 4eacb025cd935603d06937d8aef1f61cdc27f9f4
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 22
-  completed_plans: 16
+  completed_plans: 17
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
@@ -73,6 +73,7 @@ Progress: [█████░░░░░] 50%
 | Phase 02 P10 | 6 min | 2 tasks | 23 files |
 | Phase 03 P01 | 4 min | 2 tasks | 11 files |
 | Phase 03 P02 | 3 min | 2 tasks | 7 files |
+| Phase 03 P03 | 5 min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-01: truncated contexts page, missing node, null rollup or failed query keeps the plain failing badge; a check name is never guessed — LIST-07 v1 limit accepted in D-02
 - [Phase 03]: 03-02: Step-2 failing-name behavior already held; tests pinned and proven by mutation, no production change — 03-01 implementation covered re-runs, truncation, partial errors, chunking, rate limit and cancel
 - [Phase 03]: 03-02: ciCell cuts only the check name with ansi.Truncate and keeps (cancelled) and +N; under 2 name cells it shows the cut plain badge — Display-width safe for CJK and ZWJ emoji; suffix carries cancelled/more information
+- [Phase 03]: 03-03: compact 'widen for columns' hint sits on the column-header line, not the header line — Keeps the header segments asserted by filter_test.go at 36 cells unchanged
+- [Phase 03]: 03-03: a compact row with no room for a ref draws only the marker and the REVIEW and CI glyphs — Approved/blocked/failing state stays visible down to 4 cells
 
 ### Pending Todos
 
@@ -139,6 +142,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:04:09.921Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-10-12T23:11:42.556Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
