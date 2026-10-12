@@ -44,3 +44,9 @@ func ciCell(pr domain.PR, w int) string {
 	}
 	return prefix + ansi.Truncate(pr.Failing.Name, room, "…") + suffix
 }
+
+// reviewersCell is a RED stub, replaced in GREEN.
+func reviewersCell(rs []domain.Reviewer, viewer string, w int) string { return "" }
+
+// reviewersCount is a RED stub, replaced in GREEN.
+func reviewersCount(rs []domain.Reviewer) string { return "" }

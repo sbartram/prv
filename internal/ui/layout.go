@@ -13,6 +13,7 @@ const (
 	colAuthor
 	colState
 	colReview
+	colReviewers
 	colMerge
 	colCI
 	colCount
@@ -23,7 +24,9 @@ const (
 	minTitleW    = 10 // TITLE never gets fewer cells than this
 	maxPRColW    = 40 // cap for the PR column
 	maxAuthorCol = 16 // cap for the AUTHOR column
-	minPRColW    = 8  // the PR column is never cut below this
+	// maxReviewersW caps the REVIEWERS column; a longer list ends in "+N".
+	maxReviewersW = 22
+	minPRColW     = 8 // the PR column is never cut below this
 	// compactBelow is the pane width under which the list shows compact rows
 	// (D-14).
 	compactBelow = 40
@@ -63,13 +66,15 @@ func (m *Model) clampOffset() {
 
 // sizes holds what layoutColumns needs to know about each column: the width it
 // wants and the narrowest it may get before the layout gives up on it.
-type sizes struct{ natural, min [colCount]int }
+type sizes struct{ natural, min, collapsed [colCount]int }
 
 // layout says which columns are shown and how wide each one is.
 type layout struct {
 	compact bool
 	show    [colCount]bool
 	width   [colCount]int
+	// collapsed marks a column shown in its count-only form.
+	collapsed [colCount]bool
 }
 
 // dropStep is one step of the D-13 drop order.
@@ -101,6 +106,7 @@ func layoutColumns(sz sizes, total int) layout {
 		l.width[c] = sz.natural[c]
 	}
 	l.width[colMarker] = 1
+	l.show[colReviewers] = false // RED stub, replaced in GREEN
 	if total <= 0 {
 		return l
 	}

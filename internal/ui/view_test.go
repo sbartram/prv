@@ -35,17 +35,28 @@ func fixtureSix() domain.Snapshot {
 	at := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
 	return domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
 		{ID: "1", Ref: domain.Ref{Repo: "acme/api", Number: 101}, Title: "Add retry to the client", Author: "octo",
-			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, Merge: domain.MergeMergeable, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, Merge: domain.MergeMergeable, UpdatedAt: at,
+			Reviewers: []domain.Reviewer{{Name: "alice", State: domain.ReviewerApproved}}},
 		{ID: "2", Ref: domain.Ref{Repo: "acme/api", Number: 102}, Title: "Rework the cache layer", Author: "alice",
-			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, Merge: domain.MergeBlocked, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, Merge: domain.MergeBlocked, UpdatedAt: at,
+			Reviewers: []domain.Reviewer{
+				{Name: "bob", State: domain.ReviewerChangesRequested},
+				{Name: "carol", State: domain.ReviewerPending},
+				{Name: "dave", State: domain.ReviewerApproved},
+			}},
 		{ID: "3", Ref: domain.Ref{Repo: "acme/web", Number: 7}, Title: "Spike a new sidebar", Author: "octo", IsDraft: true,
 			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIRunning, Merge: domain.MergeUnknown, UpdatedAt: at},
 		{ID: "4", Ref: domain.Ref{Repo: "acme/web", Number: 6}, Title: "Fix the login redirect", Author: "bob",
-			State: domain.StateMerged, Review: domain.ReviewApproved, CI: domain.CIPassing, UpdatedAt: at, ClosedAt: at},
+			State: domain.StateMerged, Review: domain.ReviewApproved, CI: domain.CIPassing, UpdatedAt: at, ClosedAt: at,
+			Reviewers: []domain.Reviewer{{Name: "octo", State: domain.ReviewerApproved}}},
 		{ID: "5", Ref: domain.Ref{Repo: "acme/docs", Number: 3}, Title: "Drop the old guide", Author: "octo",
 			State: domain.StateClosed, Review: domain.ReviewRequired, CI: domain.CINone, UpdatedAt: at, ClosedAt: at},
 		{ID: "6", Ref: domain.Ref{Repo: "acme/docs", Number: 2}, Title: "Typo in the readme", Author: "carol",
-			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIUnknown, Merge: domain.MergeBehind, UpdatedAt: at},
+			State: domain.StateOpen, Review: domain.ReviewNone, CI: domain.CIUnknown, Merge: domain.MergeBehind, UpdatedAt: at,
+			Reviewers: []domain.Reviewer{
+				{Kind: domain.ReviewerHidden, State: domain.ReviewerPending},
+				{Kind: domain.ReviewerHidden, State: domain.ReviewerPending},
+			}},
 	}}
 }
 
@@ -117,8 +128,8 @@ func TestReviewAndCIColours(t *testing.T) {
 func TestMergeColumn(t *testing.T) {
 	ls := lines(newTestModel(t, fixtureSix(), 120, 40).View().Content)
 	header := ls[1]
-	if got := strings.Join(strings.Fields(header), ","); got != "PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI" {
-		t.Fatalf("header = %q, want PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI", header)
+	if got := strings.Join(strings.Fields(header), ","); got != "PR,TITLE,AUTHOR,STATE,REVIEW,REVIEWERS,MERGE,CI" {
+		t.Fatalf("header = %q, want PR,TITLE,AUTHOR,STATE,REVIEW,REVIEWERS,MERGE,CI", header)
 	}
 	from := lipgloss.Width(header[:strings.Index(header, "MERGE")])
 	to := lipgloss.Width(header[:strings.Index(header, "CI")])
@@ -176,6 +187,97 @@ func TestMergeColours(t *testing.T) {
 		}
 		if !strings.Contains(row, seq) {
 			t.Errorf("row of %s lacks %q: %q", ref, seq, row)
+		}
+	}
+}
+
+// TestReviewersColumn: REVIEWERS sits between REVIEW and MERGE and shows a
+// glyph glued to each login (LIST-04, D-06); the viewer is "me" and hidden
+// requests keep a token. The column has no colour of its own (T-03-20).
+func TestReviewersColumn(t *testing.T) {
+	ls := lines(newTestModel(t, fixtureSix(), 120, 40).View().Content)
+	header := ls[1]
+	if !strings.Contains(header, "REVIEWERS") || !strings.Contains(header, "MERGE") {
+		t.Fatalf("header = %q, want REVIEWERS before MERGE", header)
+	}
+	from := lipgloss.Width(header[:strings.Index(header, "REVIEWERS")])
+	to := lipgloss.Width(header[:strings.Index(header, "MERGE")])
+	for ref, want := range map[string]string{
+		"acme/api#101": "✓alice",
+		"acme/api#102": "✗bob …carol ✓dave",
+		"acme/web#7":   "",
+		"acme/web#6":   "✓me",
+		"acme/docs#3":  "",
+		"acme/docs#2":  "…2 teams",
+	} {
+		var row string
+		for _, l := range ls {
+			if strings.Contains(l, ref+" ") {
+				row = l
+			}
+		}
+		if row == "" {
+			t.Fatalf("no row for %s", ref)
+		}
+		if got := strings.TrimSpace(ansi.Cut(row, from, to)); got != want {
+			t.Errorf("REVIEWERS of %s = %q, want %q (row %q)", ref, got, want, row)
+		}
+	}
+	// No colour inside the cell: the only styling around a REVIEWERS cell is
+	// the row's own (faint for dimmed rows, reverse for the selected one).
+	for _, l := range strings.Split(newTestModel(t, fixtureSix(), 120, 40).View().Content, "\n") {
+		if strings.Contains(ansi.Strip(l), "acme/api#102") {
+			i := strings.Index(l, "✗bob")
+			if i < 0 {
+				t.Fatalf("row of #102 lost its reviewers: %q", l)
+			}
+			if j := strings.LastIndex(l[:i], "\x1b["); j >= 0 && strings.HasPrefix(l[j:], "\x1b[3") {
+				t.Errorf("the REVIEWERS cell starts with a colour sequence: %q", l[j:i])
+			}
+		}
+	}
+}
+
+// TestReviewersCollapse: the narrowing pane first folds REVIEWERS into a
+// count under the header REVS, then drops it (D-13).
+func TestReviewersCollapse(t *testing.T) {
+	var sawFull, sawCount, sawGone bool
+	for w := 120; w >= 40; w-- {
+		ls := lines(newTestModel(t, fixtureSix(), w, 40).View().Content)
+		header := ls[1]
+		switch {
+		case strings.Contains(header, "REVIEWERS"):
+			sawFull = true
+		case strings.Contains(header, "REVS"):
+			sawCount = true
+			var row string
+			for _, l := range ls {
+				if strings.Contains(l, "acme/api#102") {
+					row = l
+				}
+			}
+			if !strings.Contains(row, "+3") {
+				t.Errorf("w=%d: the collapsed cell of #102 should read +3: %q", w, row)
+			}
+		default:
+			sawGone = true
+		}
+	}
+	if !sawFull || !sawCount || !sawGone {
+		t.Errorf("REVIEWERS full=%v REVS=%v gone=%v over widths 120..40, want all three", sawFull, sawCount, sawGone)
+	}
+}
+
+// TestHelpReviewersLegend: the ? overlay explains the reviewer glyphs.
+func TestHelpReviewersLegend(t *testing.T) {
+	m := helpModel(t, 120, 40, fixtureSix(), Options{ConfigPath: testConfigPath})
+	v := plain(press(m, "?"))
+	for _, want := range []string{
+		"✓ mergeable", "⊘ blocked", "↓ behind", "✗ conflicts",
+		"✗ changes requested", "… pending", "✓ approved", "…team name hidden", "+N more",
+	} {
+		if !strings.Contains(v, want) {
+			t.Errorf("overlay missing %q:\n%s", want, v)
 		}
 	}
 }
@@ -267,10 +369,24 @@ func fixtureThirty() domain.Snapshot {
 			ID: "N" + strings.Repeat("x", i%3), Ref: domain.Ref{Repo: "acme/api", Number: i},
 			Title: "Change number " + string(rune('A'+i%26)), Author: "alice", UpdatedAt: at,
 			State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, Merge: domain.MergeMergeable,
+			Reviewers: []domain.Reviewer{{Name: "bob", State: domain.ReviewerApproved}},
 		}
 		switch i {
 		case 4:
 			pr.Merge = domain.MergeConflicts
+			pr.Reviewers = []domain.Reviewer{
+				{Name: "erin", State: domain.ReviewerChangesRequested},
+				{Name: "frank", State: domain.ReviewerPending},
+			}
+		case 15:
+			pr.Reviewers = []domain.Reviewer{
+				{Name: "erin", State: domain.ReviewerChangesRequested},
+				{Name: "frank", State: domain.ReviewerPending},
+				{Name: "gina", State: domain.ReviewerPending},
+				{Name: "hank", State: domain.ReviewerApproved},
+				{Name: "ivan", State: domain.ReviewerApproved},
+				{Name: "judy", State: domain.ReviewerApproved},
+			}
 		case 8:
 			pr.Merge = domain.MergeBehind
 		case 5:
@@ -349,6 +465,12 @@ func itoa(n int) string { return strconv.Itoa(n) }
 
 func lines(s string) []string { return strings.Split(ansi.Strip(s), "\n") }
 
+// TestTitleTruncatesFirst: TITLE is the column that shrinks first (D-05). The
+// fixture's natural widths are: marker 1, PR 12, AUTHOR 6, STATE 6, REVIEW 10,
+// REVIEWERS 18 ("✗bob …carol ✓dave"), MERGE 11, CI 11, TITLE 10 at its floor:
+// 75 cells plus 8 gaps plus 10 is 93, so everything shows at 120. At 80 it
+// does not fit: AUTHOR goes (86 > 80), then STATE (79 <= 80), so the header is
+// PR TITLE REVIEW REVIEWERS MERGE CI and TITLE gets 11 cells.
 func TestTitleTruncatesFirst(t *testing.T) {
 	snap := fixtureSix()
 	long := strings.Repeat("0123456789", 12) // 120 characters
@@ -356,7 +478,10 @@ func TestTitleTruncatesFirst(t *testing.T) {
 		ID: "7", Ref: domain.Ref{Repo: "acme/api", Number: 999}, Title: long, Author: "dave",
 		State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing,
 	})
-	for _, w := range []int{80, 120} {
+	for w, want := range map[int]string{
+		120: "PR,TITLE,AUTHOR,STATE,REVIEW,REVIEWERS,MERGE,CI",
+		80:  "PR,TITLE,REVIEW,REVIEWERS,MERGE,CI",
+	} {
 		m := newTestModel(t, snap, w, 40)
 		ls := lines(m.View().Content)
 		var header, row string
@@ -368,8 +493,13 @@ func TestTitleTruncatesFirst(t *testing.T) {
 				row = l
 			}
 		}
-		if got := strings.Fields(header); strings.Join(got, ",") != "PR,TITLE,AUTHOR,STATE,REVIEW,MERGE,CI" {
-			t.Errorf("w=%d header = %q, want every column header whole", w, header)
+		if got := strings.Fields(header); strings.Join(got, ",") != want {
+			t.Errorf("w=%d header = %q, want %s", w, header, want)
+		}
+		for _, must := range []string{"PR", "REVIEW", "CI"} {
+			if !strings.Contains(header, must) {
+				t.Errorf("w=%d header = %q lacks %s", w, header, must)
+			}
 		}
 		if !strings.Contains(row, "…") {
 			t.Errorf("w=%d long row is not cut with …: %q", w, row)
@@ -377,13 +507,19 @@ func TestTitleTruncatesFirst(t *testing.T) {
 		if !strings.Contains(row, "✓ approved") || !strings.Contains(row, "✓ passing") {
 			t.Errorf("w=%d long row lost its badges (only TITLE may be cut): %q", w, row)
 		}
+		// The other rows keep every shown cell whole: no … outside TITLE.
+		for _, l := range ls {
+			if strings.Contains(l, "acme/api#102") && strings.Contains(l, "…") {
+				t.Errorf("w=%d row of #102 holds a cut cell: %q", w, l)
+			}
+		}
 	}
 }
 
 func TestTruncateBoundary(t *testing.T) {
 	cells := [][colCount]string{
-		{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "MERGE", "CI"},
-		{">", "acme/api#1", strings.Repeat("x", 200), "alice", "open", "✓ approved", "✓ mergeable", "✓ passing"},
+		{"", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "REVIEWERS", "MERGE", "CI"},
+		{">", "acme/api#1", strings.Repeat("x", 200), "alice", "open", "✓ approved", "✓alice", "✓ mergeable", "✓ passing"},
 	}
 	var sz sizes
 	for _, row := range cells {
@@ -398,7 +534,7 @@ func TestTruncateBoundary(t *testing.T) {
 	if w < 10 || w > total {
 		t.Fatalf("TITLE width = %d", w)
 	}
-	sum := 7 // gaps
+	sum := 8 // gaps
 	for c := range lay.show {
 		if !lay.show[c] {
 			t.Fatalf("column %d is hidden at %d cells", c, total)
@@ -417,7 +553,7 @@ func TestTruncateBoundary(t *testing.T) {
 		t.Errorf("title of %d cells = %q (width %d), want it to end in … and fit %d", w+1, over, lipgloss.Width(over), w)
 	}
 	// A narrow pane never takes TITLE below 10 cells: at 44 cells AUTHOR,
-	// STATE and MERGE are gone and TITLE sits on its floor.
+	// STATE, REVIEWERS and MERGE are gone and TITLE sits on its floor.
 	if l := layoutColumns(sz, 44); !l.show[colTitle] || l.width[colTitle] != 10 {
 		t.Errorf("TITLE in a 44-cell pane = shown %v, width %d, want shown at the floor of 10", l.show[colTitle], l.width[colTitle])
 	}

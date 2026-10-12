@@ -14,11 +14,13 @@ import (
 )
 
 // testSizes are the column sizes of a typical list: TITLE wants 40 cells and
-// the other columns 55 plus 7 gaps, so everything fits from 72 cells up.
+// the other columns 69 plus 8 gaps, so everything fits from 87 cells up.
+// REVIEWERS wants 14 cells and folds into a count of 4.
 func testSizes() sizes {
 	var sz sizes
-	sz.natural = [colCount]int{colMarker: 1, colPR: 12, colTitle: 40, colAuthor: 6, colState: 6, colReview: 10, colMerge: 11, colCI: 9}
+	sz.natural = [colCount]int{colMarker: 1, colPR: 12, colTitle: 40, colAuthor: 6, colState: 6, colReview: 10, colReviewers: 14, colMerge: 11, colCI: 9}
 	sz.min = sz.natural
+	sz.collapsed[colReviewers] = 4
 	return sz
 }
 
@@ -33,9 +35,10 @@ func shownCols(l layout) []int {
 }
 
 func TestLayoutColumns(t *testing.T) {
-	all := []int{colMarker, colPR, colTitle, colAuthor, colState, colReview, colMerge, colCI}
-	noAuthor := []int{colMarker, colPR, colTitle, colState, colReview, colMerge, colCI}
-	noState := []int{colMarker, colPR, colTitle, colReview, colMerge, colCI}
+	all := []int{colMarker, colPR, colTitle, colAuthor, colState, colReview, colReviewers, colMerge, colCI}
+	noAuthor := []int{colMarker, colPR, colTitle, colState, colReview, colReviewers, colMerge, colCI}
+	noState := []int{colMarker, colPR, colTitle, colReview, colReviewers, colMerge, colCI}
+	noReviewers := []int{colMarker, colPR, colTitle, colReview, colMerge, colCI}
 	noMerge := []int{colMarker, colPR, colTitle, colReview, colCI}
 	noTitle := []int{colMarker, colPR, colReview, colCI}
 
@@ -50,31 +53,36 @@ func TestLayoutColumns(t *testing.T) {
 	bigCI.natural[colCI], bigCI.min[colCI] = 24, 11
 
 	for _, tt := range []struct {
-		name  string
-		sz    sizes
-		total int
-		shown []int
-		title int // wanted TITLE width, 0 when TITLE is not shown
-		pr    int // wanted PR width
-		ci    int // wanted CI width
+		name      string
+		sz        sizes
+		total     int
+		shown     []int
+		collapsed bool // REVIEWERS is folded into its count
+		title     int  // wanted TITLE width, 0 when TITLE is not shown
+		pr        int  // wanted PR width
+		ci        int  // wanted CI width
 	}{
-		{"unsized keeps every column uncut", testSizes(), 0, all, 40, 12, 9},
-		{"negative width is unsized", testSizes(), -5, all, 40, 12, 9},
-		{"room for everything", testSizes(), 200, all, 40, 12, 9},
-		{"TITLE takes what is left", testSizes(), 82, all, 20, 12, 9},
-		{"TITLE at its minimum", testSizes(), 72, all, 10, 12, 9},
-		{"AUTHOR drops first", testSizes(), 71, noAuthor, 16, 12, 9},
-		{"AUTHOR gone, TITLE at its minimum", testSizes(), 65, noAuthor, 10, 12, 9},
-		{"STATE drops second", testSizes(), 64, noState, 16, 12, 9},
-		{"STATE gone, TITLE at its minimum", testSizes(), 58, noState, 10, 12, 9},
-		{"MERGE drops third", testSizes(), 57, noMerge, 21, 12, 9},
-		{"MERGE gone, TITLE at its minimum", testSizes(), 46, noMerge, 10, 12, 9},
-		{"TITLE drops last", testSizes(), 45, noTitle, 0, 12, 9},
-		{"only the four columns left, exactly fitting", bigPR, 53, noTitle, 0, 30, 9},
-		{"a short TITLE does not force a drop", shortTitle, 69, all, 7, 12, 9},
-		{"a short TITLE still drops AUTHOR when it must", shortTitle, 68, noAuthor, 7, 12, 9},
-		{"PR narrows when nothing else can", bigPR, 40, noTitle, 0, 17, 9},
-		{"CI narrows to its minimum, then PR", bigCI, 40, noTitle, 0, 15, 11},
+		{"unsized keeps every column uncut", testSizes(), 0, all, false, 40, 12, 9},
+		{"negative width is unsized", testSizes(), -5, all, false, 40, 12, 9},
+		{"room for everything", testSizes(), 200, all, false, 40, 12, 9},
+		{"TITLE takes what is left", testSizes(), 100, all, false, 23, 12, 9},
+		{"TITLE at its minimum", testSizes(), 87, all, false, 10, 12, 9},
+		{"AUTHOR drops first", testSizes(), 86, noAuthor, false, 16, 12, 9},
+		{"AUTHOR gone, TITLE at its minimum", testSizes(), 80, noAuthor, false, 10, 12, 9},
+		{"STATE drops second", testSizes(), 79, noState, false, 16, 12, 9},
+		{"STATE gone, TITLE at its minimum", testSizes(), 73, noState, false, 10, 12, 9},
+		{"REVIEWERS folds into a count third", testSizes(), 72, noState, true, 19, 12, 9},
+		{"folded, TITLE at its minimum", testSizes(), 63, noState, true, 10, 12, 9},
+		{"REVIEWERS drops fourth", testSizes(), 62, noReviewers, false, 14, 12, 9},
+		{"REVIEWERS gone, TITLE at its minimum", testSizes(), 58, noReviewers, false, 10, 12, 9},
+		{"MERGE drops fifth", testSizes(), 57, noMerge, false, 21, 12, 9},
+		{"MERGE gone, TITLE at its minimum", testSizes(), 46, noMerge, false, 10, 12, 9},
+		{"TITLE drops last", testSizes(), 45, noTitle, false, 0, 12, 9},
+		{"only the four columns left, exactly fitting", bigPR, 53, noTitle, false, 0, 30, 9},
+		{"a short TITLE does not force a drop", shortTitle, 84, all, false, 7, 12, 9},
+		{"a short TITLE still drops AUTHOR when it must", shortTitle, 83, noAuthor, false, 7, 12, 9},
+		{"PR narrows when nothing else can", bigPR, 40, noTitle, false, 0, 17, 9},
+		{"CI narrows to its minimum, then PR", bigCI, 40, noTitle, false, 0, 15, 11},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			l := layoutColumns(tt.sz, tt.total)
@@ -83,6 +91,18 @@ func TestLayoutColumns(t *testing.T) {
 			}
 			if got := shownCols(l); !slices.Equal(got, tt.shown) {
 				t.Fatalf("shown columns = %v, want %v", got, tt.shown)
+			}
+			if l.collapsed[colReviewers] != tt.collapsed {
+				t.Errorf("REVIEWERS collapsed = %v, want %v", l.collapsed[colReviewers], tt.collapsed)
+			}
+			if l.show[colReviewers] {
+				want := 14
+				if tt.collapsed {
+					want = 4
+				}
+				if l.width[colReviewers] != want {
+					t.Errorf("REVIEWERS width = %d, want %d", l.width[colReviewers], want)
+				}
 			}
 			if tt.title > 0 && l.width[colTitle] != tt.title {
 				t.Errorf("TITLE width = %d, want %d", l.width[colTitle], tt.title)
@@ -112,15 +132,29 @@ func TestLayoutColumns(t *testing.T) {
 
 // TestDropOrder renders the list at every width from 120 down to 40 and
 // reads the column-header row: PR, REVIEW and CI stay, the other columns only
-// ever disappear, in the order AUTHOR, STATE, MERGE, TITLE.
+// ever disappear, in the order AUTHOR, STATE, REVIEWERS (first folded into a
+// count under the header REVS, then dropped), MERGE, TITLE (D-13).
 func TestDropOrder(t *testing.T) {
 	snap := fixtureSix()
 	snap.PRs = append(snap.PRs, domain.PR{
 		ID: "7", Ref: domain.Ref{Repo: "acme/api", Number: 999}, Title: strings.Repeat("0123456789", 12), Author: "dave",
 		State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing,
 	})
-	order := []string{"AUTHOR", "STATE", "MERGE", "TITLE"}
-	prev := map[string]bool{"AUTHOR": true, "STATE": true, "MERGE": true, "TITLE": true}
+	// Each column has a rank; the header of a width may only show a column
+	// when every column of a lower rank is still shown in the same form.
+	order := []string{"AUTHOR", "STATE", "REVIEWERS", "MERGE", "TITLE"}
+	// level of a column: 2 = shown whole, 1 = REVIEWERS folded to REVS, 0 = gone
+	level := func(has map[string]bool, c string) int {
+		switch {
+		case has[c]:
+			return 2
+		case c == "REVIEWERS" && has["REVS"]:
+			return 1
+		}
+		return 0
+	}
+	prev := map[string]int{"AUTHOR": 2, "STATE": 2, "REVIEWERS": 2, "MERGE": 2, "TITLE": 2}
+	seen := map[string]bool{}
 	for w := 120; w >= 40; w-- {
 		ls := lines(newTestModel(t, snap, w, 40).View().Content)
 		for _, l := range ls {
@@ -128,10 +162,10 @@ func TestDropOrder(t *testing.T) {
 				t.Fatalf("w=%d: line is %d cells wide: %q", w, lipgloss.Width(l), l)
 			}
 		}
-		fields := strings.Fields(ls[1])
 		has := map[string]bool{}
-		for _, f := range fields {
+		for _, f := range strings.Fields(ls[1]) {
 			has[f] = true
+			seen[f] = true
 		}
 		for _, must := range []string{"PR", "REVIEW", "CI"} {
 			if !has[must] {
@@ -139,23 +173,31 @@ func TestDropOrder(t *testing.T) {
 			}
 		}
 		for i, c := range order {
-			if has[c] && !prev[c] {
-				t.Errorf("w=%d: column %s came back after it was dropped", w, c)
+			lv := level(has, c)
+			if lv > prev[c] {
+				t.Errorf("w=%d: column %s came back after it was cut: %q", w, c, ls[1])
 			}
-			// A column may only be gone when every column before it in the
-			// drop order is gone too.
-			if !has[c] {
+			// A column may only lose form when every column before it in the
+			// drop order is gone.
+			if lv < 2 {
 				for _, earlier := range order[:i] {
-					if has[earlier] {
-						t.Errorf("w=%d: %s dropped while %s is still shown: %q", w, c, earlier, ls[1])
+					if level(has, earlier) > 0 {
+						t.Errorf("w=%d: %s cut while %s is still shown: %q", w, c, earlier, ls[1])
 					}
 				}
 			}
+			prev[c] = lv
 		}
-		prev = has
 	}
-	if prev["TITLE"] || prev["AUTHOR"] || prev["STATE"] || prev["MERGE"] {
-		t.Errorf("at 40 cells the header is %v, want only PR, REVIEW and CI", prev)
+	for _, f := range []string{"REVIEWERS", "REVS"} {
+		if !seen[f] {
+			t.Errorf("the header %s never appeared between 120 and 40 cells", f)
+		}
+	}
+	for c, lv := range prev {
+		if lv != 0 {
+			t.Errorf("at 40 cells %s is still shown, want only PR, REVIEW and CI", c)
+		}
 	}
 }
 

@@ -106,3 +106,81 @@ func TestCICellCap(t *testing.T) {
 		}
 	}
 }
+
+// TestReviewersCell: tokens are a glyph glued to a name in slice order, the
+// viewer is "me", hidden requests make one token, and a cell that is too
+// narrow ends in "+N" counting every reviewer not shown (LIST-04, D-06).
+func TestReviewersCell(t *testing.T) {
+	hidden := domain.Reviewer{Kind: domain.ReviewerHidden, State: domain.ReviewerPending}
+	rs6 := []domain.Reviewer{
+		{Name: "bob", State: domain.ReviewerChangesRequested},
+		{Name: "carol", State: domain.ReviewerPending},
+		hidden, hidden,
+		{Name: "alice", State: domain.ReviewerApproved},
+		{Name: "octo", State: domain.ReviewerApproved},
+	}
+	tests := []struct {
+		name   string
+		rs     []domain.Reviewer
+		viewer string
+		w      int
+		want   string
+	}{
+		{"everything, unsized", rs6, "octo", 0, "✗bob …carol …2 teams ✓alice ✓me"},
+		{"everything, exactly fitting", rs6, "octo", 31, "✗bob …carol …2 teams ✓alice ✓me"},
+		{"one reviewer short", rs6, "octo", 30, "✗bob …carol …2 teams ✓alice +1"},
+		{"narrow: the rest becomes +N", rs6, "octo", 16, "✗bob …carol +4"},
+		{"no room for a token: the total", rs6, "octo", 3, "+6"},
+		{"the viewer matches without case", rs6, "OCTO", 0, "✗bob …carol …2 teams ✓alice ✓me"},
+		{"another viewer keeps the login", rs6, "dave", 0, "✗bob …carol …2 teams ✓alice ✓octo"},
+		{"one hidden request", []domain.Reviewer{hidden}, "octo", 0, "…team"},
+		{"three hidden requests", []domain.Reviewer{hidden, hidden, hidden}, "octo", 0, "…3 teams"},
+		{"hidden token does not fit", []domain.Reviewer{hidden, hidden, hidden}, "octo", 5, "+3"},
+		{"a visible team", []domain.Reviewer{{Name: "acme/core", Kind: domain.ReviewerTeam, State: domain.ReviewerPending}}, "octo", 0, "…@acme/core"},
+		{"no reviewers", nil, "octo", 0, ""},
+		{"no reviewers in a width", nil, "octo", 10, ""},
+		{"CJK login counted in cells", []domain.Reviewer{
+			{Name: "数据数据", State: domain.ReviewerApproved}, {Name: "bob", State: domain.ReviewerPending},
+		}, "octo", 12, "✓数据数据 +1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := reviewersCell(tt.rs, tt.viewer, tt.w)
+			if got != tt.want {
+				t.Errorf("reviewersCell(w=%d) = %q, want %q", tt.w, got, tt.want)
+			}
+			if tt.w > 0 && lipgloss.Width(got) > tt.w {
+				t.Errorf("width(%q) = %d, want at most %d", got, lipgloss.Width(got), tt.w)
+			}
+		})
+	}
+
+	t.Run("never wider than the cell, never a silent loss", func(t *testing.T) {
+		for w := 1; w <= 40; w++ {
+			got := reviewersCell(rs6, "octo", w)
+			if lipgloss.Width(got) > w {
+				t.Errorf("w=%d: %q is %d cells wide", w, got, lipgloss.Width(got))
+			}
+			// Either all six reviewers are named, or the cell says how many are
+			// not shown (or is cut to a bare ellipsis at 1 cell).
+			if !strings.Contains(got, "+") && !strings.Contains(got, "✓me") && got != "…" {
+				t.Errorf("w=%d: %q hides reviewers without a +N", w, got)
+			}
+		}
+	})
+}
+
+func TestReviewersCount(t *testing.T) {
+	r := domain.Reviewer{Name: "bob", State: domain.ReviewerApproved}
+	for _, tt := range []struct {
+		rs   []domain.Reviewer
+		want string
+	}{
+		{nil, ""}, {[]domain.Reviewer{r}, "+1"}, {[]domain.Reviewer{r, r, r, r, r, r}, "+6"},
+		{[]domain.Reviewer{{Kind: domain.ReviewerHidden}, {Kind: domain.ReviewerHidden}}, "+2"},
+	} {
+		if got := reviewersCount(tt.rs); got != tt.want {
+			t.Errorf("reviewersCount(%d reviewers) = %q, want %q", len(tt.rs), got, tt.want)
+		}
+	}
+}
