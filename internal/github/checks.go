@@ -273,46 +273,82 @@ func errDetailGone() error {
 	return &Error{Kind: KindGraphQL, Message: "this pull request could not be loaded"}
 }
 
-// FetchDetail returns the full detail of one pull request: its de-duplicated,
-// sorted checks, every reviewer with their state, and the counts. The error
-// policy follows Fetch: a rate limit or a cancelled context is returned as is,
-// partial GraphQL data is kept, and any other error is returned.
-func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
+// detailPage sends one Detail request and returns its pull request node. Partial
+// GraphQL data is kept when the node is a pull request; a rate limit, a
+// cancelled context and any other error are returned. A missing node, or one
+// that is not a pull request, is errDetailGone.
+func (c *Client) detailPage(ctx context.Context, vars map[string]any) (*wireDetailNode, error) {
 	var resp wireDetailResp
-	err := c.gql.DoWithContext(ctx, detailQuery, map[string]any{"id": id}, &resp)
+	err := c.gql.DoWithContext(ctx, detailQuery, vars, &resp)
 	if err != nil {
 		err = classify(err, c.capture.latest())
 		if errors.Is(err, context.Canceled) {
-			return domain.Detail{}, err
+			return nil, err
 		}
 		var ce *Error
 		var ge *api.GraphQLError
 		keep := errors.As(err, &ce) && ce.Kind == KindGraphQL && errors.As(err, &ge) &&
 			resp.Node != nil && resp.Node.Typename == "PullRequest"
 		if !keep {
-			return domain.Detail{}, err
+			return nil, err
 		}
 	}
-	n := resp.Node
-	if n == nil || n.Typename != "PullRequest" {
-		return domain.Detail{}, errDetailGone()
+	if resp.Node == nil || resp.Node.Typename != "PullRequest" {
+		return nil, errDetailGone()
 	}
+	return resp.Node, nil
+}
 
+// FetchDetail returns the full detail of one pull request: its de-duplicated,
+// sorted checks, every reviewer with their state, and the counts.
+//
+// Contexts are read 100 at a time for at most maxPages pages. Counts always
+// come from the de-duplicated checks of the pages read (D-03), so a run
+// superseded on another page is not counted. When the pull request has more
+// check runs than were read, or a later page fails, Truncated is set and Read
+// and Total say how many runs were read of how many exist. A failure on page 1
+// is returned; so are a rate limit and a cancelled context on any page.
+func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
+	vars := map[string]any{"id": id}
 	var d domain.Detail
 	var checks []domain.Check
-	if r := n.StatusCheckRollup; r != nil {
-		d.Total = r.Contexts.TotalCount
-		d.Truncated = r.Contexts.PageInfo.HasNextPage
+	for page := 1; page <= maxPages; page++ {
+		n, err := c.detailPage(ctx, vars)
+		if err != nil {
+			var ce *Error
+			if page == 1 || errors.Is(err, context.Canceled) || (errors.As(err, &ce) && ce.Kind == KindRateLimited) {
+				return domain.Detail{}, err
+			}
+			d.Truncated = true // a later page failed: keep the pages read so far
+			break
+		}
+		if page == 1 {
+			d.Reviewers = detailReviewers(n)
+		}
+		r := n.StatusCheckRollup
+		if r == nil {
+			break
+		}
+		if page == 1 {
+			d.Total = r.Contexts.TotalCount
+		}
 		for _, ctxNode := range r.Contexts.Nodes {
 			if ctxNode != nil {
 				checks = append(checks, mapContext(ctxNode))
+				d.Read++
 			}
 		}
+		if !r.Contexts.PageInfo.HasNextPage {
+			break
+		}
+		if page == maxPages || r.Contexts.PageInfo.EndCursor == "" {
+			d.Truncated = true
+			break
+		}
+		vars["after"] = r.Contexts.PageInfo.EndCursor
 	}
-	d.Read = len(checks)
 	d.Checks = domain.LatestChecks(checks)
 	domain.SortChecks(d.Checks)
 	d.Counts = domain.CountChecks(d.Checks)
-	d.Reviewers = detailReviewers(n)
 	return d, nil
 }
