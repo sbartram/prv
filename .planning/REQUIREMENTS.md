@@ -22,9 +22,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LIST-01**: Each row shows repo, PR number, title, author, and a draft marker
 - [x] **LIST-02**: Each row shows state: Open, Merged, or Closed
 - [x] **LIST-03**: Each row shows review status: approved, changes requested, review required, or no review status. Repos without required reviews still show approved or changes requested based on actual reviews, and never show "review required" by mistake
-- [ ] **LIST-04**: Each row shows reviewers who approved or requested changes, and reviewers still pending
+- [x] **LIST-04**: Each row shows reviewers who approved or requested changes, and reviewers still pending
 - [x] **LIST-05**: Each row shows one CI badge: passing, failing, running, or no checks. A PR with no checks never shows as passing
-- [ ] **LIST-06**: Each row shows merge-readiness: mergeable, blocked, behind, or conflicts
+- [x] **LIST-06**: Each row shows merge-readiness: mergeable, blocked, behind, or conflicts
 - [x] **LIST-07**: For failing PRs, the row shows the name of a failing check
   - v1 limit, accepted by the user on 2026-10-12 (Phase 3 CONTEXT D-02, revised): when a failing PR's checks fill more than one page of 100 contexts, the row shows the plain `✗ failing` badge with no name. prv never guesses a name, so a failed check-name query also leaves the plain badge (Phase 3 CONTEXT, Claude's Discretion).
 - [x] **LIST-08**: List is sorted by need for attention (failing CI / changes requested first) in a stable order that does not shuffle between refreshes
@@ -133,9 +133,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-01 | Phase 1 | Complete |
 | LIST-02 | Phase 1 | Complete |
 | LIST-03 | Phase 1 | Complete |
-| LIST-04 | Phase 3 | Pending |
+| LIST-04 | Phase 3 | Complete |
 | LIST-05 | Phase 1 | Complete |
-| LIST-06 | Phase 3 | Pending |
+| LIST-06 | Phase 3 | Complete |
 | LIST-07 | Phase 3 | Complete |
 | LIST-08 | Phase 2 | Complete |
 | LIST-09 | Phase 4 | Pending |

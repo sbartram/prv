@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-10-12T23:17:17.820Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-10-12T23:26:17.858Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: 7bc177d92cf1895abb0af72fb4f856b7ebcbffff
+state_head: 024416a323186136e0afb8f930b8d41a72d05d0e
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 22
-  completed_plans: 18
+  completed_plans: 19
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
@@ -75,6 +75,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P02 | 3 min | 2 tasks | 7 files |
 | Phase 03 P03 | 5 min | 2 tasks | 13 files |
 | Phase 03 P04 | 20 min | 2 tasks | 10 files |
+| Phase 03 P05 | 8 min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-03: a compact row with no room for a ref draws only the marker and the REVIEW and CI glyphs — Approved/blocked/failing state stays visible down to 4 cells
 - [Phase 03]: 03-04: review logins lose [bot] like request names, so a re-requested bot shows once as pending
 - [Phase 03]: 03-04: PR holds a Reviewers slice, so PR values are no longer comparable with ==; tests compare with reflect.DeepEqual
+- [Phase 03]: 03-05: reviewers legend in the ? overlay is two lines, because the one-line text is 82 cells and wrapped mid-token at 80
+- [Phase 03]: 03-05: renderList cell and header tables are [colCount]string arrays indexed by column constant, so inserting a column cannot shift another column's data
 
 ### Pending Todos
 
@@ -145,6 +148,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:17:17.779Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-10-12T23:26:17.818Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None

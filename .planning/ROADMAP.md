@@ -112,7 +112,7 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 4/8 plans executed
+**Plans**: 5/8 plans executed
 
 Plans:
 **Wave 1**
@@ -124,7 +124,7 @@ Plans:
 - [x] 03-04-PLAN.md — Merge readiness and reviewers reach every PR through the github seam: DeriveMerge (state and draft first, UNKNOWN+CONFLICTING) and MergeReviewers (pending wins, hidden teams, bots) (D-06, D-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-05-PLAN.md — MERGE and REVIEWERS columns in every row (+N, me, hidden teams), in the D-13 drop order and the compact glyphs, with help legends (D-05..D-07, D-13)
+- [x] 03-05-PLAN.md — MERGE and REVIEWERS columns in every row (+N, me, hidden teams), in the D-13 drop order and the compact glyphs, with help legends (D-05..D-07, D-13)
 - [ ] 03-06-PLAN.md — Detail data: one paged Detail query per PR with de-duplicated sorted checks, every reviewer incl. commented and dismissed, counts de-duplicated at every size with a partial read reported (D-01, D-03, D-08, D-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -160,5 +160,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
-| 3. Blocker Detail | 4/8 | In Progress | - |
+| 3. Blocker Detail | 5/8 | In Progress | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |
