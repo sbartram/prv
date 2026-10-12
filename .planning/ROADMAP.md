@@ -12,7 +12,7 @@ prv is built as four vertical slices, and every phase ends with a working `prv` 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Status at a Glance** - Live spike, then auth + one GraphQL fetch of authored/assigned PRs rendered as a list with state, review, and CI badges
+- [x] **Phase 1: Status at a Glance** - Live spike, then auth + one GraphQL fetch of authored/assigned PRs rendered as a list with state, review, and CI badges (completed 2026-10-11)
 - [ ] **Phase 2: Live Monitoring** - Single-flight auto-refresh, rate-limit backoff, stable attention sort, state/number filters, config file, open-in-browser, help
 - [ ] **Phase 3: Blocker Detail** - Reviewer names, merge-readiness, failing check name in rows, and a detail view of every check and reviewer
 - [ ] **Phase 4: Curated Watch List** - Add any PR by URL or `owner/repo#n`, remove it, persist across restarts, and degrade to per-PR unavailable rows
@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Early gate**: Run the live-verification spike (research/SUMMARY.md, "Live-Verification Spike", all 10 questions, via `gh api graphql`) before the discovery query, review derivation, and token resolution are frozen. Record the findings in the phase directory. Q1, Q4, Q5, and Q8 decide this phase: discovery shape (C2), the latestOpinionatedReviews fallback (C4), and token precedence. Q2, Q7, Q9, and Q10 feed the Phase 3 contexts decision (C3). Q3 and Q6 feed the Phase 4 per-alias error handling.
 **Pitfalls first addressed here**: A null `reviewDecision` is derived from latestOpinionatedReviews and never maps to "review required". A null `statusCheckRollup` maps to "no checks". One total mapping covers CheckRun and StatusContext, with an unknown case, and CANCELLED/NEUTRAL/SKIPPED are never red. Recorded GraphQL fixtures cover these cases plus comment-after-approve. Read the raw GraphQL envelope (partial data plus `errors[]`). Dedupe by node ID. The 14-day closed window is a fixed default in the discovery query until Phase 2 makes it configurable. Strip control characters and ANSI from remote strings. No I/O in Update/View. Do not log the token (`LogIgnoreEnv`). Data is fetched once at launch; auto-refresh arrives in Phase 2.
-**Plans**: 4/4 plans executed
+**Plans**: 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Status at a Glance | 4/4 | In Progress | - |
+| 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 0/TBD | Not started | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |
