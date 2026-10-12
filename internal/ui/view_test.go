@@ -704,9 +704,11 @@ func TestRateWarning(t *testing.T) {
 		}
 	}
 	t.Run("narrow pane keeps the warning over the count", func(t *testing.T) {
-		m := newTestModel(t, withRate(5000, 10), 45, 24)
+		// 100 left is under 20% but above the 10-refresh reserve, so no pause
+		// segment competes for the room (plan 02-06).
+		m := newTestModel(t, withRate(5000, 100), 45, 24)
 		h := ansi.Strip(strings.Split(m.View().Content, "\n")[0])
-		if !strings.Contains(h, "api 10/5000") || lipgloss.Width(h) > 45 {
+		if !strings.Contains(h, "api 100/5000") || lipgloss.Width(h) > 45 {
 			t.Errorf("header = %q, want the warning and at most 45 cells", h)
 		}
 	})

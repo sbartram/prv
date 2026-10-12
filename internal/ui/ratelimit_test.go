@@ -354,9 +354,9 @@ func TestErrorPanelPaused(t *testing.T) {
 			t.Errorf("error panel promises a retry during a pause:\n%s", v)
 		}
 		clk.t = simStart.Add(time.Minute)
-		if _, cmd := m.Update(key("r")); cmd != nil {
-			t.Error("r in the error panel during a pause returned a command")
-		}
+		m, cmd := m.Update(key("r"))
+		m = runCmd(m, cmd) // only the redraw timer: it must start no fetch
+		_ = m
 		if f.calls != 1 {
 			t.Errorf("r in the error panel during a pause fetched (calls = %d)", f.calls)
 		}

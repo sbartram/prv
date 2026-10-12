@@ -14,6 +14,12 @@ import (
 // a tick from another generation is dropped.
 type tickMsg struct{ gen int }
 
+// redrawMsg makes Bubble Tea redraw when a flash expires. Update ignores it.
+type redrawMsg struct{}
+
+// flashFor is how long a transient footer message stays.
+const flashFor = 4 * time.Second
+
 // fetchedMsg is the result of one fetch, stamped with the generation that
 // started it.
 type fetchedMsg struct {
@@ -53,4 +59,12 @@ func (m *Model) beginFetch() tea.Cmd {
 func (m *Model) arm(d time.Duration) tea.Cmd {
 	m.nextAt = m.now().Add(d)
 	return m.after(d, tickMsg{gen: m.gen})
+}
+
+// setFlash shows text in the footer for d and returns the Cmd that redraws
+// the screen when it expires.
+func (m *Model) setFlash(text string, d time.Duration) tea.Cmd {
+	m.flash = text
+	m.flashUntil = m.now().Add(d)
+	return m.after(d, redrawMsg{})
 }

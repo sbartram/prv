@@ -74,6 +74,22 @@ type Model struct {
 	lastOK   time.Time // time of the last successful fetch
 	nextAt   time.Time // when the pending tick is due
 	failedAt time.Time // time of the last failed refresh while data is shown
+
+	// Backoff state. failures counts consecutive failed fetches. While now is
+	// before pausedUntil no request goes out, not even on r. flash is a short
+	// message in the footer that expires at flashUntil.
+	failures    int
+	pausedUntil time.Time
+	flash       string
+	flashUntil  time.Time
+}
+
+// backoffer is implemented by errors that know when to retry. ui declares it
+// so that it never imports internal/github. It returns the Retry-After delay,
+// the time the limit resets (zero when unknown), and whether the error is a
+// rate limit.
+type backoffer interface {
+	Backoff() (time.Duration, time.Time, bool)
 }
 
 // New builds a Model that starts in the loading state. Init starts the first
@@ -125,6 +141,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.inFlight {
 				return m, nil // merges with the running refresh
 			}
+			if m.now().Before(m.pausedUntil) {
+				// D-08: no request during a pause; say when refreshing resumes.
+				return m, m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
+			}
 			m.gen++ // orphans the pending tick
 			if m.state == stateError {
 				m.state = stateLoading
@@ -156,7 +176,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.gen != m.gen || m.inFlight {
 			return m, nil
 		}
+		if now := m.now(); now.Before(m.pausedUntil) {
+			// The timer fired early: no request during a pause.
+			return m, m.arm(m.pausedUntil.Sub(now))
+		}
 		return m, m.beginFetch()
+	case redrawMsg:
+		// Nothing to change: Bubble Tea redraws after every Update, which
+		// lets an expired flash leave the footer.
+		return m, nil
 	case fetchedMsg:
 		if errors.Is(msg.err, context.Canceled) {
 			return m, nil // the program is quitting
@@ -170,12 +198,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.lastOK.IsZero() {
 				// Data has been shown: keep the rows and the state, undimmed.
 				m.failedAt = m.now()
-				return m, m.arm(m.interval)
+				return m, m.schedule(msg.err)
 			}
 			// No data yet: the error panel, and the tick retries on its own.
 			m.cursor, m.offset = 0, 0
 			m.state = stateError
-			return m, m.arm(m.interval)
+			return m, m.schedule(msg.err)
 		}
 		m.err = nil
 		m.failedAt = time.Time{}
@@ -187,9 +215,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = stateList
 		}
-		return m, m.arm(m.interval)
+		return m, m.schedule(nil)
 	}
 	return m, nil
+}
+
+// schedule applies the backoff policy to the result of the current-generation
+// fetch (err is nil on success) and arms the one tick for the next refresh. It
+// also sets or clears the rate-limit pause.
+func (m *Model) schedule(err error) tea.Cmd {
+	out := domain.Outcome{Failed: err != nil}
+	if err == nil {
+		m.failures = 0
+	} else {
+		m.failures++
+		var b backoffer
+		if errors.As(err, &b) {
+			out.RetryAfter, out.ResetAt, out.RateLimited = b.Backoff()
+		}
+	}
+	d := domain.NextDelay(m.now(), m.interval, m.failures, m.snap.RateLimit, out)
+	m.pausedUntil = d.PausedUntil
+	return m.arm(d.Wait)
 }
 
 // rebuild derives the rows on screen and the cursor from the snapshot and the

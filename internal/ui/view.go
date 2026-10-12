@@ -53,6 +53,9 @@ func (m Model) renderEmpty() string {
 // the limit: showing a number before that would be made up.
 func (m Model) footer() string {
 	var notes []string
+	if m.flash != "" && m.now().Before(m.flashUntil) {
+		notes = append(notes, warnStyle.Render(m.flash)) // first, so it is cut last
+	}
 	if m.snap.Truncated {
 		notes = append(notes, "list truncated")
 	}
@@ -201,6 +204,10 @@ func (m Model) header() string {
 		}
 		segs = append(segs, segment{text, prio})
 	}
+	if m.now().Before(m.pausedUntil) {
+		// D-08: a pause always says when refreshing resumes.
+		segs = append(segs, segment{warnStyle.Render("paused until " + m.clock(m.pausedUntil, "15:04") + " (rate limit)"), 7})
+	}
 	// D-06: below 20% of the limit the budget moves up into the header.
 	if rl := m.snap.RateLimit; rl.Limit > 0 && rl.Remaining*5 < rl.Limit {
 		segs = append(segs, segment{warnStyle.Render("api " + strconv.Itoa(rl.Remaining) + "/" +
@@ -222,6 +229,8 @@ func (m Model) renderError() string {
 	// D-09: the panel says when the automatic retry comes.
 	if m.inFlight {
 		b.WriteString("\n\nretrying now… " + m.spin.View())
+	} else if m.now().Before(m.pausedUntil) {
+		b.WriteString("\n\npaused until " + m.clock(m.pausedUntil, "15:04") + " (rate limit)")
 	} else if !m.nextAt.IsZero() {
 		b.WriteString("\n\nretrying at " + m.clock(m.nextAt, "15:04"))
 	}
