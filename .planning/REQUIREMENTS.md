@@ -53,8 +53,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Navigation
 
 - [x] **NAV-01**: User can move through the list with j/k and the arrow keys
-- [ ] **NAV-02**: User can press `o` to open the selected PR in the browser
-- [ ] **NAV-03**: User can press `?` to see key bindings
+- [x] **NAV-02**: User can press `o` to open the selected PR in the browser
+- [x] **NAV-03**: User can press `?` to see key bindings
 - [x] **NAV-04**: User can quit with `q`
 - [ ] **NAV-05**: Layout adapts to terminal resizes and stays usable in narrow panes
 
@@ -151,8 +151,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RFSH-05 | Phase 2 | Complete |
 | RFSH-06 | Phase 2 | Complete |
 | NAV-01 | Phase 1 | Complete |
-| NAV-02 | Phase 2 | Pending |
-| NAV-03 | Phase 2 | Pending |
+| NAV-02 | Phase 2 | Complete |
+| NAV-03 | Phase 2 | Complete |
 | NAV-04 | Phase 1 | Complete |
 | NAV-05 | Phase 3 | Pending |
 | AUTH-01 | Phase 1 | Complete |
