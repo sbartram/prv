@@ -29,7 +29,7 @@ Not in this phase: reviewer names, merge-readiness, failing check names, the det
   8. closed (then unknown state)
 - **D-02:** Within a bucket the order is `createdAt` newest first, then ref (owner/repo, then number as an integer). Neither key changes when polling. `updatedAt` is **not** a sort key any more: it replaces D-06's secondary key from Phase 1, because comments and pushes would make rows inside a bucket swap places.
 - **D-03:** When a refresh moves a PR to a different bucket, the PR moves at once. The cursor follows the selected PR by ref. When the selected PR leaves the list, the cursor goes to its nearest neighbour (roadmap pitfall).
-- **D-04:** A draft always sorts into the draft bucket (6), even with failing CI. It stays dimmed, and its badges still show the true values (Phase 1 D-13).
+- **D-04:** A draft always sorts into the draft bucket (6), even with failing CI. It stays dimmed, and its badges still show the true values (Phase 1 D-13). Clarified 2026-10-12 (user decision during plan-phase): this applies to OPEN drafts. Lifecycle state is checked first, so a merged or closed draft sorts with merged/closed PRs (bucket 8), not bucket 6.
 
 ### Status bar & refresh (RFSH-01..05)
 - **D-05:** The header shows `updated HH:MM:SS`, which is a clock time with no redraw every second. A spinner shows next to it while a refresh is running. Example: `prv · @sbartram · 12 PRs · updated 14:32:05 ⠋`.
