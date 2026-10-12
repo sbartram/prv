@@ -33,6 +33,8 @@ func TestNextDelay(t *testing.T) {
 		{"reserve scales with cost", sec(60), 0, rl(5, 50, T.Add(min(5))), ok, min(5) + sec(1), min(5) + sec(1)},
 		{"pacing stretches the delay", sec(60), 0, rl(5, 100, T.Add(min(60))), ok, min(3), 0},
 		{"pacing never goes below the interval", sec(60), 0, rl(1, 4000, T.Add(min(60))), ok, sec(60), 0},
+		{"pacing with a reset in a year is cut to 65 min", sec(60), 0, rl(1, 11, T.Add(8760*time.Hour)), ok, min(65), 0},
+		{"pacing with a reset in 100 years is cut to 65 min", sec(60), 0, rl(1, 5000, T.Add(876000*time.Hour)), ok, min(65), 0},
 
 		{"failure 1", sec(60), 1, RateLimit{}, fail, sec(60), 0},
 		{"failure 2", sec(60), 2, RateLimit{}, fail, sec(120), 0},
