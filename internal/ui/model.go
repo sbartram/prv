@@ -44,6 +44,7 @@ type Model struct {
 	snap    domain.Snapshot
 	err     error
 	cursor  int
+	offset  int // index of the first visible row
 	w, h    int
 }
 
