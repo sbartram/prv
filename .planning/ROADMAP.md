@@ -65,7 +65,7 @@ Plans:
   5. User can press `o` to open the selected PR in the browser and `?` to see the key bindings screen.
 
 **Pitfalls first addressed here**: Single-flight refresh with one tick chain that re-arms after each result. A generation counter drops stale ticks and results, and a manual `r` coalesces with an in-flight refresh. Selection is tracked by PR ref (owner/repo#n), not by row index, with a nearest-neighbour fallback. The sort is stable on a key that polling does not change. Every query includes `rateLimit { cost remaining resetAt }`. Backoff honours retry-after, then resetAt, then a bounded exponential. Cancel the context on quit. Wrap Cmds so that a panic is caught. Logs go to a file only. Open only `https://github.com` URLs, through go-gh `pkg/browser` in a `tea.Cmd`. Verify with a counting fake client over a simulated hour with `-race`.
-**Plans**: 8/10 plans executed
+**Plans**: 9/10 plans executed
 
 Plans:
 **Wave 1**
@@ -91,7 +91,7 @@ Plans:
 - [x] 02-08-PLAN.md — Open/Merged/Closed toggles (1/2/3) with header indicator and hidden count, PR-number prompt (/), filtered-empty message (D-10..D-13)
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 02-09-PLAN.md — config.toml complete (closed_days, show, line-numbered errors, --closed-days precedence in 1..365), unknown-key warnings with a bounded 8 s lifetime that never mask other messages (D-14..D-16)
+- [x] 02-09-PLAN.md — config.toml complete (closed_days, show, line-numbered errors, --closed-days precedence in 1..365), unknown-key warnings with a bounded 8 s lifetime that never mask other messages (D-14..D-16)
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [ ] 02-10-PLAN.md — ? help overlay from the keymap with badges, settings, API budget and config warnings (D-17); o opens the selected PR on github.com only
@@ -139,6 +139,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
-| 2. Live Monitoring | 8/10 | In Progress | - |
+| 2. Live Monitoring | 9/10 | In Progress | - |
 | 3. Blocker Detail | 0/TBD | Not started | - |
 | 4. Curated Watch List | 0/TBD | Not started | - |

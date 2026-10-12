@@ -32,7 +32,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Filtering
 
 - [x] **FILT-01**: User can toggle Open / Merged / Closed visibility in any combination
-- [ ] **FILT-02**: Auto-found PRs that are merged or closed only show if they closed within a configurable window (default 14 days)
+- [x] **FILT-02**: Auto-found PRs that are merged or closed only show if they closed within a configurable window (default 14 days)
 - [x] **FILT-03**: User can type a PR number to narrow the list to matching PRs
 
 ### Detail view
@@ -63,7 +63,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **AUTH-01**: Uses the same token `gh` would: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login
 - [x] **AUTH-02**: If no token is found, prv exits with a clear message explaining how to log in
 - [x] **AUTH-03**: The token is never logged, displayed, or written to disk
-- [ ] **CONF-01**: Settings (refresh interval, closed window) are read from `~/.config/prv/config.toml`, with defaults if the file is missing
+- [x] **CONF-01**: Settings (refresh interval, closed window) are read from `~/.config/prv/config.toml`, with defaults if the file is missing
 - [x] **CONF-02**: `go install github.com/sbartram/prv/cmd/prv@latest` installs a working binary, and `prv --version` prints its version
 
 ## v2 Requirements
@@ -139,7 +139,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-08 | Phase 2 | Complete |
 | LIST-09 | Phase 4 | Pending |
 | FILT-01 | Phase 2 | Complete |
-| FILT-02 | Phase 2 | Pending |
+| FILT-02 | Phase 2 | Complete |
 | FILT-03 | Phase 2 | Complete |
 | DETL-01 | Phase 3 | Pending |
 | DETL-02 | Phase 3 | Pending |
@@ -158,7 +158,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Complete |
-| CONF-01 | Phase 2 | Pending |
+| CONF-01 | Phase 2 | Complete |
 | CONF-02 | Phase 1 | Complete |
 
 **Coverage:**
