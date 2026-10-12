@@ -542,3 +542,83 @@ func TestFitDropsLowestPriorityFirst(t *testing.T) {
 		}
 	}
 }
+
+// ---- footer and empty screen (plan 02-04 task 2) ----
+
+func TestFooterNotesFirst(t *testing.T) {
+	snap := onePR()
+	snap.Truncated = true
+	snap.Warnings = []string{"Some data could not be loaded: x"}
+	for _, w := range []int{40, 50, 120} {
+		t.Run(itoa(w), func(t *testing.T) {
+			m := newTestModel(t, snap, w, 24)
+			f := ansi.Strip(m.footer())
+			if lipgloss.Width(f) > w {
+				t.Errorf("footer is %d cells wide, want at most %d: %q", lipgloss.Width(f), w, f)
+			}
+			switch w {
+			case 40:
+				// Notes outlive hints: cut with an ellipsis, never dropped.
+				if !strings.HasPrefix(f, "list truncated") || strings.Contains(f, "j/k move") {
+					t.Errorf("footer = %q, want the truncated note and no hint", f)
+				}
+			case 50:
+				if !strings.Contains(f, "list truncated") || !strings.Contains(f, "some data could not be loaded") || strings.Contains(f, "j/k move") {
+					t.Errorf("footer = %q, want both notes and no hint", f)
+				}
+			case 120:
+				if !strings.HasPrefix(f, "list truncated") || !strings.Contains(f, "some data could not be loaded") || !strings.Contains(f, "j/k move") {
+					t.Errorf("footer = %q, want both notes first and the hints after them", f)
+				}
+			}
+			// The same line is the last line of the list view.
+			ls := lines(m.View().Content)
+			if got := ls[len(ls)-1]; got != f {
+				t.Errorf("last view line = %q, want the footer %q", got, f)
+			}
+		})
+	}
+	t.Run("no notes", func(t *testing.T) {
+		f := ansi.Strip(newTestModel(t, onePR(), 120, 24).footer())
+		for _, want := range []string{"j/k move · r refresh", "q quit"} {
+			if !strings.Contains(f, want) {
+				t.Errorf("footer = %q, missing %q", f, want)
+			}
+		}
+	})
+	t.Run("not sized", func(t *testing.T) {
+		f := ansi.Strip(newTestModel(t, snap, 0, 0).footer())
+		if !strings.Contains(f, "list truncated") || !strings.Contains(f, "q quit") {
+			t.Errorf("footer = %q, want the notes and the full hint line", f)
+		}
+	})
+}
+
+func TestEmptyStateShowsNotes(t *testing.T) {
+	for name, snap := range map[string]domain.Snapshot{
+		"warnings":  {Viewer: "octo", Warnings: []string{"Some data could not be loaded: x"}},
+		"truncated": {Viewer: "octo", Truncated: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			v := ansi.Strip(newTestModel(t, snap, 120, 24).View().Content)
+			if !strings.Contains(v, "No PRs could be listed for @octo.") {
+				t.Errorf("view = %q, want the partial-load sentence", v)
+			}
+			if strings.Contains(v, "No open PRs authored by") {
+				t.Errorf("a partial load must not claim there are no open PRs:\n%s", v)
+			}
+			if !strings.Contains(v, "list truncated") && !strings.Contains(v, "some data could not be loaded") {
+				t.Errorf("the integrity note is missing:\n%s", v)
+			}
+		})
+	}
+	t.Run("no notes keeps the Phase 1 sentence", func(t *testing.T) {
+		v := ansi.Strip(newTestModel(t, domain.Snapshot{Viewer: "octo"}, 120, 24).View().Content)
+		if !strings.Contains(v, "No open PRs authored by or assigned to @octo, and none closed in the last 14 days.") {
+			t.Errorf("view = %q", v)
+		}
+		if !strings.HasPrefix(v, "prv · @octo · 0 PRs") {
+			t.Errorf("empty screen has no header line:\n%s", v)
+		}
+	})
+}

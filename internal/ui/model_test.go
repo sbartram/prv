@@ -323,8 +323,11 @@ func TestFooterNotes(t *testing.T) {
 	if strings.Contains(v, "list truncated") || strings.Contains(v, "some data could not be loaded") {
 		t.Errorf("a complete list must carry no notes:\n%s", v)
 	}
-	if !strings.Contains(v, "j/k move · q quit") {
-		t.Errorf("list footer missing:\n%s", v)
+	// The hint pieces are asserted apart: later plans insert bindings between them.
+	for _, want := range []string{"j/k move · r refresh", "q quit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list footer missing %q:\n%s", want, v)
+		}
 	}
 	if v := list(false, []string{"Some data could not be loaded: x"}); !strings.Contains(v, "some data could not be loaded") {
 		t.Errorf("warnings produce no note:\n%s", v)
