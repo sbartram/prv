@@ -216,9 +216,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			u, ok := safeURL(m.rows[m.cursor].URL)
 			switch {
 			case !ok:
-				return m, m.setFlash("not a github.com link — not opened", flashFor)
+				cmd := m.setFlash("not a github.com link — not opened", flashFor)
+				return m, cmd
 			case m.opener == nil:
-				return m, m.setFlash("no browser available", flashFor)
+				cmd := m.setFlash("no browser available", flashFor)
+				return m, cmd
 			}
 			return m, openCmd(m.opener, u) // the launch happens in the Cmd, never here
 		case bkey.Matches(msg, m.keys.Refresh):
@@ -227,13 +229,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.now().Before(m.pausedUntil) {
 				// D-08: no request during a pause; say when refreshing resumes.
-				return m, m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
+				cmd := m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
+				return m, cmd
 			}
 			m.gen++ // orphans the pending tick
 			if m.state == stateError {
 				m.state = stateLoading
 			}
-			return m, m.beginFetch()
+			cmd := m.beginFetch()
+			return m, cmd
 		case bkey.Matches(msg, m.keys.Filter):
 			if m.state == stateList { // the prompt line only exists on the list screens
 				m.prompting = true
@@ -278,12 +282,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if now := m.now(); now.Before(m.pausedUntil) {
 			// The timer fired early: no request during a pause.
-			return m, m.arm(m.pausedUntil.Sub(now))
+			cmd := m.arm(m.pausedUntil.Sub(now))
+			return m, cmd
 		}
-		return m, m.beginFetch()
+		cmd := m.beginFetch()
+		return m, cmd
 	case openedMsg:
 		if msg.err != nil && !errors.Is(msg.err, context.Canceled) {
-			return m, m.setFlash("could not open the browser", flashFor)
+			cmd := m.setFlash("could not open the browser", flashFor)
+			return m, cmd
 		}
 	case redrawMsg:
 		// Nothing to change: Bubble Tea redraws after every Update, which
@@ -302,12 +309,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.lastOK.IsZero() {
 				// Data has been shown: keep the rows and the state, undimmed.
 				m.failedAt = m.now()
-				return m, tea.Batch(m.schedule(msg.err), m.startWarning())
+				cmd := tea.Batch(m.schedule(msg.err), m.startWarning())
+				return m, cmd
 			}
 			// No data yet: the error panel, and the tick retries on its own.
 			m.cursor, m.offset = 0, 0
 			m.state = stateError
-			return m, tea.Batch(m.schedule(msg.err), m.startWarning())
+			cmd := tea.Batch(m.schedule(msg.err), m.startWarning())
+			return m, cmd
 		}
 		m.err = nil
 		m.failedAt = time.Time{}
@@ -319,7 +328,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.state = stateList
 		}
-		return m, tea.Batch(m.schedule(nil), m.startWarning())
+		cmd := tea.Batch(m.schedule(nil), m.startWarning())
+		return m, cmd
 	}
 	return m, nil
 }
