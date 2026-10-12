@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -206,5 +207,132 @@ func TestMapperCleansRemoteStrings(t *testing.T) {
 				t.Errorf("mapped string %q has a %s", s, why)
 			}
 		}
+	}
+}
+
+func refs(snap domain.Snapshot) []string {
+	var out []string
+	for _, pr := range snap.PRs {
+		out = append(out, pr.Ref.String())
+	}
+	return out
+}
+
+// TestMembership: authored and assigned PRs interleave by the display order
+// only; duplicates, Issue nodes, null nodes and out-of-window PRs are handled.
+func TestMembership(t *testing.T) {
+	c, _ := newFixtureClient(t, "search_page1.json", "search_page2.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"acme/web#77", "acme/api#481", "deps/bot#1", "acme/a#9", "acme/a#10", "acme/b#10",
+		"acme/old#3", "acme/one#7", "acme/api#500", "acme/two#7", "acme/api#503",
+	}
+	if got := refs(snap); !slices.Equal(got, want) {
+		t.Errorf("refs =\n%v\nwant\n%v", got, want)
+	}
+	if snap.Viewer != "octo" {
+		t.Errorf("Viewer = %q, want octo", snap.Viewer)
+	}
+	byRef := map[string]domain.PR{}
+	for _, pr := range snap.PRs {
+		byRef[pr.Ref.String()] = pr
+	}
+	if got := byRef["acme/web#77"].Author; got != "hubot" {
+		t.Errorf("assigned PR author = %q, want hubot", got)
+	}
+	if pr := byRef["acme/old#3"]; pr.Author != "ghost" || pr.Title != "" {
+		t.Errorf("acme/old#3 author/title = %q/%q, want ghost and empty", pr.Author, pr.Title)
+	}
+	if got := byRef["deps/bot#1"].Author; got != "dependabot" {
+		t.Errorf("deps/bot#1 author = %q, want dependabot", got)
+	}
+	// Same number in two repositories gives two rows.
+	if _, ok := byRef["acme/one#7"]; !ok {
+		t.Error("acme/one#7 missing")
+	}
+	if _, ok := byRef["acme/two#7"]; !ok {
+		t.Error("acme/two#7 missing")
+	}
+	// The duplicate PR_B (page 1 and page 2) appears once.
+	n := 0
+	for _, pr := range snap.PRs {
+		if pr.ID == "PR_B" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("PR_B appears %d times, want 1", n)
+	}
+	for _, dropped := range []string{"acme/api#501", "acme/api#502"} {
+		if _, ok := byRef[dropped]; ok {
+			t.Errorf("%s is outside the window and must be dropped", dropped)
+		}
+	}
+	if pr := byRef["acme/api#503"]; pr.State != domain.StateUnknown {
+		t.Errorf("acme/api#503 state = %v, want unknown", pr.State)
+	}
+	if snap.Truncated {
+		t.Error("two pages ending in hasNextPage false must not be truncated")
+	}
+}
+
+func TestPagination(t *testing.T) {
+	c, tr := newFixtureClient(t, "search_page1.json", "search_page2.json")
+	if _, err := c.Fetch(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(tr.bodies) != 2 {
+		t.Fatalf("requests = %d, want 2", len(tr.bodies))
+	}
+	after := func(i int) any {
+		var payload struct {
+			Variables map[string]any `json:"variables"`
+		}
+		if err := json.Unmarshal(tr.bodies[i], &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload.Variables["after"]
+	}
+	if got := after(0); got != nil {
+		t.Errorf("first request after = %v, want none", got)
+	}
+	if got := after(1); got != "CUR1" {
+		t.Errorf("second request after = %v, want CUR1", got)
+	}
+}
+
+// TestTruncatedAfterFivePages is the accepted 500-result cap: a transport that
+// always says another page exists gets exactly five requests, and the snapshot
+// says it is truncated.
+func TestTruncatedAfterFivePages(t *testing.T) {
+	files := []string{"search_page1.json", "search_page1.json", "search_page1.json", "search_page1.json", "search_page1.json"}
+	c, tr := newFixtureClient(t, files...)
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.calls != 5 || len(tr.bodies) != 5 {
+		t.Errorf("requests = %d, want exactly 5", len(tr.bodies))
+	}
+	if !snap.Truncated {
+		t.Error("Truncated = false, want true after five pages with more remaining")
+	}
+}
+
+func TestRateLimitDecoded(t *testing.T) {
+	c, _ := newFixtureClient(t, "search_page1.json", "search_page2.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rl := snap.RateLimit
+	if rl.Cost != 2 || rl.Remaining != 4989 {
+		t.Errorf("RateLimit cost/remaining = %d/%d, want 2/4989", rl.Cost, rl.Remaining)
+	}
+	if want := time.Date(2026, 10, 11, 13, 0, 0, 0, time.UTC); !rl.ResetAt.Equal(want) {
+		t.Errorf("ResetAt = %v, want %v", rl.ResetAt, want)
 	}
 }

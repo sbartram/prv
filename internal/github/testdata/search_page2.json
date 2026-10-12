@@ -1,0 +1,159 @@
+{
+ "data": {
+  "viewer": {
+   "login": "octo"
+  },
+  "rateLimit": {
+   "cost": 1,
+   "remaining": 4989,
+   "resetAt": "2026-10-11T13:00:00Z"
+  },
+  "search": {
+   "issueCount": 14,
+   "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": "CUR2"
+   },
+   "nodes": [
+    {
+     "__typename": "PullRequest",
+     "id": "PR_B",
+     "number": 77,
+     "title": "PR_B title",
+     "url": "https://github.com/acme/web/pull/77",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-11T11:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/web"
+     },
+     "author": {
+      "login": "hubot"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_EDGE_IN",
+     "number": 500,
+     "title": "PR_EDGE_IN title",
+     "url": "https://github.com/acme/api/pull/500",
+     "isDraft": false,
+     "state": "MERGED",
+     "closedAt": "2026-09-27T12:00:00Z",
+     "mergedAt": "2026-09-27T12:00:00Z",
+     "updatedAt": "2026-09-28T00:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/api"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_EDGE_OUT",
+     "number": 501,
+     "title": "PR_EDGE_OUT title",
+     "url": "https://github.com/acme/api/pull/501",
+     "isDraft": false,
+     "state": "CLOSED",
+     "closedAt": "2026-09-27T11:59:59Z",
+     "mergedAt": null,
+     "updatedAt": "2026-09-28T00:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/api"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_OLD",
+     "number": 502,
+     "title": "PR_OLD title",
+     "url": "https://github.com/acme/api/pull/502",
+     "isDraft": false,
+     "state": "MERGED",
+     "closedAt": "2026-09-20T00:00:00Z",
+     "mergedAt": "2026-09-20T00:00:00Z",
+     "updatedAt": "2026-09-20T00:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/api"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_U",
+     "number": 503,
+     "title": "PR_U title",
+     "url": "https://github.com/acme/api/pull/503",
+     "isDraft": false,
+     "state": "LOCKED",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-09-01T00:00:00Z",
+     "repository": {
+      "nameWithOwner": "acme/api"
+     },
+     "author": {
+      "login": "octo"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    },
+    {
+     "__typename": "PullRequest",
+     "id": "PR_BOT",
+     "number": 1,
+     "title": "PR_BOT title",
+     "url": "https://github.com/deps/bot/pull/1",
+     "isDraft": false,
+     "state": "OPEN",
+     "closedAt": null,
+     "mergedAt": null,
+     "updatedAt": "2026-10-10T00:00:00Z",
+     "repository": {
+      "nameWithOwner": "deps/bot"
+     },
+     "author": {
+      "login": "dependabot"
+     },
+     "reviewDecision": null,
+     "latestOpinionatedReviews": {
+      "nodes": []
+     },
+     "statusCheckRollup": null
+    }
+   ]
+  }
+ }
+}
