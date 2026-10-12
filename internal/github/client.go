@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -128,14 +129,54 @@ type wireNode struct {
 	StatusCheckRollup *struct{ State string }
 }
 
-// Fetch runs the discovery query and maps the result.
+// maxPages caps discovery at 5 pages of 100 results (cost 1 each). When more
+// remain, the snapshot is marked Truncated so the list is never shown as
+// complete.
+const maxPages = 5
+
+// Fetch runs the discovery query page by page, de-duplicates by node id, keeps
+// the PRs inside the closed window and orders them for display.
 func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
-	vars := map[string]any{"q": BuildSearch(c.now(), c.closedDays)}
-	var resp wireResp
-	if err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp); err != nil {
-		return domain.Snapshot{}, fmt.Errorf("fetching PRs: %w", err)
+	now := c.now() // one instant for every page and the window filter
+	vars := map[string]any{"q": BuildSearch(now, c.closedDays)}
+
+	var snap domain.Snapshot
+	seen := map[string]bool{}
+	for page := 1; page <= maxPages; page++ {
+		var resp wireResp
+		if err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp); err != nil {
+			return domain.Snapshot{}, fmt.Errorf("fetching PRs: %w", err)
+		}
+		pageSnap := mapResponse(resp)
+		if page == 1 {
+			snap.Viewer = pageSnap.Viewer
+		}
+		for _, pr := range pageSnap.PRs {
+			if seen[pr.ID] {
+				continue
+			}
+			seen[pr.ID] = true
+			snap.PRs = append(snap.PRs, pr)
+		}
+		snap.RateLimit.Cost += pageSnap.RateLimit.Cost
+		snap.RateLimit.Remaining = pageSnap.RateLimit.Remaining
+		snap.RateLimit.ResetAt = pageSnap.RateLimit.ResetAt
+
+		if !resp.Search.PageInfo.HasNextPage {
+			break
+		}
+		if page == maxPages {
+			snap.Truncated = true
+			break
+		}
+		vars["after"] = resp.Search.PageInfo.EndCursor
 	}
-	return mapResponse(resp), nil
+
+	snap.PRs = slices.DeleteFunc(snap.PRs, func(pr domain.PR) bool {
+		return !domain.InWindow(pr, now, c.closedDays)
+	})
+	domain.Sort(snap.PRs)
+	return snap, nil
 }
 
 func mapResponse(resp wireResp) domain.Snapshot {
