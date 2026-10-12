@@ -115,6 +115,22 @@ func TestHelpContent(t *testing.T) {
 		}
 	}
 
+	t.Run("checks legend and the expand key", func(t *testing.T) {
+		var legend string
+		for _, l := range strings.Split(v, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(l), "checks") {
+				legend = l
+			}
+		}
+		for _, want := range []string{"✗ failing", "⊘ cancelled", "● running", "✓ passing", "– skipped"} {
+			if !strings.Contains(legend, want) {
+				t.Errorf("checks legend %q missing %q", legend, want)
+			}
+		}
+		if !strings.Contains(v, "e expand") {
+			t.Errorf("overlay missing 'e expand':\n%s", v)
+		}
+	})
 	t.Run("limit not known", func(t *testing.T) {
 		snap := fixtureThirty()
 		snap.RateLimit = domain.RateLimit{}

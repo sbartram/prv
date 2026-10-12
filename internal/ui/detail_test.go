@@ -152,7 +152,8 @@ func TestDetailEnterOnlyOnRows(t *testing.T) {
 }
 
 func TestDetailRender(t *testing.T) {
-	m := openDetailOn(t, detailModel(t, newDetailFake(fixtureDetail()), Options{}, 120, 40))
+	// Expanded, so that the passing and skipped checks are listed too.
+	m := press(openDetailOn(t, detailModel(t, newDetailFake(fixtureDetail()), Options{}, 120, 40)), "e")
 	v := plain(m)
 	order := []string{
 		"prv · acme/api#102 · updated 14:32:05",
@@ -441,5 +442,129 @@ func TestDetailEmpty(t *testing.T) {
 		if !strings.Contains(v, want) {
 			t.Errorf("view missing %q:\n%s", want, v)
 		}
+	}
+}
+
+// bigDetail is a detail with 2 failing, 1 cancelled, 1 running, 10 passing and
+// 2 skipped checks, and the reviewers of fixtureDetail.
+func bigDetail() domain.Detail {
+	var checks []domain.Check
+	add := func(state domain.CheckState, word string, names ...string) {
+		for _, n := range names {
+			checks = append(checks, domain.Check{Name: n, Source: "ci.yml", State: state, Word: word})
+		}
+	}
+	add(domain.CheckFailing, "failure", "fail-a", "fail-b")
+	add(domain.CheckCancelled, "cancelled", "cancel-a")
+	add(domain.CheckRunning, "running", "run-a")
+	add(domain.CheckPassing, "success", "pass-01", "pass-02", "pass-03", "pass-04", "pass-05",
+		"pass-06", "pass-07", "pass-08", "pass-09", "pass-10")
+	add(domain.CheckNeutral, "skipped", "skip-a", "skip-b")
+	domain.SortChecks(checks)
+	d := fixtureDetail()
+	d.Checks, d.Counts, d.Read, d.Total = checks, domain.CountChecks(checks), len(checks), len(checks)
+	return d
+}
+
+func TestDetailFold(t *testing.T) {
+	const fold = "… +12 more passing"
+	always := []string{"fail-a", "fail-b", "cancel-a", "run-a"}
+	folded := []string{"pass-01", "pass-05", "pass-10", "skip-a", "skip-b"}
+	open := func(d domain.Detail) tea.Model {
+		return runDetailOpen(t, detailModel(t, newDetailFake(d), Options{}, 120, 40))
+	}
+
+	m := open(bigDetail())
+	v := plain(m)
+	for _, want := range always {
+		if !strings.Contains(v, want) {
+			t.Errorf("collapsed view missing %q:\n%s", want, v)
+		}
+	}
+	for _, not := range folded {
+		if strings.Contains(v, not) {
+			t.Errorf("collapsed view lists %q:\n%s", not, v)
+		}
+	}
+	if i, j, k := strings.Index(v, "run-a"), strings.Index(v, fold), strings.Index(v, "REVIEWERS"); !(i < j && j < k) {
+		t.Errorf("the fold line should sit after the last listed check and before REVIEWERS:\n%s", v)
+	}
+	if !strings.Contains(v, "2 failing · 1 cancelled · 1 running · 10 passing · 2 skipped") {
+		t.Errorf("the summary should count every check even when folded:\n%s", v)
+	}
+
+	m = press(m, "e")
+	v = plain(m)
+	for _, want := range append(always, folded...) {
+		if !strings.Contains(v, want) {
+			t.Errorf("expanded view missing %q:\n%s", want, v)
+		}
+	}
+	if strings.Contains(v, "more passing") {
+		t.Errorf("expanded view still has the fold line:\n%s", v)
+	}
+
+	m = press(m, "e")
+	if v := plain(m); !strings.Contains(v, fold) || strings.Contains(v, "pass-01") {
+		t.Errorf("the second e should collapse again:\n%s", v)
+	}
+
+	t.Run("failing, cancelled and running checks are never folded", func(t *testing.T) {
+		d := bigDetail()
+		d.Checks = d.Checks[:4]
+		if v := plain(open(d)); strings.Contains(v, "more passing") {
+			t.Errorf("a fold line with nothing folded:\n%s", v)
+		}
+	})
+	t.Run("an unknown check folds too", func(t *testing.T) {
+		d := fixtureDetail()
+		d.Checks = append(d.Checks, domain.Check{Name: "mystery", State: domain.CheckOther, Word: "unknown"})
+		v := plain(open(d))
+		if strings.Contains(v, "mystery") || !strings.Contains(v, "… +5 more passing") {
+			t.Errorf("unknown check not folded:\n%s", v)
+		}
+	})
+	t.Run("e scrolls back into range", func(t *testing.T) {
+		m := detailModel(t, newDetailFake(bigDetail()), Options{}, 80, 10)
+		m = press(runDetailOpen(t, m), "e")
+		m = press(m, "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j", "j")
+		if mm := m.(Model); mm.detail.vp.YOffset() == 0 {
+			t.Fatal("the expanded detail did not scroll")
+		}
+		m = press(m, "e")
+		if got := plain(m); !strings.Contains(got, "esc back") {
+			t.Errorf("collapsing broke the view:\n%s", got)
+		}
+	})
+}
+
+func TestDetailTruncatedSummary(t *testing.T) {
+	d := fixtureDetail()
+	d.Counts = domain.CheckCounts{Failing: 2, Running: 1, Passing: 280, Neutral: 3}
+	d.Truncated, d.Read, d.Total = true, 500, 731
+	v := plain(runDetailOpen(t, detailModel(t, newDetailFake(d), Options{}, 120, 40)))
+	if want := "CHECKS  2 failing · 1 running · 280 passing · 3 skipped · read 500 of 731 runs"; !strings.Contains(v, want) {
+		t.Errorf("view missing %q:\n%s", want, v)
+	}
+	d.Truncated = false
+	if v := plain(runDetailOpen(t, detailModel(t, newDetailFake(d), Options{}, 120, 40))); strings.Contains(v, "read ") {
+		t.Errorf("a complete read says how much was read:\n%s", v)
+	}
+}
+
+func TestDetailFooterHints(t *testing.T) {
+	m := runDetailOpen(t, detailModel(t, newDetailFake(fixtureDetail()), Options{}, 120, 40))
+	ls := strings.Split(plain(m), "\n")
+	last := ls[len(ls)-1]
+	at := 0
+	for _, want := range []string{"esc back", "o open", "r refresh", "j/k scroll", "e expand", "? help", "q quit"} {
+		i := strings.Index(last[at:], want)
+		if i < 0 {
+			t.Fatalf("footer %q missing %q in order", last, want)
+		}
+		at += i + len(want)
+	}
+	if strings.Contains(last, "enter") || strings.Contains(last, "PR #") {
+		t.Errorf("footer %q holds list hints", last)
 	}
 }
