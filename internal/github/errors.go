@@ -56,7 +56,28 @@ func (e *Error) Hint() string {
 	return "Press r to retry. If this keeps happening, run `gh auth status`."
 }
 
-var _ interface{ Hint() string } = (*Error)(nil)
+// Short names the failure in one or two words for the header (D-07). The text
+// is fixed per kind: it never holds the API message or the token.
+func (e *Error) Short() string {
+	switch e.Kind {
+	case KindAuth:
+		return "auth"
+	case KindForbidden:
+		return "forbidden"
+	case KindServer:
+		return "server"
+	case KindNetwork:
+		return "network"
+	case KindGraphQL:
+		return "GitHub error"
+	}
+	return "error"
+}
+
+var (
+	_ interface{ Hint() string }  = (*Error)(nil)
+	_ interface{ Short() string } = (*Error)(nil)
+)
 
 // classify turns a failed request into an *Error. A canceled context is
 // returned unchanged: it means prv is quitting. A 401 is never retried with

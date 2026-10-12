@@ -14,6 +14,9 @@ var (
 	headerStyle   = lipgloss.NewStyle().Bold(true)
 	selectedStyle = lipgloss.NewStyle().Reverse(true)
 	faintStyle    = lipgloss.NewStyle().Faint(true)
+	// warnStyle marks a failed refresh in the header (D-07). The glyph and the
+	// words keep it readable without colour.
+	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
 )
 
 // reviewStyle colours the REVIEW badge.

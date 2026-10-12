@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -56,6 +57,80 @@ func (m Model) wrap(s string) string {
 // It is declared here so that ui never imports internal/github.
 type hinter interface{ Hint() string }
 
+// shorter is implemented by errors that name themselves in a word or two for
+// the header (D-07). Declared here for the same reason as hinter.
+type shorter interface{ Short() string }
+
+// segment is one piece of the header line. A higher prio survives longer when
+// the pane is too narrow for the whole line.
+type segment struct {
+	text string
+	prio int
+}
+
+// fit joins segs with sep. While the line is wider than width it drops the
+// segment with the lowest prio (the leftmost on a tie). When one segment is
+// left and still too wide it is cut with an ellipsis. A width of 0 or less
+// (not sized yet) keeps everything.
+func fit(segs []segment, sep string, width int) string {
+	segs = slices.Clone(segs)
+	join := func() string {
+		texts := make([]string, len(segs))
+		for i, s := range segs {
+			texts[i] = s.text
+		}
+		return strings.Join(texts, sep)
+	}
+	if width <= 0 {
+		return join()
+	}
+	for lipgloss.Width(join()) > width && len(segs) > 1 {
+		lowest := 0
+		for i, s := range segs {
+			if s.prio < segs[lowest].prio {
+				lowest = i
+			}
+		}
+		segs = slices.Delete(segs, lowest, lowest+1)
+	}
+	line := join()
+	if lipgloss.Width(line) > width {
+		return ansi.Truncate(line, width, "…")
+	}
+	return line
+}
+
+// header builds the first line of the list view. Prio 3 and 6 are left free:
+// the filter segment (plan 02-08) takes 3 and the rate warning (plan 02-05) 6.
+func (m Model) header() string {
+	segs := []segment{
+		{"prv", 1},
+		{"@" + m.snap.Viewer, 2},
+		{strconv.Itoa(len(m.rows)) + " PRs", 4},
+	}
+	if !m.lastOK.IsZero() {
+		// Clock times, not "5s ago": nothing redraws once a second (D-05).
+		text, prio := "updated "+m.clock(m.lastOK, "15:04:05"), 5
+		if m.err != nil {
+			// A failed refresh keeps the rows, so the header must say that
+			// they are older than they look (D-07).
+			reason := "error"
+			var sh shorter
+			if errors.As(m.err, &sh) {
+				reason = sh.Short()
+			}
+			text = warnStyle.Render("✗ refresh failed " + m.clock(m.failedAt, "15:04") +
+				" (" + reason + ") · data from " + m.clock(m.lastOK, "15:04:05"))
+			prio = 7
+		}
+		if m.inFlight {
+			text += " " + m.spin.View()
+		}
+		segs = append(segs, segment{text, prio})
+	}
+	return fit(segs, " · ", m.w)
+}
+
 func (m Model) renderError() string {
 	var b strings.Builder
 	b.WriteString("Could not load your PRs\n\n")
@@ -65,6 +140,12 @@ func (m Model) renderError() string {
 		if hint := h.Hint(); hint != "" {
 			b.WriteString("\n\n" + hint)
 		}
+	}
+	// D-09: the panel says when the automatic retry comes.
+	if m.inFlight {
+		b.WriteString("\n\nretrying now… " + m.spin.View())
+	} else if !m.nextAt.IsZero() {
+		b.WriteString("\n\nretrying at " + m.clock(m.nextAt, "15:04"))
 	}
 	b.WriteString("\n\nr retry · q quit")
 	return b.String()
@@ -153,15 +234,7 @@ func (m Model) renderList() string {
 		footer += " · some data could not be loaded"
 	}
 
-	header := "prv · @" + m.snap.Viewer + " · " + strconv.Itoa(len(m.rows)) + " PRs"
-	if !m.lastOK.IsZero() {
-		// A clock time, not "5s ago": nothing redraws once a second (D-05).
-		header += " · updated " + m.clock(m.lastOK, "15:04:05")
-		if m.inFlight {
-			header += " " + m.spin.View()
-		}
-	}
-	lines := []string{header}
+	lines := []string{m.header()}
 	lines = append(lines, strings.Split(t.String(), "\n")...)
 	lines = append(lines, footer)
 	for i, l := range lines {

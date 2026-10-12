@@ -466,11 +466,13 @@ func TestUpdatedOnlyOnSuccess(t *testing.T) {
 	f.err = errors.New("boom")
 	clk.t = t1.Add(time.Minute)
 	refresh()
-	if h := headerOf(m); !strings.Contains(h, "updated 14:32:05") {
-		t.Errorf("after a failure the header = %q, want 'updated 14:32:05'", h)
+	// The updated time never advances; the D-07 marker says the data is from
+	// the last good fetch instead of claiming "updated".
+	if h := headerOf(m); !strings.Contains(h, "data from 14:32:05") || strings.Contains(h, "updated") {
+		t.Errorf("after a failure the header = %q, want 'data from 14:32:05' and no 'updated'", h)
 	}
-	if got := plain(m); got != first {
-		t.Errorf("a failed refresh changed the screen:\n%s", got)
+	if got, want := strings.SplitN(plain(m), "\n", 2)[1], strings.SplitN(first, "\n", 2)[1]; got != want {
+		t.Errorf("a failed refresh changed the rows:\n%s", got)
 	}
 
 	// Two successes with identical data differ only in the updated time.

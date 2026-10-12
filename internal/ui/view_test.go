@@ -530,10 +530,10 @@ func TestFitDropsLowestPriorityFirst(t *testing.T) {
 		{0, "aaaa|bbbb|cccc|dddd"},
 		{19, "aaaa|bbbb|cccc|dddd"},
 		{18, "bbbb|cccc|dddd"},
-		{13, "bbbb|cccc|dddd"},
-		{12, "bbbb|dddd"},
-		{8, "bbbb|dddd"},
-		{7, "dddd"},
+		{14, "bbbb|cccc|dddd"},
+		{13, "bbbb|dddd"},
+		{9, "bbbb|dddd"},
+		{8, "dddd"},
 		{3, "dd…"},
 	}
 	for _, tt := range tests {
