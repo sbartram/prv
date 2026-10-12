@@ -203,9 +203,14 @@ func TestCleanAtSeam(t *testing.T) {
 	if !strings.Contains(pr.Title, "title x") {
 		t.Errorf("Title = %q, want the tab turned into a space", pr.Title)
 	}
+	if got := reviewerNames(pr); !slices.Equal(got, []string{"requser", "reviewer"}) &&
+		!slices.Equal(got, []string{"req^[[2Juser", "rev^[[31miewer"}) {
+		t.Errorf("PR 18 reviewer names = %q, want the two hostile logins with controls removed", got)
+	}
 	all := []string{snap.Viewer}
 	for _, p := range snap.PRs {
 		all = append(all, p.Title, p.Author, p.Ref.Repo)
+		all = append(all, reviewerNames(p)...)
 	}
 	for _, s := range all {
 		if why := noUnsafe(s); why != "" {
@@ -246,13 +251,25 @@ func TestMapperCleansRemoteStrings(t *testing.T) {
 	if pr.Ref.Repo != "acme/repo" {
 		t.Errorf("Repo = %q, want %q", pr.Ref.Repo, "acme/repo")
 	}
+	if got := reviewerNames(pr); !slices.Equal(got, []string{"requser", "reviewer"}) {
+		t.Errorf("Reviewer names = %q, want [requser reviewer]", got)
+	}
 	for _, p := range snap.PRs {
-		for _, s := range []string{p.Title, p.Author, p.Ref.Repo} {
+		for _, s := range append([]string{p.Title, p.Author, p.Ref.Repo}, reviewerNames(p)...) {
 			if why := noUnsafe(s); why != "" {
 				t.Errorf("mapped string %q has a %s", s, why)
 			}
 		}
 	}
+}
+
+// reviewerNames returns the names of a PR's reviewers, in order.
+func reviewerNames(pr domain.PR) []string {
+	var out []string
+	for _, r := range pr.Reviewers {
+		out = append(out, r.Name)
+	}
+	return out
 }
 
 func refs(snap domain.Snapshot) []string {
@@ -448,6 +465,39 @@ func TestMergeMapping(t *testing.T) {
 	}
 	for _, field := range []string{"mergeStateStatus mergeable"} {
 		if !strings.Contains(string(tr.bodies[0]), field) {
+			t.Errorf("the discovery query must request %q", field)
+		}
+	}
+}
+
+// TestReviewerMapping: Fetch merges latestOpinionatedReviews and reviewRequests
+// into D-06 order, pending wins over an old review, and a null requested
+// reviewer is a hidden pending reviewer, never dropped.
+func TestReviewerMapping(t *testing.T) {
+	c, tr := newFixtureClient(t, "blockers.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending := func(n string) domain.Reviewer { return domain.Reviewer{Name: n} }
+	hidden := domain.Reviewer{Kind: domain.ReviewerHidden}
+	want := map[int][]domain.Reviewer{
+		1: {pending("carol"), {Name: "alice", State: domain.ReviewerApproved}},
+		2: {{Name: "bob", State: domain.ReviewerChangesRequested}, pending("alice")},
+		3: {{Name: "acme/core", Kind: domain.ReviewerTeam}, hidden, hidden},
+		4: {pending("renovate")},
+		5: nil,
+		6: {pending("old-user"), {Name: "ent/reviewers", Kind: domain.ReviewerTeam}},
+		7: {{Name: "octo", State: domain.ReviewerApproved}},
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Reviewers; !slices.Equal(got, want[pr.Ref.Number]) {
+			t.Errorf("PR %d Reviewers =\n%v\nwant\n%v", pr.Ref.Number, got, want[pr.Ref.Number])
+		}
+	}
+	body := string(tr.bodies[0])
+	for _, field := range []string{"reviewRequests(first: 20)", "combinedSlug", "requestedReviewer", "__typename"} {
+		if !strings.Contains(body, field) {
 			t.Errorf("the discovery query must request %q", field)
 		}
 	}

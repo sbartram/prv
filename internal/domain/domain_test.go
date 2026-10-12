@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -402,7 +403,7 @@ func TestVisible(t *testing.T) {
 	t.Run("input is not modified", func(t *testing.T) {
 		in := slices.Clone(states)
 		_ = Visible(in, 0, "9")
-		if !slices.Equal(in, states) {
+		if !slices.EqualFunc(in, states, func(a, b PR) bool { return reflect.DeepEqual(a, b) }) {
 			t.Error("Visible changed its input")
 		}
 	})

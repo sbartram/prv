@@ -97,6 +97,8 @@ type PR struct {
 	Failing FailingCheck
 	// Merge is the merge-readiness (LIST-06); the zero value is a blank cell.
 	Merge Merge
+	// Reviewers are the people and teams on the PR in D-06 order (LIST-04).
+	Reviewers []Reviewer
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

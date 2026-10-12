@@ -495,9 +495,26 @@
      },
      "reviewDecision": null,
      "latestOpinionatedReviews": {
-      "nodes": []
+      "nodes": [
+       {
+        "state": "APPROVED",
+        "author": {
+         "login": "rev\u001b[31m\u202eiewer"
+        }
+       }
+      ]
      },
-     "statusCheckRollup": null
+     "statusCheckRollup": null,
+     "reviewRequests": {
+      "nodes": [
+       {
+        "requestedReviewer": {
+         "__typename": "User",
+         "login": "req\u001b[2Juser"
+        }
+       }
+      ]
+     }
     },
     {
      "__typename": "PullRequest",
