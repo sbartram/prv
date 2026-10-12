@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Monitoring
 status: executing
-stopped_at: Completed 02-07-PLAN.md
-last_updated: "2026-10-12T16:03:36.921Z"
+stopped_at: Completed 02-08-PLAN.md
+last_updated: "2026-10-12T16:09:09.817Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 02 execution started
-state_head: 451308f3864d9f80d954d918e63054280db70a97
+state_head: 3ac48d762b20c972c037930291b6c1b97e43c2d5
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 25
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 02 (Live Monitoring) — EXECUTING
-Plan: 8 of 10
+Plan: 9 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 02 execution started
 
@@ -67,6 +67,7 @@ Progress: [███░░░░░░░] 25%
 | Phase 02 P05 | 4 min | 2 tasks | 10 files |
 | Phase 02 P06 | 6 min | 2 tasks | 7 files |
 | Phase 02 P07 | 8 min | 2 tasks | 5 files |
+| Phase 02 P08 | 14min | 2 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-06: NextDelay is pure in domain (clock passed in); ui reads Backoff() through its own backoffer interface, so 02-07 adds the method to *github.Error without ui importing it
 - [Phase 02]: 02-07: a rate limit on any discovery page returns an empty snapshot and the error (previous data stays, model pauses); other later-page errors still truncate
 - [Phase 02]: 02-07: rate limit decided from captured headers first, RATE_LIMITED error type second, never message text; Retry-After saturates at 2^31 s
+- [Phase 02]: 02-08: unknown-state PRs are never hidden by 1/2/3; the number prompt opens only on the list screen and its keys are handled before the list keys
+- [Phase 02]: 02-08: rows = domain.Visible(snap.PRs, show, numFilter) in rebuild(); bottom() is the prompt while open, else the footer, so the prompt costs no list row
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T16:03:36.892Z
-Stopped at: Completed 02-07-PLAN.md
+Last session: 2026-10-12T16:09:09.787Z
+Stopped at: Completed 02-08-PLAN.md
 Resume file: None

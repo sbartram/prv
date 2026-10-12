@@ -31,9 +31,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Filtering
 
-- [ ] **FILT-01**: User can toggle Open / Merged / Closed visibility in any combination
+- [x] **FILT-01**: User can toggle Open / Merged / Closed visibility in any combination
 - [ ] **FILT-02**: Auto-found PRs that are merged or closed only show if they closed within a configurable window (default 14 days)
-- [ ] **FILT-03**: User can type a PR number to narrow the list to matching PRs
+- [x] **FILT-03**: User can type a PR number to narrow the list to matching PRs
 
 ### Detail view
 
@@ -138,9 +138,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-07 | Phase 3 | Pending |
 | LIST-08 | Phase 2 | Complete |
 | LIST-09 | Phase 4 | Pending |
-| FILT-01 | Phase 2 | Pending |
+| FILT-01 | Phase 2 | Complete |
 | FILT-02 | Phase 2 | Pending |
-| FILT-03 | Phase 2 | Pending |
+| FILT-03 | Phase 2 | Complete |
 | DETL-01 | Phase 3 | Pending |
 | DETL-02 | Phase 3 | Pending |
 | DETL-03 | Phase 3 | Pending |
