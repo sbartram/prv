@@ -43,6 +43,15 @@ func fetch(ctx context.Context, f Fetcher, gen int) tea.Cmd {
 	}
 }
 
+// detailMsg is the result of one detail fetch, stamped with the sequence number
+// and the PR it was started for.
+type detailMsg struct {
+	seq  int
+	ref  domain.Ref
+	data domain.Detail
+	err  error
+}
+
 // afterTick returns a Cmd that delivers msg after d. It uses tea.Tick, whose
 // timer starts when the Cmd is created, not a wall-clock-aligned tick.
 func afterTick(d time.Duration, msg tea.Msg) tea.Cmd {

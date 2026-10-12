@@ -21,6 +21,14 @@ type Fetcher interface {
 	Fetch(ctx context.Context) (domain.Snapshot, error)
 }
 
+// DetailFetcher loads the detail of one pull request: every check and every
+// reviewer. It is optional: the model type-asserts its Fetcher, and a Fetcher
+// without the method shows "details not available" in the detail view.
+// *github.Client implements it.
+type DetailFetcher interface {
+	FetchDetail(ctx context.Context, id string) (domain.Detail, error)
+}
+
 // defaultInterval is the refresh interval when Options.Interval is zero. The
 // 15 s floor is the config package's job, so tests can use short intervals.
 const defaultInterval = 60 * time.Second
@@ -111,6 +119,13 @@ type Model struct {
 	pausedUntil time.Time
 	flash       string
 	flashUntil  time.Time
+
+	// The detail view (DETL-01) replaces the list while detail.open. Its data
+	// comes from its own sequenced fetch: detailSeq is bumped for every start
+	// and every close, so a result that arrives late is dropped.
+	detail         detailState
+	detailSeq      int
+	detailInFlight bool
 
 	// Config warnings (D-15) have their own fields and footer segment, so a
 	// flash never overwrites them and they never hide a flash. warnUntil is
