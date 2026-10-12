@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -101,7 +102,7 @@ func TestClassify(t *testing.T) {
 	}{
 		{"401", statusTransport(401, "Bad credentials"), context.Background(), KindAuth, 401, []string{"gh auth login", "GH_TOKEN", "GITHUB_TOKEN"}},
 		{"403", statusTransport(403, "Forbidden"), context.Background(), KindForbidden, 403, []string{"rate limit", "SSO"}},
-		{"429", statusTransport(429, "Too many requests"), context.Background(), KindForbidden, 429, []string{"rate limit", "SSO"}},
+		{"429", statusTransport(429, "Too many requests"), context.Background(), KindRateLimited, 429, []string{"rate limit", "resumes on its own"}},
 		{"500", statusTransport(500, "Server Error"), context.Background(), KindServer, 500, []string{"GitHub is having problems"}},
 		{"502", statusTransport(502, "Bad Gateway"), context.Background(), KindServer, 502, []string{"GitHub is having problems"}},
 		{"404", statusTransport(404, "Not Found"), context.Background(), KindUnknown, 404, []string{"gh auth status"}},
@@ -232,13 +233,15 @@ func TestTokenNeverAppears(t *testing.T) {
 	partial := withErrors(t, "search_page2.json", `[{"message":"partial failure"}]`)
 	second := 0
 	scenarios := map[string]http.RoundTripper{
-		"401":   statusTransport(401, "Bad credentials"),
-		"403":   statusTransport(403, "Forbidden"),
-		"429":   statusTransport(429, "Too many requests"),
-		"500":   statusTransport(500, "Server Error"),
-		"404":   statusTransport(404, "Not Found"),
-		"leaky": leaky,
-		"dns":   rtFunc(func(*http.Request) (*http.Response, error) { return nil, &net.DNSError{Err: "no such host"} }),
+		"401":              statusTransport(401, "Bad credentials"),
+		"403":              statusTransport(403, "Forbidden"),
+		"429":              statusTransport(429, "Too many requests"),
+		"200 rate limited": headerTransport(200, rateLimitedBody, http.Header{"X-Ratelimit-Remaining": {"0"}, "X-Ratelimit-Reset": {"1791721800"}}),
+		"403 retry-after":  headerTransport(403, `{"message":"secondary rate limit"}`, http.Header{"Retry-After": {"120"}}),
+		"500":              statusTransport(500, "Server Error"),
+		"404":              statusTransport(404, "Not Found"),
+		"leaky":            leaky,
+		"dns":              rtFunc(func(*http.Request) (*http.Response, error) { return nil, &net.DNSError{Err: "no such host"} }),
 		"graphql none": rtFunc(func(req *http.Request) (*http.Response, error) {
 			return jsonResp(req, 200, []byte(`{"data":null,"errors":[{"message":"boom"}]}`)), nil
 		}),
@@ -279,6 +282,7 @@ func TestShortReason(t *testing.T) {
 		{KindNetwork, "network"},
 		{KindGraphQL, "GitHub error"},
 		{KindUnknown, "error"},
+		{KindRateLimited, "rate limit"},
 	}
 	for _, tt := range tests {
 		e := &Error{Kind: tt.kind, Status: 401, Message: "HTTP 401: " + secretToken}
@@ -289,5 +293,136 @@ func TestShortReason(t *testing.T) {
 		if strings.Contains(got, secretToken) || strings.Contains(got, "HTTP") {
 			t.Errorf("Short() for kind %d leaks the message: %q", tt.kind, got)
 		}
+	}
+}
+
+const rateLimitedBody = `{"data":null,"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`
+
+// headerTransport answers every request with the given status, body and headers.
+func headerTransport(status int, body string, h http.Header) http.RoundTripper {
+	return rtFunc(func(req *http.Request) (*http.Response, error) {
+		resp := jsonResp(req, status, []byte(body))
+		for k, v := range h {
+			resp.Header[k] = v
+		}
+		return resp, nil
+	})
+}
+
+func TestRateLimitDetection(t *testing.T) {
+	reset := time.Date(2026, 10, 11, 12, 30, 0, 0, time.UTC)
+	epoch := fmt.Sprint(reset.Unix())
+	noType := `{"data":null,"errors":[{"message":"API rate limit exceeded"}]}`
+	plainErr := `{"data":null,"errors":[{"message":"Something went wrong"}]}`
+	tests := []struct {
+		name       string
+		status     int
+		body       string
+		hdr        http.Header
+		kind       ErrorKind
+		retryAfter time.Duration
+		resetAt    time.Time
+		backoff    bool
+	}{
+		{"200 typed with reset", 200, rateLimitedBody, http.Header{"X-Ratelimit-Remaining": {"0"}, "X-Ratelimit-Reset": {epoch}}, KindRateLimited, 0, reset, true},
+		{"200 header only", 200, noType, http.Header{"X-Ratelimit-Remaining": {"0"}, "X-Ratelimit-Reset": {epoch}}, KindRateLimited, 0, reset, true},
+		{"200 type only", 200, rateLimitedBody, nil, KindRateLimited, 0, time.Time{}, true},
+		{"200 neither signal", 200, plainErr, nil, KindGraphQL, 0, time.Time{}, false},
+		{"200 retry-after", 200, plainErr, http.Header{"Retry-After": {"30"}}, KindRateLimited, 30 * time.Second, time.Time{}, true},
+		{"403 retry-after", 403, `{"message":"secondary"}`, http.Header{"Retry-After": {"120"}}, KindRateLimited, 120 * time.Second, time.Time{}, true},
+		{"403 remaining 0", 403, `{"message":"limit"}`, http.Header{"X-Ratelimit-Remaining": {"0"}, "X-Ratelimit-Reset": {epoch}}, KindRateLimited, 0, reset, true},
+		{"429 bare", 429, `{"message":"slow down"}`, nil, KindRateLimited, 0, time.Time{}, true},
+		{"403 SSO stays forbidden", 403, `{"message":"SAML"}`, nil, KindForbidden, 0, time.Time{}, false},
+		{"403 remaining 4999 stays forbidden", 403, `{"message":"SAML"}`, http.Header{"X-Ratelimit-Remaining": {"4999"}}, KindForbidden, 0, time.Time{}, false},
+		{"retry-after as date", 429, `{"message":"x"}`, http.Header{"Retry-After": {"Wed, 21 Oct 2015 07:28:00 GMT"}}, KindRateLimited, 0, time.Time{}, true},
+		{"retry-after negative", 429, `{"message":"x"}`, http.Header{"Retry-After": {"-5"}}, KindRateLimited, 0, time.Time{}, true},
+		{"reset not a number", 429, `{"message":"x"}`, http.Header{"X-Ratelimit-Reset": {"abc"}}, KindRateLimited, 0, time.Time{}, true},
+		{"reset zero", 429, `{"message":"x"}`, http.Header{"X-Ratelimit-Reset": {"0"}}, KindRateLimited, 0, time.Time{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := clientWith(t, headerTransport(tt.status, tt.body, tt.hdr)).Fetch(context.Background())
+			var ge *Error
+			if !errors.As(err, &ge) {
+				t.Fatalf("err = %v (%T), want *Error", err, err)
+			}
+			if ge.Kind != tt.kind {
+				t.Fatalf("Kind = %v, want %v", ge.Kind, tt.kind)
+			}
+			if ge.RetryAfter != tt.retryAfter || !ge.ResetAt.Equal(tt.resetAt) {
+				t.Errorf("RetryAfter/ResetAt = %v/%v, want %v/%v", ge.RetryAfter, ge.ResetAt, tt.retryAfter, tt.resetAt)
+			}
+			ra, at, ok := ge.Backoff()
+			if ok != tt.backoff || ra != tt.retryAfter || !at.Equal(tt.resetAt) {
+				t.Errorf("Backoff() = %v, %v, %v", ra, at, ok)
+			}
+			if tt.kind == KindRateLimited {
+				if ge.Short() != "rate limit" {
+					t.Errorf("Short() = %q", ge.Short())
+				}
+				if tt.status == 200 && ge.Message != "GitHub API rate limit exceeded" {
+					t.Errorf("Message = %q", ge.Message)
+				}
+			}
+		})
+	}
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	tests := map[string]time.Duration{
+		"30": 30 * time.Second, " 120 ": 120 * time.Second, "0": 0, "": 0, "-5": 0, "1.5": 0,
+		"Wed, 21 Oct 2015 07:28:00 GMT": 0, "abc": 0,
+	}
+	for in, want := range tests {
+		if got := parseRetryAfter(in); got != want {
+			t.Errorf("parseRetryAfter(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestParseReset(t *testing.T) {
+	want := time.Date(2026, 10, 11, 12, 30, 0, 0, time.UTC)
+	if got := parseReset(fmt.Sprint(want.Unix())); !got.Equal(want) {
+		t.Errorf("parseReset(valid) = %v, want %v", got, want)
+	}
+	for _, in := range []string{"", "abc", "0", "-1", "1.5"} {
+		if got := parseReset(in); !got.IsZero() {
+			t.Errorf("parseReset(%q) = %v, want zero", in, got)
+		}
+	}
+}
+
+func TestCaptureHeadersOnly(t *testing.T) {
+	if n := reflect.TypeOf(rateHeaders{}).NumField(); n != 3 {
+		t.Fatalf("rateHeaders has %d fields, want exactly 3", n)
+	}
+	ct := &captureTransport{base: rtFunc(func(req *http.Request) (*http.Response, error) {
+		resp := jsonResp(req, 200, []byte("{}"))
+		resp.Header.Set("Retry-After", "7")
+		resp.Header.Set("X-RateLimit-Remaining", "0")
+		resp.Header.Set("X-RateLimit-Reset", "1791721800")
+		resp.Header.Set("Authorization", "token "+secretToken)
+		resp.Header.Set("X-Other", secretToken)
+		return resp, nil
+	})}
+	req, _ := http.NewRequest("POST", "https://api.github.com/graphql", nil)
+	req.Header.Set("Authorization", "token "+secretToken)
+	if _, err := ct.RoundTrip(req); err != nil {
+		t.Fatal(err)
+	}
+	got := ct.latest()
+	if got != (rateHeaders{retryAfter: "7", remaining: "0", reset: "1791721800"}) {
+		t.Errorf("latest() = %+v", got)
+	}
+	if s := fmt.Sprintf("%+v", got); strings.Contains(s, secretToken) || strings.Contains(s, "NEVER-SHOW") {
+		t.Errorf("captured record contains the token: %s", s)
+	}
+	// A transport error clears the record.
+	ct.base = rtFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("boom") })
+	if _, err := ct.RoundTrip(req); err == nil {
+		t.Fatal("want error")
+	}
+	if ct.latest() != (rateHeaders{}) {
+		t.Errorf("latest() after a failed request = %+v, want zero", ct.latest())
 	}
 }
