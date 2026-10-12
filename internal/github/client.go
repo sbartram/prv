@@ -140,7 +140,7 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 
 func mapResponse(resp wireResp) domain.Snapshot {
 	snap := domain.Snapshot{
-		Viewer: resp.Viewer.Login,
+		Viewer: domain.Clean(resp.Viewer.Login),
 		RateLimit: domain.RateLimit{
 			Cost:      resp.RateLimit.Cost,
 			Remaining: resp.RateLimit.Remaining,
@@ -153,16 +153,32 @@ func mapResponse(resp wireResp) domain.Snapshot {
 		}
 		author := "ghost"
 		if n.Author != nil {
-			author = n.Author.Login
+			author = domain.Clean(n.Author.Login)
+		}
+		decision := ""
+		if n.ReviewDecision != nil {
+			decision = *n.ReviewDecision
+		}
+		var reviewStates []string
+		for _, r := range n.LatestOpinionatedReviews.Nodes {
+			if r != nil {
+				reviewStates = append(reviewStates, r.State)
+			}
+		}
+		var rollup *string
+		if n.StatusCheckRollup != nil {
+			rollup = &n.StatusCheckRollup.State
 		}
 		snap.PRs = append(snap.PRs, domain.PR{
 			ID:        n.ID,
-			Ref:       domain.Ref{Repo: n.Repository.NameWithOwner, Number: n.Number},
-			Title:     n.Title,
+			Ref:       domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
+			Title:     domain.Clean(n.Title),
 			URL:       n.URL,
 			Author:    author,
 			IsDraft:   n.IsDraft,
 			State:     domain.ParseState(n.State),
+			Review:    domain.DeriveReview(decision, reviewStates),
+			CI:        domain.ClassifyRollup(rollup),
 			UpdatedAt: n.UpdatedAt,
 			ClosedAt:  n.ClosedAt,
 		})

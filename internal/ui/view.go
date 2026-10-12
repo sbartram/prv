@@ -44,14 +44,18 @@ func (m Model) renderList() string {
 		if strings.EqualFold(pr.Author, m.snap.Viewer) {
 			author = "me"
 		}
-		rows = append(rows, []string{marker, pr.Ref.String(), title, author, pr.State.String()})
+		rows = append(rows, []string{
+			marker, pr.Ref.String(), title, author, pr.State.String(),
+			pr.Review.Badge(),
+			pr.CI.Badge(),
+		})
 	}
 
 	t := table.New().
 		Border(lipgloss.HiddenBorder()).
 		BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
 		BorderColumn(false).BorderHeader(false).BorderRow(false).
-		Headers("", "PR", "TITLE", "AUTHOR", "STATE").
+		Headers("", "PR", "TITLE", "AUTHOR", "STATE", "REVIEW", "CI").
 		Rows(rows...).
 		StyleFunc(func(_, _ int) lipgloss.Style {
 			return lipgloss.NewStyle().PaddingRight(2)

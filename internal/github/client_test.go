@@ -3,6 +3,8 @@ package github
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/sbartram/prv/internal/domain"
 )
@@ -131,9 +134,63 @@ func TestCommentAfterApprove(t *testing.T) {
 	}
 }
 
+// noUnsafe reports why a mapped string is unsafe to print, or "" if it is fine.
+func noUnsafe(s string) string {
+	for _, r := range s {
+		switch {
+		case unicode.IsControl(r):
+			return fmt.Sprintf("control character %U", r)
+		case r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069:
+			return fmt.Sprintf("bidi character %U", r)
+		}
+	}
+	return ""
+}
+
+// TestCleanAtSeam sends the hostile PR 18 through the real client. go-gh's own
+// response sanitiser already turns ESC and BEL into visible "^[" and "^G"
+// before the mapper sees them, so this test asserts the outcome only: no
+// control or bidi character reaches the screen strings.
 func TestCleanAtSeam(t *testing.T) {
 	snap, prs := fetchStatus(t)
 	pr := prs[18]
+	if !strings.Contains(pr.Title, "title x") {
+		t.Errorf("Title = %q, want the tab turned into a space", pr.Title)
+	}
+	all := []string{snap.Viewer}
+	for _, p := range snap.PRs {
+		all = append(all, p.Title, p.Author, p.Ref.Repo)
+	}
+	for _, s := range all {
+		if why := noUnsafe(s); why != "" {
+			t.Errorf("mapped string %q has a %s", s, why)
+		}
+	}
+}
+
+// TestMapperCleansRemoteStrings decodes the fixture directly, bypassing go-gh's
+// sanitiser, so the mapper's own domain.Clean calls are what get tested.
+func TestMapperCleansRemoteStrings(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "status.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var env struct {
+		Data wireResp `json:"data"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(env.Data.Search.Nodes[17].Title, "\x1b") {
+		t.Fatal("fixture PR 18 should still hold a raw ESC before mapping")
+	}
+	snap := mapResponse(env.Data)
+	var pr domain.PR
+	for _, p := range snap.PRs {
+		if p.Ref.Number == 18 {
+			pr = p
+		}
+	}
 	if pr.Title != "eviltitle x" {
 		t.Errorf("Title = %q, want %q", pr.Title, "eviltitle x")
 	}
@@ -143,14 +200,10 @@ func TestCleanAtSeam(t *testing.T) {
 	if pr.Ref.Repo != "acme/repo" {
 		t.Errorf("Repo = %q, want %q", pr.Ref.Repo, "acme/repo")
 	}
-	all := []string{snap.Viewer}
 	for _, p := range snap.PRs {
-		all = append(all, p.Title, p.Author, p.Ref.Repo)
-	}
-	for _, s := range all {
-		for _, bad := range []string{"\x1b", "\a", "‮"} {
-			if strings.Contains(s, bad) {
-				t.Errorf("mapped string %q still contains %q", s, bad)
+		for _, s := range []string{p.Title, p.Author, p.Ref.Repo} {
+			if why := noUnsafe(s); why != "" {
+				t.Errorf("mapped string %q has a %s", s, why)
 			}
 		}
 	}
