@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/cli/go-gh/v2/pkg/auth"
 
+	"github.com/sbartram/prv/internal/config"
+	"github.com/sbartram/prv/internal/domain"
 	"github.com/sbartram/prv/internal/github"
 	"github.com/sbartram/prv/internal/ui"
 )
@@ -87,6 +90,149 @@ func TestHiddenClosedDaysFlag(t *testing.T) {
 	stderr.Reset()
 	if code := run([]string{"--closed-days", "0"}, &stdout, &stderr); code != 2 {
 		t.Errorf("--closed-days 0 exit code = %d, want 2", code)
+	}
+
+	// WR-01: the upper bound is 365, and the message names both bounds.
+	stderr.Reset()
+	if code := run([]string{"--closed-days", "366"}, &stdout, &stderr); code != 2 {
+		t.Errorf("--closed-days 366 exit code = %d, want 2", code)
+	}
+	if want := "prv: --closed-days must be between 1 and 365\n"; stderr.String() != want {
+		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+
+	// 365 passes validation: with no token the run stops at the token check.
+	orig := tokenForHost
+	tokenForHost = func(string) (string, string) { return "", "default" }
+	t.Cleanup(func() { tokenForHost = orig })
+	stderr.Reset()
+	if code := run([]string{"--closed-days", "365"}, &stdout, &stderr); code != 1 {
+		t.Errorf("--closed-days 365 exit code = %d, want 1 (validation passed, no token)", code)
+	}
+}
+
+func TestEffectiveClosedDays(t *testing.T) {
+	parse := func(args ...string) (*flag.FlagSet, int) {
+		fs := flag.NewFlagSet("prv", flag.ContinueOnError)
+		days := fs.Int("closed-days", domain.DefaultClosedDays, "")
+		if err := fs.Parse(args); err != nil {
+			t.Fatal(err)
+		}
+		return fs, *days
+	}
+	cases := []struct {
+		name string
+		args []string
+		cfg  int
+		want int
+	}{
+		{"flag beats config", []string{"--closed-days", "30"}, 20, 30},
+		{"config beats default", nil, 20, 20},
+		{"default config", nil, domain.DefaultClosedDays, 14},
+		{"flag equal to the default still beats config", []string{"--closed-days", "14"}, 20, 14},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fs, days := parse(c.args...)
+			cfg := config.Default()
+			cfg.ClosedDays = c.cfg
+			if got := effectiveClosedDays(fs, days, cfg); got != c.want {
+				t.Errorf("effectiveClosedDays = %d, want %d", got, c.want)
+			}
+		})
+	}
+}
+
+func TestConfigErrorFormat(t *testing.T) {
+	cases := []struct {
+		name, body, linePrefix string
+	}{
+		{"wrong type", `closed_days = "fourteen"`, " line 1: "},
+		{"unknown show value", "show = [\"open\", \"opne\"]", " line 1: "},
+		{"integer interval", `refresh_interval = 60`, " line 1: "},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path := useConfig(t, c.body)
+			orig := tokenForHost
+			tokenForHost = func(string) (string, string) {
+				t.Error("tokenForHost was called with a broken config")
+				return "", ""
+			}
+			t.Cleanup(func() { tokenForHost = orig })
+			var stdout, stderr bytes.Buffer
+			if code := run(nil, &stdout, &stderr); code != 2 {
+				t.Fatalf("exit code = %d, want 2", code)
+			}
+			if want := "prv: " + path + c.linePrefix; !strings.HasPrefix(stderr.String(), want) {
+				t.Errorf("stderr = %q, want a prefix %q", stderr.String(), want)
+			}
+		})
+	}
+}
+
+func TestDisplayPath(t *testing.T) {
+	cases := []struct{ path, home, want string }{
+		{"/home/u/.config/prv/config.toml", "/home/u", "~/.config/prv/config.toml"},
+		{"/etc/prv/config.toml", "/home/u", "/etc/prv/config.toml"},
+		{"/home/user2/x.toml", "/home/u", "/home/user2/x.toml"},
+		{"/home/u/x.toml", "", "/home/u/x.toml"},
+		{"", "/home/u", "none"},
+	}
+	for _, c := range cases {
+		if got := displayPath(c.path, c.home); got != c.want {
+			t.Errorf("displayPath(%q, %q) = %q, want %q", c.path, c.home, got, c.want)
+		}
+	}
+}
+
+// TestClosedWindowFromConfig follows closed_days = 3 from the file to the
+// search date and the exact window filter (FILT-02).
+func TestClosedWindowFromConfig(t *testing.T) {
+	path := useConfig(t, "closed_days = 3\n")
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := flag.NewFlagSet("prv", flag.ContinueOnError)
+	days := fs.Int("closed-days", domain.DefaultClosedDays, "")
+	if err := fs.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	eff := effectiveClosedDays(fs, *days, cfg)
+	if eff != 3 {
+		t.Fatalf("effectiveClosedDays = %d, want 3", eff)
+	}
+
+	old := `,
+{"__typename":"PullRequest","id":"PR_3","number":7,"title":"Old news","url":"https://github.com/acme/web/pull/7",
+ "isDraft":false,"state":"CLOSED","closedAt":"2026-10-06T09:00:00Z","mergedAt":null,"updatedAt":"2026-10-06T09:00:00Z",
+ "repository":{"nameWithOwner":"acme/web"},"author":{"login":"hubot"},
+ "reviewDecision":null,"latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":null}`
+	rec := &recorder{body: fixtureHead + fixtureNodes + old + fixtureTail}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: eff,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rec,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := client.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, _ := rec.vars["q"].(string); !strings.Contains(q, "closed:>=2026-10-07") {
+		t.Errorf("search q = %q, want it to contain closed:>=2026-10-07", q)
+	}
+	for _, pr := range snap.PRs {
+		if pr.Ref.Number == 7 {
+			t.Errorf("a PR closed 5 days ago is listed with closed_days = 3")
+		}
+	}
+	if len(snap.PRs) != 2 {
+		t.Errorf("got %d PRs, want the 2 inside the window", len(snap.PRs))
 	}
 }
 

@@ -350,3 +350,150 @@ func TestCanceledFetchIgnored(t *testing.T) {
 		}
 	}
 }
+
+// testClock is a mutable clock for the config-warning tests.
+type testClock struct{ t time.Time }
+
+func (c *testClock) now() time.Time { return c.t }
+func (c *testClock) set(hh, mm, ss int) {
+	c.t = time.Date(2026, 10, 11, hh, mm, ss, 0, time.UTC)
+}
+
+// warnModel builds a sized model with config warnings, a test clock at
+// 12:00:00 and recorded timers.
+func warnModel(w, h int, warnings []string) (Model, *testClock, *afterRec) {
+	clk := &testClock{}
+	clk.set(12, 0, 0)
+	m := New(context.Background(), &fakeFetcher{}, Options{ClosedDays: 14, Now: clk.now, Warnings: warnings})
+	rec := &afterRec{}
+	m.after = rec.after
+	tm, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
+	return tm.(Model), clk, rec
+}
+
+func redraws(rec *afterRec) []time.Duration {
+	var out []time.Duration
+	for _, c := range rec.calls {
+		if _, ok := c.msg.(redrawMsg); ok {
+			out = append(out, c.d)
+		}
+	}
+	return out
+}
+
+const unknownKeyWarning = `config: unknown key "x"`
+
+func TestConfigWarningLifetime(t *testing.T) {
+	m, clk, rec := warnModel(120, 40, []string{unknownKeyWarning})
+
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the loading screen shows the warning:\n%s", v)
+	}
+	m.Init()
+	if len(rec.calls) != 0 {
+		t.Errorf("Init armed %d timers, want 0", len(rec.calls))
+	}
+
+	clk.set(12, 0, 2)
+	tm, _ := m.Update(fetchedMsg{snap: onePR()})
+	m = tm.(Model)
+	if v := plain(m); !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the footer after the first result lacks the warning:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 || got[0] != 8*time.Second {
+		t.Errorf("redraw timers = %v, want one 8s timer", got)
+	}
+
+	clk.set(12, 0, 9)
+	if v := plain(m); !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is gone at 12:00:09:\n%s", v)
+	}
+
+	clk.set(12, 0, 10)
+	tm, _ = m.Update(redrawMsg{})
+	m = tm.(Model)
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is still shown at 12:00:10:\n%s", v)
+	}
+
+	// A later result neither shows nor arms the warning again.
+	clk.set(12, 1, 0)
+	tm, _ = m.Update(fetchedMsg{snap: onePR()})
+	m = tm.(Model)
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("a second result shows the warning again:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 {
+		t.Errorf("redraw timers after a second result = %v, want still one", got)
+	}
+}
+
+func TestConfigWarningKeepsFlash(t *testing.T) {
+	const flash = "rate limited — resumes 12:30"
+
+	t.Run("wide pane shows both", func(t *testing.T) {
+		m, clk, _ := warnModel(120, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		tm, _ := m.Update(fetchedMsg{snap: onePR()})
+		m = tm.(Model)
+		m.setFlash(flash, 4*time.Second)
+		v := plain(m)
+		if !strings.Contains(v, flash) || !strings.Contains(v, unknownKeyWarning) {
+			t.Errorf("footer lacks the flash or the warning:\n%s", v)
+		}
+	})
+
+	t.Run("narrow pane keeps the flash and the note", func(t *testing.T) {
+		m, clk, _ := warnModel(50, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		snap := onePR()
+		snap.Truncated = true
+		tm, _ := m.Update(fetchedMsg{snap: snap})
+		m = tm.(Model)
+		m.setFlash(flash, 4*time.Second)
+		lines := strings.Split(plain(m), "\n")
+		footer := lines[len(lines)-1]
+		if !strings.Contains(footer, flash) || !strings.Contains(footer, "list truncated") {
+			t.Errorf("footer lost the flash or the note:\n%q", footer)
+		}
+		if strings.Contains(footer, unknownKeyWarning) {
+			t.Errorf("the whole warning fits where it should not:\n%q", footer)
+		}
+	})
+
+	t.Run("a cut warning ends with an ellipsis", func(t *testing.T) {
+		m, clk, _ := warnModel(60, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		snap := onePR()
+		snap.Truncated = true
+		tm, _ := m.Update(fetchedMsg{snap: snap})
+		m = tm.(Model)
+		lines := strings.Split(plain(m), "\n")
+		footer := lines[len(lines)-1]
+		if !strings.Contains(footer, "list truncated") || !strings.Contains(footer, "config: ") || !strings.Contains(footer, "…") {
+			t.Errorf("want the note and a cut warning with …:\n%q", footer)
+		}
+	})
+}
+
+func TestConfigWarningOnErrorPanel(t *testing.T) {
+	m, clk, rec := warnModel(120, 40, []string{unknownKeyWarning})
+	clk.set(12, 0, 2)
+	tm, _ := m.Update(fetchedMsg{err: errors.New("boom")})
+	m = tm.(Model)
+	v := plain(m)
+	if !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the error panel lacks the warning:\n%s", v)
+	}
+	if strings.Index(v, unknownKeyWarning) > strings.Index(v, "r retry · q quit") {
+		t.Errorf("the warning should sit above the key line:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 || got[0] != 8*time.Second {
+		t.Errorf("redraw timers = %v, want one 8s timer", got)
+	}
+	clk.set(12, 0, 10)
+	tm, _ = m.Update(redrawMsg{})
+	if v := plain(tm); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is still on the error panel at 12:00:10:\n%s", v)
+	}
+}
