@@ -46,8 +46,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **RFSH-01**: Data refreshes automatically on a configurable interval (default 60s, minimum 15s)
 - [x] **RFSH-02**: User can press `r` to refresh immediately
 - [x] **RFSH-03**: The time of the last successful update is shown
-- [ ] **RFSH-04**: If a refresh fails, the last data stays on screen with an error indicator
-- [ ] **RFSH-05**: Remaining API rate limit is shown, and refreshing backs off automatically when the limit is low or hit
+- [x] **RFSH-04**: If a refresh fails, the last data stays on screen with an error indicator
+- [x] **RFSH-05**: Remaining API rate limit is shown, and refreshing backs off automatically when the limit is low or hit
 - [x] **RFSH-06**: The selected PR stays selected after a refresh, even if the list order changes
 
 ### Navigation
@@ -147,8 +147,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RFSH-01 | Phase 2 | Complete |
 | RFSH-02 | Phase 2 | Complete |
 | RFSH-03 | Phase 2 | Complete |
-| RFSH-04 | Phase 2 | Pending |
-| RFSH-05 | Phase 2 | Pending |
+| RFSH-04 | Phase 2 | Complete |
+| RFSH-05 | Phase 2 | Complete |
 | RFSH-06 | Phase 2 | Complete |
 | NAV-01 | Phase 1 | Complete |
 | NAV-02 | Phase 2 | Pending |
