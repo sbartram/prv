@@ -16,10 +16,14 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 )
 
+// fixedNow is the clock of the view tests, so goldens do not depend on the
+// machine or the date.
+func fixedNow() time.Time { return time.Date(2026, 10, 11, 14, 32, 5, 0, time.UTC) }
+
 // newTestModel returns a model sized w x h that has loaded snap.
 func newTestModel(t *testing.T, snap domain.Snapshot, w, h int) Model {
 	t.Helper()
-	var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14})
+	var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14, Now: fixedNow})
 	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = m.Update(fetchedMsg{snap: snap})
 	return m.(Model)
@@ -220,11 +224,11 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 	t.Helper()
 	switch state {
 	case "loading":
-		var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14})
+		var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14, Now: fixedNow})
 		m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 		return m.(Model)
 	case "error":
-		var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14})
+		var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14, Now: fixedNow})
 		m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 		m, _ = m.Update(fetchedMsg{err: hintedError()})
 		return m.(Model)

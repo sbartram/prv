@@ -427,3 +427,98 @@ func TestNoOverlappingFetches(t *testing.T) {
 		t.Errorf("max fetches in flight = %d, want exactly 1", got)
 	}
 }
+
+// headerOf returns the first line of the plain view: the list header.
+func headerOf(m tea.Model) string {
+	return strings.SplitN(plain(m), "\n", 2)[0]
+}
+
+func TestUpdatedTimeShown(t *testing.T) {
+	at := time.Date(2026, 10, 11, 14, 32, 5, 0, time.UTC)
+	f := &fakeFetcher{snap: onePR()}
+	m, _ := recModel(f, 0, func() time.Time { return at })
+	if strings.Contains(plain(m), "updated") {
+		t.Errorf("the loading screen shows an updated time:\n%s", plain(m))
+	}
+	m = runCmd(m, m.Init())
+	if h := headerOf(m); !strings.Contains(h, "updated 14:32:05") {
+		t.Errorf("header = %q, want it to contain 'updated 14:32:05'", h)
+	}
+}
+
+func TestUpdatedOnlyOnSuccess(t *testing.T) {
+	t1 := time.Date(2026, 10, 11, 14, 32, 5, 0, time.UTC)
+	f := &fakeFetcher{snap: onePR()}
+	clk := &clock{t: t1}
+	m, rec := recModel(f, 0, clk.now)
+	m = runCmd(m, m.Init())
+	first := plain(m)
+
+	refresh := func() {
+		var cmd tea.Cmd
+		m, cmd = m.Update(rec.calls[len(rec.calls)-1].msg)
+		m = runCmd(m, cmd)
+	}
+
+	// A failed refresh a minute later leaves the time alone.
+	f.err = errors.New("boom")
+	clk.t = t1.Add(time.Minute)
+	refresh()
+	if h := headerOf(m); !strings.Contains(h, "updated 14:32:05") {
+		t.Errorf("after a failure the header = %q, want 'updated 14:32:05'", h)
+	}
+	if got := plain(m); got != first {
+		t.Errorf("a failed refresh changed the screen:\n%s", got)
+	}
+
+	// Two successes with identical data differ only in the updated time.
+	f.err = nil
+	clk.t = t1.Add(2 * time.Minute)
+	refresh()
+	second := plain(m)
+	if !strings.Contains(headerOf(m), "updated 14:34:05") {
+		t.Errorf("after a success the header = %q, want 'updated 14:34:05'", headerOf(m))
+	}
+	blank := func(s string) string {
+		return strings.NewReplacer("updated 14:32:05", "updated --", "updated 14:34:05", "updated --").Replace(s)
+	}
+	if blank(first) != blank(second) {
+		t.Errorf("identical data changed the screen beyond the updated time:\n%s\n---\n%s", first, second)
+	}
+}
+
+func TestSpinnerWhileRefreshing(t *testing.T) {
+	at := time.Date(2026, 10, 11, 14, 32, 5, 0, time.UTC)
+	f := &fakeFetcher{snap: onePR()}
+	m, rec := recModel(f, 0, func() time.Time { return at })
+	m = runCmd(m, m.Init())
+
+	frame := m.(Model).spin.View()
+	if strings.TrimSpace(frame) == "" {
+		t.Fatal("setup: the spinner has no frame")
+	}
+	if h := headerOf(m); strings.Contains(h, frame) {
+		t.Errorf("idle header shows the spinner: %q", h)
+	}
+	// A stray spinner tick with no fetch running ends the chain.
+	if _, cmd := m.Update(m.(Model).spin.Tick()); cmd != nil {
+		t.Error("a spinner tick while idle returned a command")
+	}
+
+	var cmd tea.Cmd
+	m, cmd = m.Update(rec.calls[0].msg)
+	if cmd == nil {
+		t.Fatal("the tick started no fetch")
+	}
+	if h := headerOf(m); !strings.Contains(h, "updated 14:32:05 "+frame) {
+		t.Errorf("header while refreshing = %q, want the spinner after the updated time", h)
+	}
+	if _, next := m.Update(m.(Model).spin.Tick()); next == nil {
+		t.Error("a spinner tick while refreshing did not continue the chain")
+	}
+
+	m = runCmd(m, cmd)
+	if h := headerOf(m); !strings.HasSuffix(h, "updated 14:32:05") {
+		t.Errorf("header after the result = %q, want it to end with the updated time and no spinner", h)
+	}
+}
