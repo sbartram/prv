@@ -189,7 +189,9 @@ func TestStylesUseAnsi16(t *testing.T) {
 // is 24 cells wide, and a title with an emoji ZWJ sequence.
 func fixtureThirty() domain.Snapshot {
 	at := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
-	snap := domain.Snapshot{Viewer: "octo"}
+	snap := domain.Snapshot{Viewer: "octo", RateLimit: domain.RateLimit{
+		Limit: 5000, Cost: 1, Remaining: 4812, ResetAt: time.Date(2026, 10, 11, 15, 2, 0, 0, time.UTC),
+	}}
 	for i := 1; i <= 30; i++ {
 		pr := domain.PR{
 			ID: "N" + strings.Repeat("x", i%3), Ref: domain.Ref{Repo: "acme/api", Number: i},
@@ -621,4 +623,121 @@ func TestEmptyStateShowsNotes(t *testing.T) {
 			t.Errorf("empty screen has no header line:\n%s", v)
 		}
 	})
+}
+
+// withRate returns onePR carrying the given rate-limit data.
+func withRate(limit, remaining int) domain.Snapshot {
+	snap := onePR()
+	snap.RateLimit = domain.RateLimit{
+		Limit: limit, Cost: 1, Remaining: remaining,
+		ResetAt: time.Date(2026, 10, 11, 15, 2, 0, 0, time.UTC),
+	}
+	return snap
+}
+
+// TestApiFooter: the footer ends with a faint "api N" once rate data is known
+// (D-06 as narrowed: absent before the first response, kept through failures).
+func TestApiFooter(t *testing.T) {
+	for _, w := range []int{80, 120} {
+		t.Run(itoa(w), func(t *testing.T) {
+			m := stateModel(t, "list", w, 24)
+			raw := m.View().Content
+			ls := strings.Split(raw, "\n")
+			last := ls[len(ls)-1]
+			if !strings.HasSuffix(ansi.Strip(last), "api 4812") {
+				t.Errorf("last line = %q, want it to end with api 4812", ansi.Strip(last))
+			}
+			if !strings.Contains(last, "\x1b[2mapi 4812") {
+				t.Errorf("api segment is not faint: %q", last)
+			}
+			if got := lipgloss.Width(last); got != w {
+				t.Errorf("footer is %d cells wide, want exactly %d (api at the right edge)", got, w)
+			}
+		})
+	}
+	t.Run("not sized", func(t *testing.T) {
+		f := ansi.Strip(newTestModel(t, withRate(5000, 4812), 0, 0).footer())
+		if !strings.Contains(f, "q quit · api 4812") {
+			t.Errorf("footer = %q, want the api segment after the hints", f)
+		}
+	})
+	t.Run("no rate data yet", func(t *testing.T) {
+		m := newTestModel(t, withRate(0, 0), 120, 24)
+		if f := ansi.Strip(m.footer()); strings.Contains(f, "api") {
+			t.Errorf("footer = %q, want no api segment while Limit is 0", f)
+		}
+	})
+	t.Run("failed refresh keeps the last value", func(t *testing.T) {
+		clk := &clock{t: fixedNow()}
+		var m tea.Model = New(t.Context(), &fakeFetcher{}, Options{ClosedDays: 14, Now: clk.now})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
+		m, _ = m.Update(fetchedMsg{snap: withRate(5000, 4812)})
+		m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
+		ls := lines(m.View().Content)
+		if last := ls[len(ls)-1]; !strings.HasSuffix(last, "api 4812") {
+			t.Errorf("last line = %q, want api 4812 after a failed refresh", last)
+		}
+	})
+}
+
+// TestRateWarning: below 20% the header warns in yellow; the boundary is
+// Remaining*5 < Limit, so 999/5000 warns and 1000/5000 does not.
+func TestRateWarning(t *testing.T) {
+	head := func(snap domain.Snapshot) string {
+		return strings.Split(newTestModel(t, snap, 120, 24).View().Content, "\n")[0]
+	}
+	h := head(withRate(5000, 999))
+	if want := "api 999/5000 · resets 15:02"; !strings.Contains(ansi.Strip(h), want) {
+		t.Errorf("header = %q, want it to contain %q", ansi.Strip(h), want)
+	}
+	if !strings.Contains(h, "\x1b[33mapi 999/5000") {
+		t.Errorf("warning has no ANSI yellow foreground: %q", h)
+	}
+	for name, snap := range map[string]domain.Snapshot{
+		"at 20%":     withRate(5000, 1000),
+		"healthy":    withRate(5000, 4812),
+		"no limit":   withRate(0, 0),
+		"no limit 2": withRate(0, 10),
+	} {
+		if h := ansi.Strip(head(snap)); strings.Contains(h, "resets") {
+			t.Errorf("%s: header = %q, want no rate warning", name, h)
+		}
+	}
+	t.Run("narrow pane keeps the warning over the count", func(t *testing.T) {
+		m := newTestModel(t, withRate(5000, 10), 45, 24)
+		h := ansi.Strip(strings.Split(m.View().Content, "\n")[0])
+		if !strings.Contains(h, "api 10/5000") || lipgloss.Width(h) > 45 {
+			t.Errorf("header = %q, want the warning and at most 45 cells", h)
+		}
+	})
+}
+
+// TestFooterPriorityNarrow: on a narrow pane the hints go first; the notes and
+// the api segment stay and no line is wider than the pane (WR-03, D-06).
+func TestFooterPriorityNarrow(t *testing.T) {
+	snap := withRate(5000, 4812)
+	snap.Truncated = true
+	m := newTestModel(t, snap, 30, 24)
+	f := ansi.Strip(m.footer())
+	for _, want := range []string{"list truncated", "api 4812"} {
+		if !strings.Contains(f, want) {
+			t.Errorf("footer = %q, missing %q", f, want)
+		}
+	}
+	if strings.Contains(f, "j/k") || strings.Contains(f, "quit") {
+		t.Errorf("footer = %q, want the key hints dropped", f)
+	}
+	snap.Warnings = []string{"Some data could not be loaded: x"}
+	for _, w := range []int{14, 20, 30, 40, 60} {
+		f := ansi.Strip(newTestModel(t, snap, w, 24).footer())
+		if lipgloss.Width(f) > w {
+			t.Errorf("w=%d footer is %d cells wide: %q", w, lipgloss.Width(f), f)
+		}
+		if w >= 20 && !strings.HasSuffix(f, "api 4812") {
+			t.Errorf("w=%d footer = %q, want the api segment kept at the right edge", w, f)
+		}
+		if !strings.HasPrefix(f, "list truncated"[:min(w, 14)]) {
+			t.Errorf("w=%d footer = %q, want the notes first", w, f)
+		}
+	}
 }
