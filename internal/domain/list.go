@@ -62,27 +62,17 @@ func Bucket(pr PR) int {
 	return 5
 }
 
-func stateRank(s State) int {
-	switch s {
-	case StateOpen:
-		return 0
-	case StateMerged:
-		return 1
-	case StateClosed:
-		return 2
-	}
-	return 3
-}
-
-// Sort orders PRs in place for display: Open, Merged, Closed, then unknown;
-// within a group the most recently updated first, then repository ascending,
-// then PR number ascending as an integer. Equal keys keep their input order.
+// Sort orders PRs in place for display: by attention bucket (see Bucket), then
+// by creation time newest first, then repository ascending, then PR number
+// ascending as an integer (D-02). The last-update time is deliberately not a
+// key: comments and pushes would swap rows between refreshes. Equal keys keep
+// their input order.
 func Sort(prs []PR) {
 	slices.SortStableFunc(prs, func(a, b PR) int {
-		if c := cmp.Compare(stateRank(a.State), stateRank(b.State)); c != 0 {
+		if c := cmp.Compare(Bucket(a), Bucket(b)); c != 0 {
 			return c
 		}
-		if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
 			return c
 		}
 		if c := cmp.Compare(a.Ref.Repo, b.Ref.Repo); c != 0 {

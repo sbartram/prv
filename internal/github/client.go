@@ -66,7 +66,7 @@ const discoveryQuery = `query Watch($q: String!, $after: String) {
     nodes {
       __typename
       ... on PullRequest {
-        id number title url isDraft state closedAt mergedAt updatedAt
+        id number title url isDraft state createdAt closedAt mergedAt updatedAt
         repository { nameWithOwner }
         author { login }
         reviewDecision
@@ -115,6 +115,7 @@ type wireNode struct {
 	URL            string
 	IsDraft        bool
 	State          string
+	CreatedAt      time.Time
 	ClosedAt       time.Time
 	MergedAt       time.Time
 	UpdatedAt      time.Time
@@ -250,6 +251,7 @@ func mapResponse(resp wireResp) domain.Snapshot {
 			State:     domain.ParseState(n.State),
 			Review:    domain.DeriveReview(decision, reviewStates),
 			CI:        domain.ClassifyRollup(rollup),
+			CreatedAt: n.CreatedAt,
 			UpdatedAt: n.UpdatedAt,
 			ClosedAt:  n.ClosedAt,
 		})

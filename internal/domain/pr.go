@@ -93,6 +93,7 @@ type PR struct {
 	Review  Review
 	CI      CI
 
+	CreatedAt time.Time
 	UpdatedAt time.Time
 	ClosedAt  time.Time
 }
