@@ -92,6 +92,9 @@ type PR struct {
 	State   State
 	Review  Review
 	CI      CI
+	// Failing is the failing check named in the CI cell (LIST-07); the zero
+	// value shows the plain badge.
+	Failing FailingCheck
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

@@ -57,6 +57,20 @@ func withErrors(t *testing.T, name, errorsJSON string) []byte {
 	return out
 }
 
+// answerFailingNone answers a FailingChecks request with failingNoneBody
+// without calling rt, so a test about discovery paging need not know about the
+// second step.
+func answerFailingNone(rt http.RoundTripper) http.RoundTripper {
+	return rtFunc(func(req *http.Request) (*http.Response, error) {
+		raw, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewReader(raw))
+		if opName(raw) == "FailingChecks" {
+			return jsonResp(req, 200, []byte(failingNoneBody)), nil
+		}
+		return rt.RoundTrip(req)
+	})
+}
+
 func clientWith(t *testing.T, rt http.RoundTripper) *Client {
 	t.Helper()
 	c, err := NewClient(Options{
@@ -191,13 +205,13 @@ func TestGraphQLErrorNoData(t *testing.T) {
 func TestLaterPageFailure(t *testing.T) {
 	calls := 0
 	page1 := fixtureBytes(t, "search_page1.json")
-	c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
+	c := clientWith(t, answerFailingNone(rtFunc(func(req *http.Request) (*http.Response, error) {
 		calls++
 		if calls == 1 {
 			return jsonResp(req, 200, page1), nil
 		}
 		return jsonResp(req, 502, []byte(`{"message":"Bad Gateway"}`)), nil
-	}))
+	})))
 	snap, err := c.Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("err = %v, want nil: earlier pages stay on screen", err)

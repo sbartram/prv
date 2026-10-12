@@ -18,26 +18,71 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 )
 
-// fixtureTransport serves the named testdata files in order and records the
-// request bodies.
+// failingNoneBody answers a FailingChecks request with no nodes. It has no
+// rateLimit block on purpose, so the cost and Limit assertions of the discovery
+// tests stay valid.
+const failingNoneBody = `{"data":{"nodes":[]}}`
+
+// opName returns the GraphQL operation name of a request body ("Watch",
+// "FailingChecks"), or "" when the body is not a query.
+func opName(body []byte) string {
+	var payload struct {
+		Query string `json:"query"`
+	}
+	if json.Unmarshal(body, &payload) != nil {
+		return ""
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(payload.Query), "query ")
+	if !ok {
+		return ""
+	}
+	if i := strings.IndexAny(rest, "( {"); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
+}
+
+// fixtureTransport routes by operation. "Watch" requests are served from files
+// in order (only they count in calls and bodies); "FailingChecks" requests are
+// served from failing in order, then with failingNoneBody.
 type fixtureTransport struct {
-	t      *testing.T
-	files  []string
-	calls  int
-	bodies [][]byte
+	t          *testing.T
+	files      []string
+	calls      int
+	bodies     [][]byte
+	failing    []string
+	failBodies [][]byte
 }
 
 func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	raw, _ := io.ReadAll(req.Body)
-	f.bodies = append(f.bodies, raw)
-	if f.calls >= len(f.files) {
-		f.t.Fatalf("unexpected request %d; only %d fixtures", f.calls+1, len(f.files))
+	var data []byte
+	switch op := opName(raw); op {
+	case "Watch":
+		f.bodies = append(f.bodies, raw)
+		if f.calls >= len(f.files) {
+			f.t.Fatalf("unexpected request %d; only %d fixtures", f.calls+1, len(f.files))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.files[f.calls]))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		f.calls++
+	case "FailingChecks":
+		n := len(f.failBodies)
+		f.failBodies = append(f.failBodies, raw)
+		data = []byte(failingNoneBody)
+		if n < len(f.failing) {
+			var err error
+			data, err = os.ReadFile(filepath.Join("testdata", f.failing[n]))
+			if err != nil {
+				f.t.Fatal(err)
+			}
+		}
+	default:
+		f.t.Fatalf("unexpected operation %q", op)
 	}
-	data, err := os.ReadFile(filepath.Join("testdata", f.files[f.calls]))
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	f.calls++
 	return &http.Response{
 		StatusCode: 200,
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
@@ -373,5 +418,26 @@ func TestRateLimitDecoded(t *testing.T) {
 	snap, _ = fetchStatus(t)
 	if snap.RateLimit.Limit != 0 {
 		t.Errorf("Limit without a limit field = %d, want 0", snap.RateLimit.Limit)
+	}
+}
+
+// TestNoFailingNoRequest: a refresh in which no listed PR has a FAILURE or
+// ERROR rollup sends no FailingChecks request (D-01).
+func TestNoFailingNoRequest(t *testing.T) {
+	c, tr := newFixtureClient(t, "search_page2.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.PRs) == 0 {
+		t.Fatal("no PRs: the test would prove nothing")
+	}
+	if len(tr.failBodies) != 0 {
+		t.Errorf("FailingChecks requests = %d, want 0", len(tr.failBodies))
+	}
+	for _, pr := range snap.PRs {
+		if pr.Failing != (domain.FailingCheck{}) {
+			t.Errorf("%s Failing = %+v, want the zero value", pr.Ref, pr.Failing)
+		}
 	}
 }

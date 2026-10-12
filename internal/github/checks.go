@@ -1,0 +1,191 @@
+package github
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/cli/go-gh/v2/pkg/api"
+
+	"github.com/sbartram/prv/internal/domain"
+)
+
+// failingQuery is the second step of a refresh (D-01): the check contexts of
+// the PRs whose rollup is FAILURE or ERROR. The ids come from the discovery
+// response and travel only as the $ids variable, never inside this document.
+// The query is read-only.
+const failingQuery = `query FailingChecks($ids: [ID!]!) {
+  rateLimit { limit cost remaining resetAt }
+  nodes(ids: $ids) {
+    __typename
+    ... on PullRequest {
+      id
+      statusCheckRollup {
+        state
+        contexts(first: 100) {
+          totalCount
+          pageInfo { hasNextPage }
+          nodes {
+            __typename
+            ... on CheckRun { name status conclusion databaseId
+              checkSuite { createdAt app { name } workflowRun { workflow { name } } } }
+            ... on StatusContext { context state }
+          }
+        }
+      }
+    }
+  }
+}`
+
+// failingChunk is how many failing PRs one FailingChecks request names. Every
+// failing PR is looked up, in chunks (D-01): discovery lists at most
+// maxPages x 100 PRs, so a refresh sends at most 20 of these requests.
+const failingChunk = 25
+
+// Wire structs for the FailingChecks response. Everything nullable is a
+// pointer; GraphQL nulls a list element when a nested field errors.
+
+type wireFailResp struct {
+	RateLimit struct {
+		Limit     int
+		Cost      int
+		Remaining int
+		ResetAt   time.Time
+	}
+	Nodes []*wireFailNode
+}
+
+type wireFailNode struct {
+	Typename          string `json:"__typename"`
+	ID                string
+	StatusCheckRollup *struct {
+		State    string
+		Contexts wireContexts
+	}
+}
+
+type wireContexts struct {
+	TotalCount int
+	PageInfo   struct {
+		HasNextPage bool
+		EndCursor   string
+	}
+	Nodes []*wireContext
+}
+
+type wireContext struct {
+	Typename   string `json:"__typename"`
+	Name       string
+	Status     string
+	Conclusion string
+	DatabaseID int64 `json:"databaseId"`
+	CheckSuite *wireSuite
+	Context    string
+	State      string
+}
+
+type wireSuite struct {
+	CreatedAt   time.Time
+	App         *struct{ Name string }
+	WorkflowRun *struct {
+		Workflow *struct{ Name string }
+	}
+}
+
+// mapContext maps one check context. Every remote string is cleaned here, at
+// the seam.
+func mapContext(c *wireContext) domain.Check {
+	ch := domain.Check{ID: c.DatabaseID}
+	ch.State, ch.Word = domain.ClassifyCheck(c.Typename, c.Status, c.Conclusion, c.State)
+	if c.Typename == "StatusContext" {
+		ch.Context = true
+		ch.Name = domain.Clean(c.Context)
+		return ch
+	}
+	ch.Name = domain.Clean(c.Name)
+	if s := c.CheckSuite; s != nil {
+		ch.SuiteCreatedAt = s.CreatedAt
+		switch {
+		case s.WorkflowRun != nil && s.WorkflowRun.Workflow != nil:
+			ch.Workflow = domain.Clean(s.WorkflowRun.Workflow.Name)
+		case s.App != nil:
+			ch.Workflow = domain.Clean(s.App.Name)
+		}
+	}
+	return ch
+}
+
+// fetchFailing names the failing check of every PR in snap whose rollup is
+// failing, with one FailingChecks request per failingChunk PRs. It sends
+// nothing when no PR fails. Errors follow the discovery-page policy: a rate
+// limit or a cancelled context fails the whole fetch; any other error keeps
+// the discovery data, leaves the rows unnamed and adds one warning.
+func (c *Client) fetchFailing(ctx context.Context, snap *domain.Snapshot) error {
+	var failing []int
+	for i, pr := range snap.PRs {
+		if pr.CI == domain.CIFailing {
+			failing = append(failing, i)
+		}
+	}
+	for start := 0; start < len(failing); start += failingChunk {
+		chunk := failing[start:min(start+failingChunk, len(failing))]
+		ids := make([]string, len(chunk))
+		byID := make(map[string]int, len(chunk))
+		for j, i := range chunk {
+			ids[j] = snap.PRs[i].ID
+			byID[ids[j]] = i
+		}
+
+		var resp wireFailResp
+		err := c.gql.DoWithContext(ctx, failingQuery, map[string]any{"ids": ids}, &resp)
+		if err != nil {
+			err = classify(err, c.capture.latest())
+			if errors.Is(err, context.Canceled) {
+				return err
+			}
+			var ce *Error
+			isErr := errors.As(err, &ce)
+			if isErr && ce.Kind == KindRateLimited {
+				return err
+			}
+			snap.Warnings = addWarning(snap.Warnings, failingWarning)
+			// GitHub reports errors together with data: keep the nodes that loaded.
+			var ge *api.GraphQLError
+			if !isErr || ce.Kind != KindGraphQL || !errors.As(err, &ge) || len(resp.Nodes) == 0 {
+				return nil
+			}
+		}
+
+		snap.RateLimit.Cost += resp.RateLimit.Cost
+		if resp.RateLimit.Limit > 0 {
+			snap.RateLimit.Limit = resp.RateLimit.Limit
+			snap.RateLimit.Remaining = resp.RateLimit.Remaining
+			snap.RateLimit.ResetAt = resp.RateLimit.ResetAt
+		}
+
+		for _, n := range resp.Nodes {
+			if n == nil || n.Typename != "PullRequest" {
+				continue
+			}
+			i, ok := byID[n.ID]
+			if !ok {
+				continue
+			}
+			var checks []domain.Check
+			complete := false
+			if r := n.StatusCheckRollup; r != nil {
+				complete = !r.Contexts.PageInfo.HasNextPage
+				for _, ctxNode := range r.Contexts.Nodes {
+					if ctxNode != nil {
+						checks = append(checks, mapContext(ctxNode))
+					}
+				}
+			}
+			snap.PRs[i].Failing = domain.SummarizeFailing(domain.LatestChecks(checks), complete)
+		}
+	}
+	return nil
+}
+
+// failingWarning is the snapshot warning when check names could not be loaded.
+const failingWarning = "Check names could not be loaded"

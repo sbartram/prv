@@ -144,7 +144,9 @@ type wireNode struct {
 const maxPages = 5
 
 // Fetch runs the discovery query page by page, de-duplicates by node id, keeps
-// the PRs inside the closed window and orders them for display.
+// the PRs inside the closed window and orders them for display. It then names
+// the failing check of every failing PR with a second query (D-01), inside the
+// same call, so the whole refresh stays one single-flight fetch.
 func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 	now := c.now() // one instant for every page and the window filter
 	vars := map[string]any{"q": BuildSearch(now, c.closedDays)}
@@ -215,6 +217,9 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 	snap.PRs = slices.DeleteFunc(snap.PRs, func(pr domain.PR) bool {
 		return !domain.InWindow(pr, now, c.closedDays)
 	})
+	if err := c.fetchFailing(ctx, &snap); err != nil {
+		return domain.Snapshot{}, err
+	}
 	domain.Sort(snap.PRs)
 	return snap, nil
 }

@@ -357,7 +357,7 @@ func (m Model) renderList() string {
 		cells = append(cells, []string{
 			marker, pr.Ref.String(), title, author, pr.State.String(),
 			pr.Review.Badge(),
-			pr.CI.Badge(),
+			ciCell(pr, maxCIColW),
 		})
 	}
 	widths := columnWidths(cells, m.w)

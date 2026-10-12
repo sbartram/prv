@@ -618,7 +618,7 @@ const failingWatchBody = fixtureHead + `
  "repository":{"nameWithOwner":"acme/web"},"author":{"login":"octo"},
  "reviewDecision":null,"latestOpinionatedReviews":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}` + fixtureTail
 
-// run builds one CheckRun context in the GitHub Actions workflow "ci".
+// ctxRun builds one CheckRun context in the GitHub Actions workflow "ci".
 func ctxRun(id int, name, conclusion, suiteAt string) string {
 	return `{"__typename":"CheckRun","name":"` + name + `","status":"COMPLETED","conclusion":"` + conclusion +
 		`","databaseId":` + strconv.Itoa(id) + `,"checkSuite":{"createdAt":"` + suiteAt +
