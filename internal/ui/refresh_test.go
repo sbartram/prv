@@ -3,7 +3,10 @@ package ui
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -293,5 +296,134 @@ func TestStaleResultDropped(t *testing.T) {
 	}
 	if v := plain(m); !strings.Contains(v, "acme/api#1") {
 		t.Errorf("a current result did not show the list:\n%s", v)
+	}
+}
+
+func TestManualRefreshOrphansTick(t *testing.T) {
+	f := &fakeFetcher{snap: onePR()}
+	m, rec := recModel(f, 0, nil)
+	m = runCmd(m, m.Init())
+	oldTick := rec.calls[0].msg
+	if f.calls != 1 {
+		t.Fatalf("setup: fetches = %d, want 1", f.calls)
+	}
+
+	m, cmd := m.Update(key("r"))
+	if cmd == nil {
+		t.Fatal("r returned no command")
+	}
+	// The old tick fires while the manual refresh runs, then after it ends.
+	if _, c := m.Update(oldTick); c != nil {
+		t.Error("the old tick started a fetch while the manual refresh ran")
+	}
+	m = runCmd(m, cmd)
+	if f.calls != 2 {
+		t.Fatalf("fetches after r = %d, want 2", f.calls)
+	}
+	if _, c := m.Update(oldTick); c != nil {
+		t.Error("the tick armed before r started a fetch")
+	}
+	if f.calls != 2 {
+		t.Errorf("fetches after the old tick = %d, want 2", f.calls)
+	}
+	// The tick armed by the manual refresh's result is current and works.
+	last := rec.calls[len(rec.calls)-1].msg
+	if last != (tickMsg{gen: 1}) {
+		t.Fatalf("last armed tick = %#v, want tickMsg{gen: 1}", last)
+	}
+	if _, c := m.Update(last); c == nil {
+		t.Error("the current tick started no fetch")
+	}
+}
+
+// blockingFetcher holds every Fetch until release is signalled or ctx ends,
+// and records how many calls were inside at once.
+type blockingFetcher struct {
+	release   chan struct{}
+	inside    atomic.Int32
+	maxInside atomic.Int32
+	done      atomic.Int32
+}
+
+func (f *blockingFetcher) Fetch(ctx context.Context) (domain.Snapshot, error) {
+	n := f.inside.Add(1)
+	for {
+		old := f.maxInside.Load()
+		if n <= old || f.maxInside.CompareAndSwap(old, n) {
+			break
+		}
+	}
+	defer func() {
+		f.inside.Add(-1)
+		f.done.Add(1)
+	}()
+	select {
+	case <-f.release:
+		return onePR(), nil
+	case <-ctx.Done():
+		return domain.Snapshot{}, ctx.Err()
+	}
+}
+
+func TestNoOverlappingFetches(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	f := &blockingFetcher{release: make(chan struct{})}
+	p := tea.NewProgram(New(ctx, f, Options{Interval: 5 * time.Millisecond}),
+		tea.WithContext(ctx), tea.WithInput(nil), tea.WithOutput(io.Discard))
+
+	runDone := make(chan error, 1)
+	go func() {
+		_, err := p.Run()
+		runDone <- err
+	}()
+
+	stop := make(chan struct{})
+	var feeders sync.WaitGroup
+	feeders.Add(1)
+	go func() {
+		defer feeders.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			case f.release <- struct{}{}:
+			case <-time.After(time.Millisecond):
+			}
+		}
+	}()
+
+	var senders sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		senders.Add(1)
+		go func() {
+			defer senders.Done()
+			for i := 0; i < 50; i++ {
+				p.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
+				time.Sleep(time.Millisecond)
+			}
+		}()
+	}
+
+	deadline := time.After(5 * time.Second)
+	for f.done.Load() < 5 {
+		select {
+		case <-deadline:
+			t.Fatalf("only %d fetches completed in 5 s, want at least 5", f.done.Load())
+		case <-time.After(2 * time.Millisecond):
+		}
+	}
+	senders.Wait()
+	p.Quit()
+	cancel()
+	select {
+	case <-runDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("program did not return within 5 s of Quit")
+	}
+	close(stop)
+	feeders.Wait()
+	if got := f.maxInside.Load(); got != 1 {
+		t.Errorf("max fetches in flight = %d, want exactly 1", got)
 	}
 }

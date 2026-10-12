@@ -123,26 +123,60 @@ func TestQuitInEveryState(t *testing.T) {
 	}
 }
 
-func TestRetryOnlyInError(t *testing.T) {
-	for _, state := range []string{"loading", "list", "empty"} {
-		t.Run(state, func(t *testing.T) {
-			m := modelIn(t, state)
-			before := plain(m)
-			m2, cmd := m.Update(key("r"))
-			if cmd != nil {
-				t.Errorf("r in %s state returned a command", state)
+func TestRefreshKey(t *testing.T) {
+	// build returns a sized model in the named state and the fetcher behind it.
+	build := func(state string) (tea.Model, *fakeFetcher) {
+		f := &fakeFetcher{snap: onePR()}
+		var m tea.Model = New(context.Background(), f, Options{ClosedDays: 14})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		switch state {
+		case "list":
+			m, _ = m.Update(fetchedMsg{snap: onePR()})
+		case "empty":
+			m, _ = m.Update(fetchedMsg{snap: domain.Snapshot{Viewer: "octo"}})
+		case "error":
+			m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
+		}
+		return m, f
+	}
+
+	t.Run("loading: the first fetch is running, r does nothing", func(t *testing.T) {
+		m, f := build("loading")
+		m2, cmd := m.Update(key("r"))
+		if cmd != nil {
+			t.Error("r while the first fetch runs returned a command")
+		}
+		if f.calls != 0 {
+			t.Errorf("fetch calls = %d, want 0", f.calls)
+		}
+		if got := m2.(Model).gen; got != 0 {
+			t.Errorf("generation = %d, want 0", got)
+		}
+	})
+	for _, state := range []string{"list", "empty"} {
+		t.Run(state+": one fetch, merged while it runs", func(t *testing.T) {
+			m, f := build(state)
+			m, cmd := m.Update(key("r"))
+			if cmd == nil {
+				t.Fatalf("r in the %s state returned no command", state)
 			}
-			if after := plain(m2); after != before {
-				t.Errorf("r in %s state changed the screen", state)
+			if got := m.(Model).gen; got != 1 {
+				t.Errorf("generation after r = %d, want 1", got)
+			}
+			if _, again := m.Update(key("r")); again != nil {
+				t.Error("r while a refresh runs returned a command")
+			}
+			m = runCmd(m, cmd)
+			if f.calls != 1 {
+				t.Errorf("fetch calls = %d, want exactly 1", f.calls)
+			}
+			if v := plain(m); !strings.Contains(v, "acme/api#1") {
+				t.Errorf("after the refresh the screen is %q, want the list", v)
 			}
 		})
 	}
 	t.Run("error retries once", func(t *testing.T) {
-		f := &fakeFetcher{snap: onePR()}
-		var m tea.Model = New(context.Background(), f, Options{ClosedDays: 14})
-		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-		m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
-
+		m, f := build("error")
 		m, cmd := m.Update(key("r"))
 		if cmd == nil {
 			t.Fatal("r in the error state returned no command")
@@ -170,6 +204,41 @@ func TestRetryOnlyInError(t *testing.T) {
 		m = runCmd(m, cmd)
 		if v := plain(m); !strings.Contains(v, "Could not load your PRs") || !strings.Contains(v, "still broken") {
 			t.Errorf("screen = %q", v)
+		}
+	})
+	t.Run("j and k still move", func(t *testing.T) {
+		snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
+			{ID: "1", Ref: domain.Ref{Repo: "a/b", Number: 1}, Title: "one"},
+			{ID: "2", Ref: domain.Ref{Repo: "a/b", Number: 2}, Title: "two"},
+		}}
+		var m tea.Model = New(context.Background(), &fakeFetcher{}, Options{ClosedDays: 14})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		m, _ = m.Update(fetchedMsg{snap: snap})
+		marked := func() string {
+			for _, l := range strings.Split(plain(m), "\n") {
+				if strings.HasPrefix(l, ">") {
+					return l
+				}
+			}
+			return ""
+		}
+		for _, k := range []string{"j", "down"} {
+			m, _ = m.Update(key("k"))
+			m, _ = m.Update(key(k))
+			if !strings.Contains(marked(), "a/b#2") {
+				t.Errorf("after %s the marker is on %q, want a/b#2", k, marked())
+			}
+		}
+		for _, k := range []string{"k", "up"} {
+			m, _ = m.Update(key("j"))
+			if k == "up" {
+				m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+			} else {
+				m, _ = m.Update(key(k))
+			}
+			if !strings.Contains(marked(), "a/b#1") {
+				t.Errorf("after %s the marker is on %q, want a/b#1", k, marked())
+			}
 		}
 	})
 }
