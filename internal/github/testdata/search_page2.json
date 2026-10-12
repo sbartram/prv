@@ -23,6 +23,7 @@
      "url": "https://github.com/acme/web/pull/77",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-05T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-11T11:00:00Z",
@@ -46,6 +47,7 @@
      "url": "https://github.com/acme/api/pull/500",
      "isDraft": false,
      "state": "MERGED",
+     "createdAt": "2026-09-20T00:00:00Z",
      "closedAt": "2026-09-27T12:00:00Z",
      "mergedAt": "2026-09-27T12:00:00Z",
      "updatedAt": "2026-09-28T00:00:00Z",
@@ -69,6 +71,7 @@
      "url": "https://github.com/acme/api/pull/501",
      "isDraft": false,
      "state": "CLOSED",
+     "createdAt": "2026-09-10T00:00:00Z",
      "closedAt": "2026-09-27T11:59:59Z",
      "mergedAt": null,
      "updatedAt": "2026-09-28T00:00:00Z",
@@ -92,6 +95,7 @@
      "url": "https://github.com/acme/api/pull/502",
      "isDraft": false,
      "state": "MERGED",
+     "createdAt": "2026-09-10T00:00:00Z",
      "closedAt": "2026-09-20T00:00:00Z",
      "mergedAt": "2026-09-20T00:00:00Z",
      "updatedAt": "2026-09-20T00:00:00Z",
@@ -115,6 +119,7 @@
      "url": "https://github.com/acme/api/pull/503",
      "isDraft": false,
      "state": "LOCKED",
+     "createdAt": "2026-08-01T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-09-01T00:00:00Z",
@@ -138,6 +143,7 @@
      "url": "https://github.com/deps/bot/pull/1",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-09T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-10T00:00:00Z",
@@ -147,11 +153,13 @@
      "author": {
       "login": "dependabot"
      },
-     "reviewDecision": null,
+     "reviewDecision": "APPROVED",
      "latestOpinionatedReviews": {
       "nodes": []
      },
-     "statusCheckRollup": null
+     "statusCheckRollup": {
+      "state": "SUCCESS"
+     }
     }
    ]
   }

@@ -227,7 +227,7 @@ func TestMembership(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"acme/web#77", "acme/api#481", "deps/bot#1", "acme/a#9", "acme/a#10", "acme/b#10",
+		"acme/api#481", "deps/bot#1", "acme/web#77", "acme/a#9", "acme/a#10", "acme/b#10",
 		"acme/old#3", "acme/one#7", "acme/api#500", "acme/two#7", "acme/api#503",
 	}
 	if got := refs(snap); !slices.Equal(got, want) {
@@ -248,6 +248,13 @@ func TestMembership(t *testing.T) {
 	}
 	if got := byRef["deps/bot#1"].Author; got != "dependabot" {
 		t.Errorf("deps/bot#1 author = %q, want dependabot", got)
+	}
+	// createdAt comes from the query and is kept at full precision.
+	if got, want := byRef["acme/api#481"].CreatedAt, time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("acme/api#481 CreatedAt = %v, want %v", got, want)
+	}
+	if got, want := byRef["deps/bot#1"].CreatedAt, time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("deps/bot#1 CreatedAt = %v, want %v", got, want)
 	}
 	// Same number in two repositories gives two rows.
 	if _, ok := byRef["acme/one#7"]; !ok {
@@ -276,6 +283,30 @@ func TestMembership(t *testing.T) {
 	}
 	if snap.Truncated {
 		t.Error("two pages ending in hasNextPage false must not be truncated")
+	}
+}
+
+// TestFetchAttentionOrder: Fetch hands rows back in D-01 bucket order, and the
+// discovery query asks for createdAt (the D-02 tie-break key).
+func TestFetchAttentionOrder(t *testing.T) {
+	c, tr := newFixtureClient(t, "status.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.PRs) < 2 {
+		t.Fatalf("fixture gave %d PRs, want several", len(snap.PRs))
+	}
+	prev := 0
+	for _, pr := range snap.PRs {
+		b := domain.Bucket(pr)
+		if b < prev {
+			t.Errorf("%s is in bucket %d after bucket %d: order is not attention order", pr.Ref, b, prev)
+		}
+		prev = b
+	}
+	if len(tr.bodies) == 0 || !strings.Contains(string(tr.bodies[0]), "createdAt") {
+		t.Error("the discovery query must request createdAt")
 	}
 }
 

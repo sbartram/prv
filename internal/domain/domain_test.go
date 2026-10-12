@@ -177,54 +177,115 @@ func TestInWindow(t *testing.T) {
 
 func TestSort(t *testing.T) {
 	t0 := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
-	mk := func(id string, st State, upd time.Time, repo string, n int) PR {
-		return PR{ID: id, State: st, UpdatedAt: upd, Ref: Ref{Repo: repo, Number: n}}
+	mk := func(id string, created time.Time, repo string, n int) PR {
+		return PR{ID: id, State: StateOpen, CreatedAt: created, Ref: Ref{Repo: repo, Number: n}}
 	}
-	t.Run("state rank, then updated desc, then repo, then number as int", func(t *testing.T) {
-		prs := []PR{
-			mk("unknown", StateUnknown, t0.Add(10*time.Hour), "acme/z", 1),
-			mk("closed", StateClosed, t0.Add(9*time.Hour), "acme/z", 1),
-			mk("merged", StateMerged, t0.Add(8*time.Hour), "acme/z", 1),
-			mk("open-old", StateOpen, t0.Add(-time.Hour), "acme/a", 1),
-			mk("open-b10", StateOpen, t0, "acme/b", 10),
-			mk("open-a10", StateOpen, t0, "acme/a", 10),
-			mk("open-a9", StateOpen, t0, "acme/a", 9),
-			mk("open-new", StateOpen, t0.Add(time.Hour), "acme/z", 99),
-		}
-		Sort(prs)
+	ids := func(prs []PR) []string {
 		var got []string
 		for _, p := range prs {
 			got = append(got, p.ID)
 		}
-		want := []string{"open-new", "open-a9", "open-a10", "open-b10", "open-old", "merged", "closed", "unknown"}
-		if !slices.Equal(got, want) {
+		return got
+	}
+	t.Run("bucket order, then createdAt newest first inside a bucket", func(t *testing.T) {
+		prs := []PR{
+			{ID: "unknown", State: StateUnknown, Ref: Ref{Repo: "a/a", Number: 1}},
+			{ID: "closed", State: StateClosed, Ref: Ref{Repo: "a/a", Number: 2}},
+			{ID: "merged", State: StateMerged, Ref: Ref{Repo: "a/a", Number: 3}},
+			{ID: "draft", State: StateOpen, IsDraft: true, CI: CIFailing, Ref: Ref{Repo: "a/a", Number: 4}},
+			{ID: "plain", State: StateOpen, Ref: Ref{Repo: "a/a", Number: 5}},
+			{ID: "running", State: StateOpen, CI: CIRunning, Ref: Ref{Repo: "a/a", Number: 6}},
+			{ID: "ready", State: StateOpen, Review: ReviewApproved, CI: CIPassing, Ref: Ref{Repo: "a/a", Number: 7}},
+			{ID: "changes", State: StateOpen, Review: ReviewChangesRequested, Ref: Ref{Repo: "a/a", Number: 8}},
+			{ID: "fail-old", State: StateOpen, CI: CIFailing, CreatedAt: t0, Ref: Ref{Repo: "a/a", Number: 9}},
+			{ID: "fail-new", State: StateOpen, CI: CIFailing, CreatedAt: t0.Add(time.Hour), Ref: Ref{Repo: "a/a", Number: 10}},
+		}
+		Sort(prs)
+		want := []string{"fail-new", "fail-old", "changes", "ready", "running", "plain", "draft", "merged", "closed", "unknown"}
+		if got := ids(prs); !slices.Equal(got, want) {
 			t.Errorf("order = %v\nwant    %v", got, want)
 		}
 	})
-	t.Run("merged ranks before closed even when the closed one is newer", func(t *testing.T) {
+	t.Run("same bucket and createdAt: repo, then number as an integer", func(t *testing.T) {
 		prs := []PR{
-			mk("closed-new", StateClosed, t0.Add(48*time.Hour), "acme/a", 1),
-			mk("merged-old", StateMerged, t0, "acme/a", 2),
+			mk("b10", t0, "acme/b", 10), mk("a100", t0, "acme/a", 100), mk("a9", t0, "acme/a", 9), mk("a10", t0, "acme/a", 10),
 		}
 		Sort(prs)
-		if prs[0].ID != "merged-old" {
-			t.Errorf("first = %s, want merged-old", prs[0].ID)
+		want := []string{"a9", "a10", "a100", "b10"}
+		if got := ids(prs); !slices.Equal(got, want) {
+			t.Errorf("order = %v, want %v", got, want)
 		}
 	})
-	t.Run("stable for equal keys", func(t *testing.T) {
-		prs := []PR{
-			{ID: "first", State: StateOpen, UpdatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 1}},
-			{ID: "second", State: StateOpen, UpdatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 1}},
-			{ID: "third", State: StateOpen, UpdatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 1}},
+	t.Run("createdAt compares at full precision", func(t *testing.T) {
+		prs := []PR{mk("earlier", t0, "acme/a", 1), mk("later", t0.Add(time.Millisecond), "acme/z", 2)}
+		Sort(prs)
+		if prs[0].ID != "later" {
+			t.Errorf("first = %s, want later (1 ms newer)", prs[0].ID)
+		}
+	})
+	t.Run("permutation independent and blind to updatedAt", func(t *testing.T) {
+		base := []PR{
+			mk("a9", t0, "acme/a", 9),
+			mk("a10", t0, "acme/a", 10),
+			mk("b10", t0, "acme/b", 10),
+			mk("newer", t0.Add(time.Hour), "acme/z", 1),
+			{ID: "fail", State: StateOpen, CI: CIFailing, CreatedAt: t0.Add(-time.Hour), Ref: Ref{Repo: "acme/q", Number: 4}},
+			{ID: "draft", State: StateOpen, IsDraft: true, CreatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 1}},
+			{ID: "merged", State: StateMerged, CreatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 2}},
+			{ID: "closed", State: StateClosed, CreatedAt: t0, Ref: Ref{Repo: "acme/a", Number: 3}},
+		}
+		perms := [][]int{
+			{0, 1, 2, 3, 4, 5, 6, 7},
+			{7, 6, 5, 4, 3, 2, 1, 0},
+			{3, 1, 7, 0, 5, 2, 6, 4},
+			{2, 0, 1, 4, 7, 3, 5, 6},
+			{5, 3, 6, 1, 4, 0, 7, 2},
+			{1, 2, 0, 6, 3, 7, 4, 5},
+		}
+		var first []string
+		for pi, perm := range perms {
+			prs := make([]PR, len(perm))
+			for i, k := range perm {
+				prs[i] = base[k]
+				prs[i].UpdatedAt = t0.Add(time.Duration(i*pi) * time.Minute) // different per permutation
+			}
+			Sort(prs)
+			got := ids(prs)
+			if first == nil {
+				first = got
+				continue
+			}
+			if !slices.Equal(got, first) {
+				t.Errorf("permutation %d = %v\nwant %v", pi, got, first)
+			}
+		}
+		// Changing only updatedAt never moves a row.
+		prs := slices.Clone(base)
+		Sort(prs)
+		before := ids(prs)
+		for i := range prs {
+			prs[i].UpdatedAt = t0.Add(time.Duration(len(prs)-i) * 24 * time.Hour)
 		}
 		Sort(prs)
-		if prs[0].ID != "first" || prs[1].ID != "second" || prs[2].ID != "third" {
-			t.Errorf("equal keys reordered: %v %v %v", prs[0].ID, prs[1].ID, prs[2].ID)
+		if got := ids(prs); !slices.Equal(got, before) {
+			t.Errorf("after updatedAt changes = %v, want %v", got, before)
 		}
 	})
-	t.Run("empty and nil do not panic", func(t *testing.T) {
+	t.Run("stable for fully equal keys", func(t *testing.T) {
+		prs := []PR{mk("first", t0, "acme/a", 1), mk("second", t0, "acme/a", 1), mk("third", t0, "acme/a", 1)}
+		Sort(prs)
+		if got := ids(prs); !slices.Equal(got, []string{"first", "second", "third"}) {
+			t.Errorf("equal keys reordered: %v", got)
+		}
+	})
+	t.Run("empty, nil and single do not panic", func(t *testing.T) {
 		Sort(nil)
 		Sort([]PR{})
+		one := []PR{mk("only", t0, "acme/a", 1)}
+		Sort(one)
+		if len(one) != 1 || one[0].ID != "only" {
+			t.Errorf("single PR changed: %v", one)
+		}
 	})
 }
 
