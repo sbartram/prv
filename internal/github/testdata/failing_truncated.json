@@ -1,0 +1,45 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-10-11T13:00:00Z"
+    },
+    "nodes": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_11",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 1,
+            "pageInfo": {
+              "hasNextPage": true
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "build",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 21,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

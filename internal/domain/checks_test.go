@@ -138,3 +138,44 @@ func TestSummarizeFailing(t *testing.T) {
 		})
 	}
 }
+
+// TestSummarizeLatestRerun runs the two steps the github mapper runs, on the
+// shapes the fixtures hold: superseded runs never reach a name or a count.
+func TestSummarizeLatestRerun(t *testing.T) {
+	t8 := time.Date(2026, 10, 11, 8, 0, 0, 0, time.UTC)
+	t9 := t8.Add(time.Hour)
+	chk := func(name, wf string, ctx bool, st CheckState, at time.Time, id int64) Check {
+		return Check{Name: name, Workflow: wf, Context: ctx, State: st, SuiteCreatedAt: at, ID: id}
+	}
+	tests := []struct {
+		name string
+		in   []Check
+		want FailingCheck
+	}{
+		{"cancelled older suite, one failure in the newer suite",
+			[]Check{
+				chk("Linux / test", "Code OSS", false, CheckCancelled, t8, 1), chk("Linux / lint", "Code OSS", false, CheckCancelled, t8, 2),
+				chk("Linux / test", "Code OSS", false, CheckFailing, t9, 3), chk("Linux / lint", "Code OSS", false, CheckPassing, t9, 4),
+			},
+			FailingCheck{Known: true, Name: "Linux / test"}},
+		{"a failure fixed by a newer passing run is not named",
+			[]Check{chk("deploy", "release", false, CheckFailing, t8, 1), chk("deploy", "release", false, CheckPassing, t9, 2)},
+			FailingCheck{}},
+		{"cancelled older run, newer run passes: nothing to name",
+			[]Check{chk("deploy", "release", false, CheckCancelled, t8, 1), chk("deploy", "release", false, CheckPassing, t9, 2)},
+			FailingCheck{}},
+		{"a failing status and a failing check run with one name are two failures",
+			[]Check{chk("build", "", true, CheckFailing, time.Time{}, 0), chk("build", "ci", false, CheckFailing, t9, 2)},
+			FailingCheck{Known: true, Name: "build", More: 1}},
+		{"a failing status stays failing next to a passing check run of that name",
+			[]Check{chk("build", "", true, CheckFailing, time.Time{}, 0), chk("build", "ci", false, CheckPassing, t9, 2)},
+			FailingCheck{Known: true, Name: "build"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SummarizeFailing(LatestChecks(tt.in), true); got != tt.want {
+				t.Errorf("SummarizeFailing(LatestChecks(...)) = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}

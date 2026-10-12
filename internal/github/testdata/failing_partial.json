@@ -1,0 +1,43 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-10-11T13:00:00Z"
+    },
+    "nodes": [
+      null,
+      {
+        "__typename": "PullRequest",
+        "id": "PR_12",
+        "statusCheckRollup": {
+          "state": "ERROR",
+          "contexts": {
+            "totalCount": 1,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "StatusContext",
+                "context": "ci/jenkins",
+                "state": "ERROR"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "nodes",
+        0
+      ],
+      "message": "Could not resolve to a node with the global id of 'PR_11'"
+    }
+  ]
+}

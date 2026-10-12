@@ -1,0 +1,294 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-10-11T13:00:00Z"
+    },
+    "nodes": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_11",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 12,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / test",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 100,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / lint",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 101,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "macOS / test",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 102,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Windows / test",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 103,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / compile",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 104,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Web / test",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 105,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / test",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 200,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / lint",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "databaseId": 201,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "macOS / test",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "databaseId": 202,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Windows / test",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "databaseId": 203,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Linux / compile",
+                "status": "IN_PROGRESS",
+                "conclusion": null,
+                "databaseId": 204,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "Web / test",
+                "status": "IN_PROGRESS",
+                "conclusion": null,
+                "databaseId": 205,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "Code OSS"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_16",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 2,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "deploy",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 300,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "release"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "deploy",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "databaseId": 301,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "release"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
