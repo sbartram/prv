@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/sbartram/prv/internal/domain"
 )
@@ -17,21 +18,29 @@ const maxCIColW = 24
 // failing PR without a known name, shows the plain badge. The colour and the
 // attention bucket come from the rollup state, never from this text.
 //
-// A text wider than w cells (w > 0) is replaced by the plain badge cut to w.
-// Widths are cells, never bytes or runes.
+// A text wider than w cells (w > 0) is shortened in the name only: the
+// " (cancelled)" and " +N" suffixes stay whole. When not even 2 cells of the
+// name fit, the plain badge cut to w is shown instead. Widths are cells, never
+// bytes or runes.
 func ciCell(pr domain.PR, w int) string {
 	if !pr.Failing.Known {
 		return pr.CI.Badge()
 	}
-	text := "✗ " + pr.Failing.Name
+	const prefix = "✗ "
+	suffix := ""
 	if pr.Failing.Cancelled {
-		text += " (cancelled)"
+		suffix += " (cancelled)"
 	}
 	if pr.Failing.More > 0 {
-		text += " +" + strconv.Itoa(pr.Failing.More)
+		suffix += " +" + strconv.Itoa(pr.Failing.More)
 	}
+	text := prefix + pr.Failing.Name + suffix
 	if w <= 0 || lipgloss.Width(text) <= w {
 		return text
 	}
-	return truncateCell(pr.CI.Badge(), w)
+	room := w - lipgloss.Width(prefix) - lipgloss.Width(suffix)
+	if room < 2 {
+		return truncateCell(pr.CI.Badge(), w)
+	}
+	return prefix + ansi.Truncate(pr.Failing.Name, room, "…") + suffix
 }
