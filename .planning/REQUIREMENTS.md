@@ -62,9 +62,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **AUTH-01**: Uses the same token `gh` would: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login
 - [x] **AUTH-02**: If no token is found, prv exits with a clear message explaining how to log in
-- [ ] **AUTH-03**: The token is never logged, displayed, or written to disk
+- [x] **AUTH-03**: The token is never logged, displayed, or written to disk
 - [ ] **CONF-01**: Settings (refresh interval, closed window) are read from `~/.config/prv/config.toml`, with defaults if the file is missing
-- [ ] **CONF-02**: `go install github.com/sbartram/prv/cmd/prv@latest` installs a working binary, and `prv --version` prints its version
+- [x] **CONF-02**: `go install github.com/sbartram/prv/cmd/prv@latest` installs a working binary, and `prv --version` prints its version
 
 ## v2 Requirements
 
@@ -157,9 +157,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-05 | Phase 3 | Pending |
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
-| AUTH-03 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Complete |
 | CONF-01 | Phase 2 | Pending |
-| CONF-02 | Phase 1 | Pending |
+| CONF-02 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 38 total
