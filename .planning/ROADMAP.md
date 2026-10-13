@@ -112,7 +112,7 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 10/10 plans executed
+**Plans**: 10/11 plans executed
 
 Plans:
 **Wave 1**
@@ -136,6 +136,9 @@ Plans:
 **Wave 6** *(gap closure, UAT 2026-10-12: review warnings WR-01, WR-02, WR-04; WR-03 deferred)*
 - [x] 03-09-PLAN.md — FetchDetail marks a partial read (null nodes or a kept GraphQL error) so the detail says "read N of M runs" (G-03-6-WR02)
 - [x] 03-10-PLAN.md — Detail rate-limit pause clamped through domain.ServerWait (1 s to 65 min); unknown checks listed and counted as "unknown", fold line "more passing or skipped" (G-03-6-WR01, G-03-6-WR04)
+
+**Wave 7** *(gap closure, UAT 2026-10-13: review warning WR-05, user chose fix before ship)*
+- [ ] 03-11-PLAN.md — Detail.Partial split from Truncated: a kept GraphQL error shows a faint "some details could not be loaded" line, "read N of M runs" only when runs were not read, "no checks" kept (G-03-6)
 
 **UI hint**: yes
 
