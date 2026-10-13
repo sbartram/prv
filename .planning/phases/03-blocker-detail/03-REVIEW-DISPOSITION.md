@@ -60,7 +60,7 @@ recorded: 2026-10-13T01:46:07.404Z
 
 | Finding | Severity | Disposition | Source |
 |---------|----------|-------------|--------|
-| WR-05 | warning | open | - |
+| WR-05 | warning | open | UAT 2026-10-12: user chose fix before ship; tracked as gap G-03-6 |
 | IN-06 | info | open | - |
 | IN-07 | info | open | - |
 | WR-01 | warning | fixed | Fixed by 03-10 Task 1 (domain.ServerWait clamp in pauseForRateLimit); confirmed resolved by re-review 2026-10-12 |

@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 03-blocker-detail
 source: [03-VERIFICATION.md]
 started: 2026-10-13T01:48:49Z
@@ -58,8 +58,21 @@ blocked: 0
   reason: "User reported: fix before ship"
   severity: major
   test: 6
-  artifacts: []  # Filled by diagnosis
-  missing: []    # Filled by diagnosis
+  root_cause: "domain.Detail.Truncated carries two meanings: FetchDetail sets it both when fewer check runs were read than exist and when GitHub kept a GraphQL error next to the data (partial). The only renderer, checksSummary, turns any Truncated into 'read Read of Total runs', so a partial reviewer error shows 'read 3 of 3 runs' (looks complete), and a PR with no statusCheckRollup plus a partial error shows 'read 0 of 0 runs' instead of 'no checks'."
+  artifacts:
+    - path: "internal/github/checks.go"
+      issue: "FetchDetail (lines ~331-335) sets d.Truncated = true on a partial page instead of a separate flag"
+    - path: "internal/domain/checks.go"
+      issue: "Detail (line ~285) has no field for 'an error was kept next to the data'"
+    - path: "internal/ui/detail.go"
+      issue: "checksSummary (lines 308-313) renders 'read N of M runs' for every Truncated and skips the 'no checks' branch"
+  missing:
+    - "Add Detail.Partial bool; set it (not Truncated) when detailPage reports partial"
+    - "Show 'read N of M runs' only when runs were actually not read (Read < Total or paging cut)"
+    - "Show a distinct faint 'some details could not be loaded' notice when Partial is set, not worded as a run count"
+    - "Keep 'no checks' when there are no checks and nothing was cut, even if Partial is set"
+    - "Rendered-output tests (not just struct fields) for both WR-05 cases: partial reviewer error with Read == Total, and nil rollup + partial on page 1"
+  debug_session: ".planning/phases/03-blocker-detail/03-REVIEW.md#wr-05"
 
 ## Deferred Follow-Ups
 
