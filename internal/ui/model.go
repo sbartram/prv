@@ -119,6 +119,11 @@ type Model struct {
 	nextAt   time.Time // when the pending tick is due
 	failedAt time.Time // time of the last failed refresh while data is shown
 
+	// fetchEpoch is the epoch of the latest fetch started (Init's is 0). A
+	// result with an epoch below mutEpoch started before the last local
+	// watch-list change and is discarded (RESEARCH Pitfall 1).
+	fetchEpoch, mutEpoch int
+
 	// Backoff state. failures counts consecutive failed fetches. While now is
 	// before pausedUntil no request goes out, not even on r. flash is a short
 	// message in the footer that expires at flashUntil.
@@ -370,6 +375,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// markMutation records a local watch-list change.
+func (m *Model) markMutation() {}
 
 // openURL opens raw in the browser, after safeURL has checked it. The launch
 // happens in the returned Cmd, never in Update.

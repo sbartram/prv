@@ -26,6 +26,10 @@ type fetchedMsg struct {
 	gen  int
 	snap domain.Snapshot
 	err  error
+	// epoch is the fetch's epoch; a result whose epoch is below Model.mutEpoch
+	// started before a local watch-list change and is discarded (RESEARCH
+	// Pitfall 1).
+	epoch int
 }
 
 // fetch runs one fetch. The closure captures only ctx, f and gen, never the
