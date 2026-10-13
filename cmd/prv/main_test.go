@@ -588,6 +588,7 @@ type routedTransport struct {
 	failing      string
 	detail       string
 	lookup       string
+	lookupStatus int // 0 means 200; any other value answers Lookup with that HTTP status
 	failVars     []map[string]any
 	failQuerys   []string
 	detailVars   []map[string]any
@@ -636,8 +637,12 @@ func (r *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	default:
 		r.t.Errorf("unexpected operation: %.40q", payload.Query)
 	}
+	status := 200
+	if r.lookupStatus != 0 && strings.HasPrefix(payload.Query, "query Lookup") {
+		status, body = r.lookupStatus, `{"message":"Bad Gateway"}`
+	}
 	return &http.Response{
-		StatusCode: 200,
+		StatusCode: status,
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Request:    req,
@@ -1173,5 +1178,67 @@ func TestUnavailableEndToEnd(t *testing.T) {
 	}
 	if !strings.Contains(ls[0], "1 unavailable") {
 		t.Errorf("header = %q, want '1 unavailable'", ls[0])
+	}
+}
+
+// lookupClosedBody answers a Lookup of octo/old#7: closed on 2026-08-01, more
+// than two months before the test clock and far outside a 14 day window.
+const lookupClosedBody = `{"data":{` + lookupRate + `,` +
+	`"r0":{"pullRequest":{"id":"PR_7","number":7,"title":"Dropped idea","url":"https://github.com/octo/old/pull/7",` +
+	`"isDraft":false,"state":"CLOSED","createdAt":"2026-07-01T08:00:00Z","closedAt":"2026-08-01T00:00:00Z","mergedAt":null,` +
+	`"updatedAt":"2026-08-01T00:00:00Z","repository":{"nameWithOwner":"octo/old"},"author":{"login":"alice"},` +
+	`"reviewDecision":null,"mergeStateStatus":"UNKNOWN","mergeable":"UNKNOWN","latestOpinionatedReviews":{"nodes":[]},` +
+	`"reviewRequests":{"nodes":[]},"statusCheckRollup":null}}}}`
+
+// TestClosedSavedPREndToEnd: a saved PR that closed long ago stays listed, one
+// row however often the list is refreshed, and a refresh that fails as a whole
+// keeps the row and the saved entry.
+func TestClosedSavedPREndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	store := watchlist.New(path)
+	if _, err := store.Add(domain.Ref{Repo: "octo/old", Number: 7}); err != nil {
+		t.Fatal(err)
+	}
+	rt := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupClosedBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+		Watch:      store,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14, Watchlist: store})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	view := plain(m)
+	if row := lineWith(view, "octo/old#7"); !strings.Contains(row, "+ octo/old#7") || !strings.Contains(row, "closed") {
+		t.Errorf("octo/old#7 row = %q, want the + marker and 'closed'\n%s", row, view)
+	}
+	refresh := func() {
+		var cmd tea.Cmd
+		m, cmd = send(m, key("r"))
+		m = drain(m, cmd)
+	}
+	refresh()
+	refresh()
+	if n := strings.Count(plain(m), "octo/old#7"); n != 1 {
+		t.Errorf("octo/old#7 is on %d lines after two refreshes, want exactly 1\n%s", n, plain(m))
+	}
+
+	rt.lookupStatus = 502
+	refresh()
+	view = plain(m)
+	if row := lineWith(view, "octo/old#7"); !strings.Contains(row, "closed") || strings.Contains(row, "unavailable") {
+		t.Errorf("after a failed refresh the row = %q, want the last data kept\n%s", row, view)
+	}
+	if !strings.Contains(strings.Split(view, "\n")[0], "refresh failed") {
+		t.Errorf("header = %q, want 'refresh failed'", strings.Split(view, "\n")[0])
+	}
+	if refs, _, err := store.Load(); err != nil || len(refs) != 1 || refs[0] != (domain.Ref{Repo: "octo/old", Number: 7}) {
+		t.Errorf("store.Load() = %v, %v, want [octo/old#7]", refs, err)
 	}
 }

@@ -475,3 +475,25 @@ func TestVisibleUnavailable(t *testing.T) {
 		t.Errorf("number 5: %v, want %v (the number filter matches it by number)", got, want)
 	}
 }
+
+func TestInWindowManual(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-60 * 24 * time.Hour)
+	tests := []struct {
+		name string
+		pr   PR
+		want bool
+	}{
+		{"saved merged 60 days ago is kept", PR{State: StateMerged, ClosedAt: old, Manual: true}, true},
+		{"saved closed 60 days ago is kept", PR{State: StateClosed, ClosedAt: old, Manual: true}, true},
+		{"the same merged PR, not saved, is dropped", PR{State: StateMerged, ClosedAt: old}, false},
+		{"saved with a zero ClosedAt is kept", PR{State: StateClosed, Manual: true}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := InWindow(tt.pr, now, 14); got != tt.want {
+				t.Errorf("InWindow = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

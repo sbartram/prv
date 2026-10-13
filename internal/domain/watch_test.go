@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"maps"
+	"reflect"
 	"slices"
 	"testing"
 )
@@ -136,4 +138,84 @@ func TestEverySavedRefOnce(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReconcile(t *testing.T) {
+	ref := Ref{"octo/tools", 42}
+	key := ref.Key()
+	loaded := func() PR {
+		return PR{ID: "PR_42", Ref: ref, Title: "Speed up the build", State: StateOpen, CI: CIPassing,
+			Manual: true, Watched: Ref{"Octo/Tools", 42}}
+	}
+	failed := func() PR { return PR{Ref: ref, Manual: true, Watched: ref, Unavail: LoadFailed("server error", "")} }
+	notFound := func() PR { return PR{Ref: ref, Manual: true, Watched: ref, Unavail: NotFound()} }
+	sso := func() PR { return PR{Ref: ref, Manual: true, Watched: ref, Unavail: SSORequired("octo")} }
+
+	tests := []struct {
+		name        string
+		prev, next  []PR
+		strikes     map[Ref]int
+		wantKind    UnavailKind
+		wantTitle   string
+		wantStrikes map[Ref]int
+	}{
+		{"first launch, other error: unavailable at once", nil, []PR{failed()}, nil, UnavailOther, "", map[Ref]int{key: 1}},
+		{"first strike keeps the last data", []PR{loaded()}, []PR{failed()}, nil, UnavailNone, "Speed up the build", map[Ref]int{key: 1}},
+		{"second strike in a row is unavailable", []PR{loaded()}, []PR{failed()}, map[Ref]int{key: 1}, UnavailOther, "", map[Ref]int{key: 2}},
+		{"third strike stays unavailable", []PR{failed()}, []PR{failed()}, map[Ref]int{key: 2}, UnavailOther, "", map[Ref]int{key: 3}},
+		{"a PR that loads clears the count", []PR{loaded()}, []PR{loaded()}, map[Ref]int{key: 1}, UnavailNone, "Speed up the build", map[Ref]int{}},
+		{"not found is unavailable at once", []PR{loaded()}, []PR{notFound()}, nil, UnavailNotFound, "", map[Ref]int{}},
+		{"SSO is unavailable at once", []PR{loaded()}, []PR{sso()}, map[Ref]int{key: 1}, UnavailSSO, "", map[Ref]int{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prev, next := slices.Clone(tt.prev), slices.Clone(tt.next)
+			var strikes map[Ref]int
+			if tt.strikes != nil {
+				strikes = map[Ref]int{}
+				for k, v := range tt.strikes {
+					strikes[k] = v
+				}
+			}
+			out, got := Reconcile(tt.prev, tt.next, tt.strikes)
+			if len(out) != 1 {
+				t.Fatalf("rows = %d, want 1", len(out))
+			}
+			if out[0].Unavail.Kind != tt.wantKind || out[0].Title != tt.wantTitle {
+				t.Errorf("row = kind %v, title %q; want kind %v, title %q", out[0].Unavail.Kind, out[0].Title, tt.wantKind, tt.wantTitle)
+			}
+			if !maps.Equal(got, tt.wantStrikes) {
+				t.Errorf("strikes = %v, want %v", got, tt.wantStrikes)
+			}
+			if !reflect.DeepEqual(tt.prev, prev) || !reflect.DeepEqual(tt.next, next) {
+				t.Error("Reconcile changed an input slice")
+			}
+			if tt.strikes != nil && !maps.Equal(tt.strikes, strikes) {
+				t.Errorf("Reconcile changed the input map: %v, was %v", tt.strikes, strikes)
+			}
+		})
+	}
+
+	t.Run("kept row stays saved and is not auto", func(t *testing.T) {
+		out, _ := Reconcile([]PR{loaded()}, []PR{failed()}, nil)
+		if !out[0].Manual || out[0].Auto || out[0].Watched != ref {
+			t.Errorf("kept row = Manual %v, Auto %v, Watched %v; want Manual, not Auto, Watched %v",
+				out[0].Manual, out[0].Auto, out[0].Watched, ref)
+		}
+	})
+	t.Run("a prev row that was not saved is not reused", func(t *testing.T) {
+		prev := loaded()
+		prev.Manual = false
+		out, _ := Reconcile([]PR{prev}, []PR{failed()}, nil)
+		if out[0].Unavail.Kind != UnavailOther {
+			t.Errorf("kind = %v, want unavailable", out[0].Unavail.Kind)
+		}
+	})
+	t.Run("the result is sorted", func(t *testing.T) {
+		fail := PR{ID: "F", Ref: Ref{"acme/x", 1}, State: StateOpen, CI: CIFailing, Auto: true}
+		out, _ := Reconcile(nil, []PR{fail, notFound()}, nil)
+		if len(out) != 2 || out[0].Unavail.Kind != UnavailNotFound {
+			t.Errorf("order = %v, want the unavailable row first", out)
+		}
+	})
 }

@@ -124,6 +124,10 @@ type Model struct {
 	// watch-list change and is discarded (RESEARCH Pitfall 1).
 	fetchEpoch, mutEpoch int
 
+	// strikes counts, per saved ref (Key), the refreshes in a row that failed
+	// for that PR with an error other than not-found or SSO (D-12).
+	strikes map[domain.Ref]int
+
 	// Backoff state. failures counts consecutive failed fetches. While now is
 	// before pausedUntil no request goes out, not even on r. flash is a short
 	// message in the footer that expires at flashUntil.

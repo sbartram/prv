@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -197,5 +198,109 @@ func TestCompactWatchRows(t *testing.T) {
 	}
 	if !strings.HasPrefix(row, "> + ") || !strings.Contains(row, "⚠") {
 		t.Errorf("6-column compact row = %q, want '> + ' kept and the warning glyph", row)
+	}
+}
+
+// toolsRef is the saved PR the two-strike tests follow.
+var toolsRef = domain.Ref{Repo: "octo/tools", Number: 42}
+
+// toolsSnap is a snapshot whose saved PR octo/tools#42 is in state: nil means it
+// loaded.
+func toolsSnap(unavail *domain.Unavail) domain.Snapshot {
+	at := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
+	pr := domain.PR{ID: "PR_42", Ref: toolsRef, Title: "Speed up the build", Author: "alice", Manual: true, Watched: toolsRef,
+		State: domain.StateOpen, Review: domain.ReviewApproved, CI: domain.CIPassing, UpdatedAt: at}
+	if unavail != nil {
+		pr = domain.PR{Ref: toolsRef, Manual: true, Watched: toolsRef, URL: toolsRef.URL(), Unavail: *unavail}
+	}
+	other := domain.PR{ID: "PR_1", Ref: domain.Ref{Repo: "acme/api", Number: 1}, Title: "Api change", Author: "octo", Auto: true,
+		State: domain.StateOpen, UpdatedAt: at}
+	snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{pr, other}}
+	domain.Sort(snap.PRs)
+	return snap
+}
+
+func TestTwoStrikeRule(t *testing.T) {
+	failed := domain.LoadFailed("server error", "")
+	notFound := domain.NotFound()
+	row := func(m tea.Model) string { return rowLine(m.(Model), "octo/tools#42") }
+	update := func(m tea.Model, snap domain.Snapshot, err error) tea.Model {
+		m, _ = m.Update(fetchedMsg{gen: m.(Model).gen, snap: snap, err: err})
+		return m
+	}
+
+	var m tea.Model = newTestModel(t, toolsSnap(nil), 120, 24)
+
+	m = update(m, toolsSnap(&failed), nil) // strike 1
+	if r := row(m); !strings.Contains(r, "Speed up the build") || !strings.Contains(r, "✓ passing") || strings.Contains(r, "unavailable") {
+		t.Errorf("after one failed refresh the row = %q, want its last data", r)
+	}
+
+	m = update(m, domain.Snapshot{}, errors.New("boom")) // the whole refresh fails: no strike
+	if r := row(m); !strings.Contains(r, "Speed up the build") {
+		t.Errorf("after a failed refresh the row = %q, want its last data", r)
+	}
+	if n := m.(Model).strikes[toolsRef]; n != 1 {
+		t.Errorf("strikes = %d after a refresh that failed as a whole, want 1 (unchanged)", n)
+	}
+
+	m = update(m, toolsSnap(&failed), nil) // strike 2
+	if r := row(m); !strings.Contains(r, "⚠ unavailable: could not load (server error)") {
+		t.Errorf("after two failed refreshes the row = %q, want '⚠ unavailable: could not load (server error)'", r)
+	}
+
+	m = update(m, toolsSnap(nil), nil) // loads again
+	if r := row(m); !strings.Contains(r, "Speed up the build") || strings.Contains(r, "unavailable") {
+		t.Errorf("after the PR loads the row = %q, want a normal row", r)
+	}
+	if n := m.(Model).strikes[toolsRef]; n != 0 {
+		t.Errorf("strikes = %d after a good load, want 0", n)
+	}
+
+	m = update(m, toolsSnap(&failed), nil) // strike 1 again: the count started over
+	if r := row(m); !strings.Contains(r, "Speed up the build") {
+		t.Errorf("first failure after a good load: row = %q, want its last data", r)
+	}
+
+	m = update(m, toolsSnap(&notFound), nil) // a real answer: at once
+	if r := row(m); !strings.Contains(r, "⚠ unavailable: not found") {
+		t.Errorf("after NOT_FOUND the row = %q, want it unavailable at once", r)
+	}
+}
+
+func TestClosedSavedFilters(t *testing.T) {
+	long := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
+		{ID: "PR_7", Ref: domain.Ref{Repo: "octo/old", Number: 7}, Title: "Dropped idea", Author: "octo", Manual: true,
+			Watched: domain.Ref{Repo: "octo/old", Number: 7}, State: domain.StateClosed, ClosedAt: long, UpdatedAt: long},
+		{ID: "PR_8", Ref: domain.Ref{Repo: "octo/old", Number: 8}, Title: "Shipped idea", Author: "octo", Manual: true,
+			Watched: domain.Ref{Repo: "octo/old", Number: 8}, State: domain.StateMerged, ClosedAt: long, UpdatedAt: long},
+	}}
+	domain.Sort(snap.PRs)
+	var m tea.Model = newTestModel(t, snap, 120, 24)
+	have := func() string {
+		var out []string
+		for _, pr := range m.(Model).rows {
+			out = append(out, pr.Ref.String())
+		}
+		return strings.Join(out, " ")
+	}
+	if got := have(); got != "octo/old#8 octo/old#7" {
+		t.Fatalf("rows = %q, want the merged then the closed saved PR", got)
+	}
+	if l := rowLine(m.(Model), "octo/old#7"); !strings.Contains(l, "closed") {
+		t.Errorf("row = %q, want 'closed'", l)
+	}
+	m = press(m, "3")
+	if got := have(); got != "octo/old#8" {
+		t.Errorf("3 hides closed: rows = %q, want 'octo/old#8'", got)
+	}
+	m = press(m, "3", "2")
+	if got := have(); got != "octo/old#7" {
+		t.Errorf("2 hides merged: rows = %q, want 'octo/old#7'", got)
+	}
+	m = press(m, "2")
+	if got := have(); got != "octo/old#8 octo/old#7" {
+		t.Errorf("toggled back: rows = %q, want both", got)
 	}
 }

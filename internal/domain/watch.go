@@ -56,3 +56,6 @@ func Combine(auto, looked []PR) []PR {
 	}
 	return out
 }
+
+// Reconcile is not implemented yet: it returns next and strikes unchanged.
+func Reconcile(prev, next []PR, strikes map[Ref]int) ([]PR, map[Ref]int) { return next, strikes }
