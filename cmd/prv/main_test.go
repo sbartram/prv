@@ -1242,3 +1242,58 @@ func TestClosedSavedPREndToEnd(t *testing.T) {
 		t.Errorf("store.Load() = %v, %v, want [octo/old#7]", refs, err)
 	}
 }
+
+// TestRemoveEndToEnd: d then y takes a saved PR off the list and out of
+// watchlist.json, with no request to GitHub.
+func TestRemoveEndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	store := watchlist.New(path)
+	if _, err := store.Add(domain.Ref{Repo: "octo/tools", Number: 42}); err != nil {
+		t.Fatal(err)
+	}
+	rt := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupOKBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+		Watch:      store,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14, Watchlist: store})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	view := plain(m)
+	if row := lineWith(view, "octo/tools#42"); !strings.HasPrefix(row, ">") || !strings.Contains(row, "+ octo/tools#42") {
+		t.Fatalf("octo/tools#42 is not the selected saved row:\n%s", view)
+	}
+	before := len(rt.ops)
+
+	m, _ = send(m, key("d"))
+	ls := strings.Split(plain(m), "\n")
+	if got, want := ls[len(ls)-1], "remove octo/tools#42 from watch list? y/n"; got != want {
+		t.Errorf("last line = %q, want %q", got, want)
+	}
+	m, cmd := send(m, key("y"))
+	m = drain(m, cmd)
+
+	view = plain(m)
+	ls = strings.Split(view, "\n")
+	for _, l := range ls[:len(ls)-1] {
+		if strings.Contains(l, "octo/tools#42") {
+			t.Errorf("octo/tools#42 is still listed:\n%s", view)
+		}
+	}
+	if last := ls[len(ls)-1]; !strings.Contains(last, "removed octo/tools#42") {
+		t.Errorf("footer = %q, want it to hold 'removed octo/tools#42'", last)
+	}
+	if refs, _, err := store.Load(); err != nil || len(refs) != 0 {
+		t.Errorf("store.Load() = %v, %v, want no ref", refs, err)
+	}
+	if n := len(rt.ops) - before; n != 0 {
+		t.Errorf("the removal sent %d GraphQL requests (%v), want none", n, rt.ops[before:])
+	}
+}
