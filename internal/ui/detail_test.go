@@ -1271,3 +1271,140 @@ func TestDetailTinyHeights(t *testing.T) {
 		}
 	}
 }
+
+// unavailDetailFetcher is an addFetcher that can also fetch detail. It counts
+// the detail calls.
+type unavailDetailFetcher struct {
+	*addFetcher
+	ids []string
+}
+
+func (f *unavailDetailFetcher) FetchDetail(_ context.Context, id string) (domain.Detail, error) {
+	f.ids = append(f.ids, id)
+	return fixtureDetail(), nil
+}
+
+// unavailDetailModel is a 120x40 model loaded with unavailSnap and a detail
+// capable fetcher. The cursor is on acme/gone#5; the row below is samlcorp/app#3.
+func unavailDetailModel(t *testing.T, w, h int, op Opener) (tea.Model, *unavailDetailFetcher) {
+	t.Helper()
+	f := &unavailDetailFetcher{addFetcher: &addFetcher{snap: unavailSnap()}}
+	var m tea.Model = New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Opener: op})
+	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
+	m, _ = m.Update(fetchedMsg{snap: unavailSnap()})
+	return m, f
+}
+
+func TestDetailUnavailable(t *testing.T) {
+	op := &fakeOpener{}
+	m, f := unavailDetailModel(t, 120, 40, op)
+	m = press(m, "j") // samlcorp/app#3
+	m, cmd := m.Update(key("enter"))
+	m = runCmd(m, cmd)
+	if !m.(Model).detail.open {
+		t.Fatal("enter did not open the detail view")
+	}
+	v := plain(m)
+	if h := strings.Split(v, "\n")[0]; !strings.Contains(h, "samlcorp/app#3") {
+		t.Errorf("header = %q, want the ref", h)
+	}
+	for _, want := range []string{
+		"⚠ unavailable: SSO: authorize your token for samlcorp",
+		"https://github.com/orgs/samlcorp/sso",
+		"gh auth refresh",
+		"saved in your watch list · esc, then d to remove it",
+	} {
+		if !strings.Contains(v, want) {
+			t.Errorf("detail lacks %q:\n%s", want, v)
+		}
+	}
+	for _, not := range []string{"CHECKS", "REVIEWERS"} {
+		if strings.Contains(v, not) {
+			t.Errorf("detail of an unavailable row has a %s section:\n%s", not, v)
+		}
+	}
+	if len(f.ids) != 0 {
+		t.Errorf("FetchDetail calls = %v, want none", f.ids)
+	}
+
+	// r refreshes the list and sends no detail request.
+	m, cmd = m.Update(key("r"))
+	m = runCmd(m, cmd)
+	if len(f.ids) != 0 {
+		t.Errorf("FetchDetail calls after r = %v, want none", f.ids)
+	}
+
+	// o opens the PR built from the saved ref.
+	_, cmd = m.Update(key("o"))
+	if cmd == nil {
+		t.Fatal("o returned no command")
+	}
+	cmd()
+	if len(op.urls) != 1 || op.urls[0] != "https://github.com/samlcorp/app/pull/3" {
+		t.Errorf("opener calls = %v, want the saved ref's github.com URL", op.urls)
+	}
+
+	// esc returns to the same row.
+	m = press(m, "esc")
+	if m.(Model).detail.open {
+		t.Fatal("esc did not close the detail view")
+	}
+	if got := markedRef(t, m); got != "samlcorp/app#3" {
+		t.Errorf("selected row after esc = %q, want samlcorp/app#3", got)
+	}
+}
+
+func TestOpenUnavailableRow(t *testing.T) {
+	op := &fakeOpener{}
+	m, _ := unavailDetailModel(t, 120, 40, op) // the cursor is on acme/gone#5
+	_, cmd := m.Update(key("o"))
+	if cmd == nil {
+		t.Fatal("o returned no command")
+	}
+	cmd()
+	if len(op.urls) != 1 || op.urls[0] != "https://github.com/acme/gone/pull/5" {
+		t.Errorf("opener calls = %v, want https://github.com/acme/gone/pull/5", op.urls)
+	}
+}
+
+func TestDetailUnavailableRecovers(t *testing.T) {
+	m, f := unavailDetailModel(t, 120, 40, nil)
+	m, cmd := m.Update(key("enter")) // acme/gone#5
+	m = runCmd(m, cmd)
+	if len(f.ids) != 0 || !strings.Contains(plain(m), "⚠ unavailable: ") {
+		t.Fatalf("setup: calls = %v, view:\n%s", f.ids, plain(m))
+	}
+
+	snap := unavailSnap()
+	for i := range snap.PRs {
+		if snap.PRs[i].Ref.Repo == "acme/gone" {
+			snap.PRs[i].ID, snap.PRs[i].Title, snap.PRs[i].Author = "PR_5", "Back again", "alice"
+			snap.PRs[i].State, snap.PRs[i].Unavail = domain.StateOpen, domain.Unavail{}
+		}
+	}
+	m, cmd = m.Update(result(m, snap, nil))
+	m = runCmd(m, cmd)
+	if len(f.ids) != 1 || f.ids[0] != "PR_5" {
+		t.Errorf("FetchDetail calls = %v, want [PR_5]", f.ids)
+	}
+	v := plain(m)
+	if strings.Contains(v, "unavailable") || !strings.Contains(v, "CHECKS") {
+		t.Errorf("the recovered PR still shows the reason or has no CHECKS section:\n%s", v)
+	}
+}
+
+func TestDetailUnavailableNarrow(t *testing.T) {
+	for _, w := range []int{60, 40} {
+		t.Run(itoa(w), func(t *testing.T) {
+			m, _ := unavailDetailModel(t, w, 20, nil)
+			m = press(m, "j")
+			m, cmd := m.Update(key("enter"))
+			m = runCmd(m, cmd)
+			for i, l := range lines(m.View().Content) {
+				if lw := lipgloss.Width(l); lw > w {
+					t.Errorf("line %d is %d cells wide, pane is %d: %q", i, lw, w, l)
+				}
+			}
+		})
+	}
+}

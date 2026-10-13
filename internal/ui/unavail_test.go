@@ -25,9 +25,9 @@ func unavailSnap() domain.Snapshot {
 			Watched: domain.Ref{Repo: "octo/tools", Number: 42}, State: domain.StateOpen, Review: domain.ReviewApproved,
 			CI: domain.CIPassing, UpdatedAt: at},
 		{Ref: domain.Ref{Repo: "samlcorp/app", Number: 3}, Manual: true, Watched: domain.Ref{Repo: "samlcorp/app", Number: 3},
-			Unavail: domain.SSORequired("samlcorp")},
+			URL: "https://github.com/samlcorp/app/pull/3", Unavail: domain.SSORequired("samlcorp")},
 		{Ref: domain.Ref{Repo: "acme/gone", Number: 5}, Manual: true, Watched: domain.Ref{Repo: "acme/gone", Number: 5},
-			Unavail: domain.NotFound()},
+			URL: "https://github.com/acme/gone/pull/5", Unavail: domain.NotFound()},
 	}}
 	domain.Sort(snap.PRs)
 	return snap
