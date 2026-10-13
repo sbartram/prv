@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Completed 03-10-PLAN.md
-last_updated: "2026-10-13T01:42:06.767Z"
+stopped_at: Completed 03-11-PLAN.md
+last_updated: "2026-10-13T02:25:02.249Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: 6508f2badb0c9a1df93c30d3e3a730de9da5f0aa
+state_head: 7be0050eb9d8abc70b0262a4e323069630513d6d
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 25
+  completed_plans: 25
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 3 of 10
+Plan: 2 of 11
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
@@ -81,6 +81,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P08 | 6 min | 2 tasks | 22 files |
 | Phase 03 P09 | 3 min | 2 tasks | 3 files |
 | Phase 03 P10 | 4 min | 2 tasks | 18 files |
+| Phase 03 P11 | 5 min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase 03]: [03-09] Reuse Detail.Truncated for both partial-read causes (Read < Total and kept GraphQL error) so the UI renders 'read N of M runs' unchanged
 - [Phase 03]: 03-10: ServerWait goes straight to RateLimitFloor without timing (no snapshot reset fallback); Retry-After wins over reset on the detail path; detail pause ends at reset+1s
 - [Phase 03]: 03-10: fold line reads '+N more passing or skipped' (user UAT decision supersedes D-10 text); unknown checks always listed and counted in CheckCounts.Other
+- [Phase 03]: [03-11] Detail.Truncated means only 'check runs not read'; new Detail.Partial means 'a GraphQL error was kept'; the faint notice 'some details could not be loaded' goes in detailNotes under the title (supersedes 03-09 reuse of Truncated)
 
 ### Pending Todos
 
@@ -164,6 +166,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T01:42:06.715Z
-Stopped at: Completed 03-10-PLAN.md
+Last session: 2026-10-13T02:25:02.197Z
+Stopped at: Completed 03-11-PLAN.md
 Resume file: None
