@@ -304,6 +304,7 @@ func (m Model) checksSummary() string {
 	add(c.Running, "running", domain.CheckRunning)
 	add(c.Passing, "passing", domain.CheckPassing)
 	add(c.Neutral, "skipped", domain.CheckNeutral)
+	add(c.Other, "unknown", domain.CheckOther) // G-03-6-WR04: never counted as skipped
 	if d.data.Truncated {
 		// D-03, D-08: keep the exact counts and say how much was read.
 		segs = append(segs, faintStyle.Render("read "+strconv.Itoa(d.data.Read)+" of "+strconv.Itoa(d.data.Total)+" runs"))
@@ -315,8 +316,10 @@ func (m Model) checksSummary() string {
 }
 
 // checkLines is the CHECKS section: the summary line, then one line per check
-// in the order the detail data gives. Unless expanded, only failing, cancelled
-// and running checks are listed; the others make one faint fold line (D-10).
+// in the order the detail data gives. Unless expanded, failing, cancelled,
+// running and unknown checks are listed; passing and skipped/neutral checks
+// make one faint fold line (D-10). An unknown check is never folded, because
+// the fold line would call it passing or skipped (G-03-6-WR04).
 func (m Model) checkLines(width int) []string {
 	lines := []string{headerStyle.Render("CHECKS") + "  " + m.checksSummary()}
 	if m.detail.data == nil {
@@ -327,7 +330,7 @@ func (m Model) checkLines(width int) []string {
 		var shown []domain.Check
 		for _, c := range checks {
 			switch c.State {
-			case domain.CheckFailing, domain.CheckCancelled, domain.CheckRunning:
+			case domain.CheckFailing, domain.CheckCancelled, domain.CheckRunning, domain.CheckOther:
 				shown = append(shown, c)
 			default:
 				folded++
@@ -384,10 +387,11 @@ func (m Model) checkLines(width int) []string {
 	return appendFold(lines, folded)
 }
 
-// appendFold adds the faint fold line when checks are folded away (D-10).
+// appendFold adds the faint fold line when checks are folded away (D-10). It
+// counts passing and skipped/neutral checks only (G-03-6-WR04).
 func appendFold(lines []string, folded int) []string {
 	if folded > 0 {
-		lines = append(lines, faintStyle.Render("  … +"+strconv.Itoa(folded)+" more passing"))
+		lines = append(lines, faintStyle.Render("  … +"+strconv.Itoa(folded)+" more passing or skipped"))
 	}
 	return lines
 }

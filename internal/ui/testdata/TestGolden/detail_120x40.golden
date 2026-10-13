@@ -6,7 +6,7 @@ CHECKS  2 failing · 1 cancelled · 1 running · 10 passing · 2 skipped
   ✗ fail-b    failure    ci.yml
   ⊘ cancel-a  cancelled  ci.yml
   ● run-a     running    ci.yml
-  … +12 more passing
+  … +12 more passing or skipped
 
 REVIEWERS
   ✗ bob    changes requested

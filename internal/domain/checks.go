@@ -222,10 +222,11 @@ func (s CheckState) rank() int {
 	return 5
 }
 
-// CheckCounts is how many checks are in each display class. Neutral also holds
-// the checks of class CheckOther.
+// CheckCounts is how many checks are in each display class. Neutral holds
+// skipped, neutral and stale checks. Other holds the checks of class CheckOther
+// (unknown), which are never counted as skipped.
 type CheckCounts struct {
-	Failing, Cancelled, Running, Passing, Neutral int
+	Failing, Cancelled, Running, Passing, Neutral, Other int
 }
 
 // CountChecks counts checks by class. Callers pass the de-duplicated checks
@@ -242,8 +243,10 @@ func CountChecks(checks []Check) CheckCounts {
 			n.Running++
 		case CheckPassing:
 			n.Passing++
-		default:
+		case CheckNeutral:
 			n.Neutral++
+		default:
+			n.Other++
 		}
 	}
 	return n
