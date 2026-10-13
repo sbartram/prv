@@ -155,7 +155,26 @@ Plans:
   4. When a saved PR later can't be fetched (deleted, access revoked, SSO not authorized), it shows as an "unavailable" row with the reason. The other PRs still display, and the saved entry is never deleted automatically.
 
 **Pitfalls first addressed here**: Batched aliased lookups use GraphQL variables, never string interpolation, in chunks of 25-50 aliases. Parse the response envelope yourself and attribute `errors[].path[0]` to its alias, using the Phase 1 spike findings (Q3, Q6) for the NOT_FOUND and SAML FORBIDDEN shapes. Validate a PR by fetching it before you persist it. Support bracketed paste. The store holds PR refs only, as versioned JSON at `$XDG_DATA_HOME/prv/watchlist.json` with an atomic write, a tolerant load, and a backup of a corrupt file. Never remove manual entries automatically. Show an SSO hint when a PR is inaccessible.
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+**Wave 1**
+- [ ] 04-01-PLAN.md — Tracer: a → paste a PR link → variables-only aliased Lookup → atomic save to watchlist.json → row with full status and the + marker; saved PRs come back after a restart, merged with discovery by key and node ID (D-01, D-02, D-04, D-05, D-16)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-02-PLAN.md — Every reference form parsed or refused with one of three reasons; per-alias errors attributed by path[0] to not found, SSO (with hint) or "could not load"; whole-request failures fail the refresh (D-04, D-10, D-12)
+- [ ] 04-03-PLAN.md — Forgiving add prompt: duplicates jump to the row (key and node ID, hidden by filters), errors inline with the text kept, esc drops late results, paste cleaning, rate-limit pause, fits any width, stale-refresh epoch rule (D-02, D-03, D-08)
+- [ ] 04-04-PLAN.md — Store survives anything: hash-named backup of a corrupt file, bad entries kept, 500 cap, 0700/0600, no temp leftovers, two panes; each refresh re-reads the file; startup warnings shown once (D-16)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 04-05-PLAN.md — Saved PRs never vanish: "⚠ unavailable: REASON" rows in bucket 0, never hidden by 1/2/3, "N unavailable" header, compact marker and glyph; closed saved PRs stay (WATCH-07); two-strike rule via domain.Reconcile (D-09, D-11..D-15)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 04-06-PLAN.md — d then y removes a saved PR; any other key (q included) cancels; unpin keeps authored/assigned rows; note for discovery-only rows; works on unavailable rows (D-06, D-07, D-08, D-11)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 04-07-PLAN.md — Reason-only detail for unavailable rows with the SSO hint and o; a add / d remove hints, empty-screen hint, ? legend; goldens for every new screen at 0x0, 60x15, 80x24, 120x40 (D-05, D-11, D-15, D-17)
+
 **UI hint**: yes
 
 ## Progress
