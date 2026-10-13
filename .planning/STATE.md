@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-10-13T03:58:08.425Z"
-last_activity: 2026-10-12
-last_activity_desc: Phase 03 complete, transitioned to Phase 4
-state_head: 66f66daf651bd1accc61c80957c40b2e994ff8de
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-10-13T23:19:02.542Z"
+last_activity: 2026-10-13
+last_activity_desc: Phase 04 execution started
+state_head: c3df12c47c111ee14535d9471e11ede68f2938ae
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 25
+  completed_plans: 26
   percent: 75
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-12)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Phase 4 — Curated Watch List
+**Current focus:** Phase 04 — Curated Watch List
 
 ## Current Position
 
-Phase: 04 (Curated Watch List) — READY TO EXECUTE
-Plan: Not started
+Phase: 04 (Curated Watch List) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
-Last activity: 2026-10-12 — Phase 03 complete, transitioned to Phase 4
+Last activity: 2026-10-13 — Phase 04 execution started
 
 Progress: [████████░░] 75%
 
@@ -83,6 +83,7 @@ Progress: [████████░░] 75%
 | Phase 03 P09 | 3 min | 2 tasks | 3 files |
 | Phase 03 P10 | 4 min | 2 tasks | 18 files |
 | Phase 03 P11 | 5 min | 2 tasks | 11 files |
+| Phase 04 P01 | 40 min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,8 @@ Recent decisions affecting current work:
 - [Phase 03]: 03-10: ServerWait goes straight to RateLimitFloor without timing (no snapshot reset fallback); Retry-After wins over reset on the detail path; detail pause ends at reset+1s
 - [Phase 03]: 03-10: fold line reads '+N more passing or skipped' (user UAT decision supersedes D-10 text); unknown checks always listed and counted in CheckCounts.Other
 - [Phase 03]: [03-11] Detail.Truncated means only 'check runs not read'; new Detail.Partial means 'a GraphQL error was kept'; the faint notice 'some details could not be loaded' goes in detailNotes under the title (supersedes 03-09 reuse of Truncated)
+- [Phase 04]: Provenance is a row property (PR.Auto, PR.Manual); the saved ref (PR.Watched) is kept apart from the canonical display ref (PR.Ref) so a repo rename cannot split one PR into two rows or make removal miss its entry
+- [Phase 04]: A Lookup that fails as a whole fails the whole refresh (previous rows stay); an unreadable watchlist.json reuses the last list read and warns, never treated as empty
 
 ### Pending Todos
 
@@ -167,6 +170,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T02:57:17.095Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-curated-watch-list/04-CONTEXT.md
+Last session: 2026-10-13T23:19:02.487Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
