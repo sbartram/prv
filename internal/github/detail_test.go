@@ -356,3 +356,21 @@ func TestFetchDetailPaging(t *testing.T) {
 		}
 	})
 }
+
+// TestFetchDetailPartial: a Detail read that GraphQL cut short is marked
+// Truncated, so the summary says how much was read (G-03-6-WR02, D-03, D-08).
+func TestFetchDetailPartial(t *testing.T) {
+	t.Run("a null context node", func(t *testing.T) {
+		c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
+			return jsonResp(req, 200, builtPage(t, "p", 3, 3, false, "", nil)), nil
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatalf("FetchDetail: %v", err)
+		}
+		if len(d.Checks) != 2 || d.Read != 2 || d.Total != 3 || !d.Truncated {
+			t.Errorf("checks/Read/Total/Truncated = %d/%d/%d/%v, want 2/2/3/true: the null node is a run that was not read",
+				len(d.Checks), d.Read, d.Total, d.Truncated)
+		}
+	})
+}

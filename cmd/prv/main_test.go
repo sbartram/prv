@@ -709,6 +709,17 @@ var detailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4986,"
 	`"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":"x"},"nodes":[` +
 	ctxRun(11, "lint", "FAILURE", "2026-10-11T09:00:00Z") + `]}}}}}`
 
+// partialDetailBody is the Detail answer for PR_7 when GitHub nulls one check
+// node: totalCount 2, the lint failure and a null, with the error that explains
+// the null next to the data (G-03-6-WR02).
+var partialDetailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4986,"resetAt":"2026-10-11T13:00:00Z"},"node":` +
+	`{"__typename":"PullRequest","id":"PR_7",` +
+	`"latestOpinionatedReviews":{"nodes":[]},"latestReviews":{"nodes":[]},"reviewRequests":{"nodes":[]},` +
+	`"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":2,"pageInfo":{"hasNextPage":false,"endCursor":"x"},"nodes":[` +
+	ctxRun(11, "lint", "FAILURE", "2026-10-11T09:00:00Z") + `,null]}}}},` +
+	`"errors":[{"type":"FORBIDDEN","path":["node","statusCheckRollup","contexts","nodes",1],` +
+	`"message":"Resource not accessible by integration"}]}`
+
 // step runs cmd and passes every message it yields to Update once, like
 // runCmd, and returns the commands Update returned. A command that takes longer
 // than 250 ms is a timer (the refresh tick) and is dropped, so no test waits
@@ -803,6 +814,33 @@ func TestDetailEndToEnd(t *testing.T) {
 	}
 	if got := len(rt.opIndexes("Watch")); got != 3 {
 		t.Errorf("Watch requests = %d, want 3 (%v)", got, rt.ops)
+	}
+}
+
+// TestDetailPartialEndToEnd: through the real client and model, a Detail answer
+// with a nulled check node and an errors[] member shows how much was read.
+func TestDetailPartialEndToEnd(t *testing.T) {
+	rt := &routedTransport{t: t, watch: failingWatchBody, failing: failingStepBody, detail: partialDetailBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	m, cmd := send(m, key("enter"))
+	m = settle(m, cmd)
+	if len(rt.detailVars) != 1 {
+		t.Fatalf("Detail requests = %v, want exactly one", rt.detailVars)
+	}
+	if v := plain(m); !strings.Contains(v, "✗ lint") || !strings.Contains(v, "read 1 of 2 runs") {
+		t.Errorf("the detail view must show the lint failure and \"read 1 of 2 runs\":\n%s", v)
 	}
 }
 
