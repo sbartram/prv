@@ -132,6 +132,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		s := watchlist.New(path)
 		ghOpts.Watch = s
 		uiOpts.Watchlist = s
+		// Config warnings first, then watch-list problems; prv never exits for them.
+		uiOpts.Warnings = append(append([]string(nil), cfg.Warnings...), watchWarnings(s)...)
 	}
 	client, err := github.NewClient(ghOpts)
 	if err != nil {
@@ -180,5 +182,13 @@ func displayPath(path, home string) string {
 // they are. Reading a corrupt file makes its backup copy here, before the TUI
 // starts.
 func watchWarnings(s *watchlist.Store) []string {
-	return nil
+	_, warns, err := s.Load()
+	var out []string
+	for _, w := range warns {
+		out = append(out, "watch list: "+w)
+	}
+	if err != nil {
+		out = append(out, "watch list: "+domain.Clean(err.Error()))
+	}
+	return out
 }
