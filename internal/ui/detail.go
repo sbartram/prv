@@ -141,10 +141,11 @@ func (m *Model) applyDetail(msg detailMsg) {
 	m.syncDetail()
 }
 
-// pauseForRateLimit moves the refresh pause to the reset time of a rate-limited
-// error, or to now plus its Retry-After when the reset time is unknown. The
-// pause never moves earlier. No tick is armed: the one pending tick re-arms
-// itself to the end of the pause.
+// pauseForRateLimit moves the refresh pause to now plus domain.ServerWait of a
+// rate-limited error: the same clamp as the list path, so a hostile Retry-After
+// or reset time can neither freeze refreshes for years nor give no pause at all
+// (G-03-6-WR01). The pause never moves earlier. No tick is armed: the one
+// pending tick re-arms itself to the end of the pause.
 func (m *Model) pauseForRateLimit(err error) {
 	var b backoffer
 	if !errors.As(err, &b) {
@@ -154,11 +155,8 @@ func (m *Model) pauseForRateLimit(err error) {
 	if !limited {
 		return
 	}
-	until := reset
-	if until.IsZero() && after > 0 {
-		until = m.now().Add(after)
-	}
-	if until.After(m.pausedUntil) {
+	now := m.now()
+	if until := now.Add(domain.ServerWait(now, after, reset)); until.After(m.pausedUntil) {
 		m.pausedUntil = until
 	}
 }

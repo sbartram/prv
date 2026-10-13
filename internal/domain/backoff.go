@@ -85,6 +85,21 @@ func NextDelay(now time.Time, interval time.Duration, failures int, rl RateLimit
 	return d
 }
 
+// ServerWait is the pause after a rate-limited response, built from that
+// response's own timing. It uses the order and bounds of NextDelay: a positive
+// retryAfter first, then a reset time after now plus one second, each kept
+// within [MinServerWait, MaxServerWait]. Without usable timing it returns
+// RateLimitFloor, so the result is always within [MinServerWait, MaxServerWait].
+func ServerWait(now time.Time, retryAfter time.Duration, reset time.Time) time.Duration {
+	if retryAfter > 0 {
+		return clamp(retryAfter)
+	}
+	if reset.After(now) {
+		return resetWait(reset.Sub(now))
+	}
+	return RateLimitFloor
+}
+
 func paused(now time.Time, wait time.Duration) Delay {
 	return Delay{Wait: wait, PausedUntil: now.Add(wait)}
 }
