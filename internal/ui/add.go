@@ -166,6 +166,9 @@ func (m *Model) submitAdd() tea.Cmd {
 		}
 		return nil
 	}
+	if hit, ok := m.findListed(ref, ""); ok {
+		return m.closeAsDuplicate(hit)
+	}
 	m.addSeq++
 	m.add.checking = true
 	m.add.errText = ""
@@ -187,6 +190,11 @@ func (m *Model) applyAddChecked(msg addCheckedMsg) tea.Cmd {
 	case msg.pr.Unavail.Kind != domain.UnavailNone:
 		m.add.errText = msg.pr.Unavail.Reason
 		return nil
+	}
+	// D-03: GitHub may return a PR that is already a row under another name (a
+	// renamed repository), found by its node ID.
+	if hit, ok := m.findListed(msg.pr.Ref, msg.pr.ID); ok {
+		return m.closeAsDuplicate(hit)
 	}
 	// Save the canonical ref GitHub returned, so the file matches discovery.
 	saved := msg.ref
@@ -213,18 +221,67 @@ func (m *Model) applyAddSaved(msg addSavedMsg) tea.Cmd {
 	}
 	m.add = addState{}
 	prs := slices.Clone(m.snap.PRs)
-	dup := slices.ContainsFunc(prs, func(p domain.PR) bool {
-		return (msg.pr.ID != "" && p.ID == msg.pr.ID) || p.Ref.Key() == msg.pr.Ref.Key()
-	})
-	if !dup {
+	target := msg.pr
+	if i := m.listedIndex(msg.pr.Ref, msg.pr.ID); i >= 0 {
+		// A refresh listed it first: it is a saved PR from now on.
+		prs[i].Manual = true
+		prs[i].Watched = msg.pr.Watched
+		target = prs[i]
+	} else {
 		prs = append(prs, msg.pr)
 	}
 	domain.Sort(prs)
 	m.snap.PRs = prs
-	m.selected = msg.pr.Ref
+	m.markMutation()
 	m.state = stateList
 	m.rebuild()
-	return nil
+	switch {
+	case !msg.added:
+		// Another pane saved it first; it is listed all the same.
+		return m.jumpTo(target, "already watching "+target.Ref.String())
+	case indexOf(m.rows, target.Ref) >= 0:
+		m.selected = target.Ref
+		m.rebuild()
+		return nil
+	}
+	return m.setFlash("added "+target.Ref.String()+" · hidden by filters", flashFor)
+}
+
+// listedIndex returns the index in m.snap.PRs of the first PR that is ref or id:
+// its non-empty ID equals id, its Ref has the same Key, or it is a saved PR whose
+// saved ref has the same Key. It returns -1 when none is.
+func (m *Model) listedIndex(ref domain.Ref, id string) int {
+	k := ref.Key()
+	return slices.IndexFunc(m.snap.PRs, func(p domain.PR) bool {
+		return (id != "" && p.ID == id) || p.Ref.Key() == k || (p.Manual && p.Watched.Key() == k)
+	})
+}
+
+// findListed returns the listed PR that is ref or id (see listedIndex).
+func (m *Model) findListed(ref domain.Ref, id string) (domain.PR, bool) {
+	if i := m.listedIndex(ref, id); i >= 0 {
+		return m.snap.PRs[i], true
+	}
+	return domain.PR{}, false
+}
+
+// closeAsDuplicate closes the prompt for a PR that is already listed and moves
+// the cursor to it (D-03). Nothing is looked up or saved.
+func (m *Model) closeAsDuplicate(hit domain.PR) tea.Cmd {
+	m.add = addState{}
+	m.addSeq++
+	return m.jumpTo(hit, "already watching "+hit.Ref.String())
+}
+
+// jumpTo selects pr and shows text in the footer. When the filters hide the row
+// the selection stays and the text says so.
+func (m *Model) jumpTo(pr domain.PR, text string) tea.Cmd {
+	if indexOf(m.rows, pr.Ref) >= 0 {
+		m.selected = pr.Ref
+		m.rebuild()
+		return m.setFlash(text, flashFor)
+	}
+	return m.setFlash(text+" · hidden by filters", flashFor)
 }
 
 // addLine is the prompt line. It replaces the footer, so it costs no list row.

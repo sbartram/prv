@@ -200,7 +200,7 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 // Init starts the spinner and the first fetch. It arms no tick: the first
 // result arms it.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, fetch(m.ctx, m.fetcher, m.gen))
+	return tea.Batch(m.spin.Tick, fetch(m.ctx, m.fetcher, m.gen, m.fetchEpoch))
 }
 
 // Update handles messages.
@@ -342,6 +342,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.inFlight = false
+		if msg.err == nil && msg.epoch < m.mutEpoch {
+			// The fetch started before a local watch-list change, so its list
+			// may lack the change: discard it and read again (RESEARCH Pitfall
+			// 1). During a rate-limit pause the one pending tick is armed to
+			// the end of the pause instead of a request going out.
+			if now := m.now(); now.Before(m.pausedUntil) {
+				cmd := m.arm(m.pausedUntil.Sub(now))
+				return m, cmd
+			}
+			cmd := m.beginFetch()
+			return m, cmd
+		}
 		if msg.err != nil {
 			m.err = msg.err
 			if !m.lastOK.IsZero() {
@@ -376,8 +388,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// markMutation records a local watch-list change.
-func (m *Model) markMutation() {}
+// markMutation records a local watch-list change (an add; from plan 04-06 also
+// a removal): a fetch that is running now started before it, so its result is
+// discarded when it arrives.
+func (m *Model) markMutation() { m.mutEpoch = m.fetchEpoch + 1 }
 
 // openURL opens raw in the browser, after safeURL has checked it. The launch
 // happens in the returned Cmd, never in Update.
