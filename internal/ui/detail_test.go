@@ -1289,7 +1289,9 @@ func (f *unavailDetailFetcher) FetchDetail(_ context.Context, id string) (domain
 func unavailDetailModel(t *testing.T, w, h int, op Opener) (tea.Model, *unavailDetailFetcher) {
 	t.Helper()
 	f := &unavailDetailFetcher{addFetcher: &addFetcher{snap: unavailSnap()}}
-	var m tea.Model = New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Opener: op})
+	nm := New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Opener: op})
+	nm.after = func(time.Duration, tea.Msg) tea.Cmd { return nil } // no timer fires
+	var m tea.Model = nm
 	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = m.Update(fetchedMsg{snap: unavailSnap()})
 	return m, f
@@ -1349,8 +1351,8 @@ func TestDetailUnavailable(t *testing.T) {
 	if m.(Model).detail.open {
 		t.Fatal("esc did not close the detail view")
 	}
-	if got := markedRef(t, m); got != "samlcorp/app#3" {
-		t.Errorf("selected row after esc = %q, want samlcorp/app#3", got)
+	if l := rowLine(m.(Model), ">"); !strings.Contains(l, "samlcorp/app#3") {
+		t.Errorf("selected row after esc = %q, want samlcorp/app#3", l)
 	}
 }
 

@@ -50,10 +50,12 @@ func (m *Model) openDetail(pr domain.PR) tea.Cmd {
 
 // startDetailFetch starts a detail fetch for the open PR. It returns nil when
 // the fetcher has no detail method, a detail fetch is already running, the PR
-// left the list (D-12) or a rate-limit pause is running (Phase 2 D-08).
+// left the list (D-12), a rate-limit pause is running (Phase 2 D-08) or the PR
+// is unavailable: it has no node ID to fetch (D-11).
 func (m *Model) startDetailFetch() tea.Cmd {
 	df, ok := m.fetcher.(DetailFetcher)
-	if !ok || m.detailInFlight || m.detail.gone || m.now().Before(m.pausedUntil) {
+	if !ok || m.detailInFlight || m.detail.gone || m.now().Before(m.pausedUntil) ||
+		m.detail.pr.Unavail.Kind != domain.UnavailNone {
 		return nil
 	}
 	m.detailSeq++
@@ -218,18 +220,36 @@ func (m Model) renderDetail() string {
 // detailLines builds the body: the title and status, the CHECKS section and
 // the REVIEWERS section. A width of 0 or less (not sized yet) cuts nothing.
 func (m Model) detailLines(width int) []string {
-	lines := m.detailTitle(width)
-	lines = append(lines, m.detailNotes()...)
-	lines = append(lines, "")
-	lines = append(lines, m.checkLines(width)...)
-	lines = append(lines, "")
-	lines = append(lines, m.reviewerLines(width)...)
+	var lines []string
+	if m.detail.pr.Unavail.Kind != domain.UnavailNone {
+		// D-11: only the ref (in the header), why, and how to remove it.
+		lines = append(m.detailNotes(), m.unavailLines()...)
+	} else {
+		lines = m.detailTitle(width)
+		lines = append(lines, m.detailNotes()...)
+		lines = append(lines, "")
+		lines = append(lines, m.checkLines(width)...)
+		lines = append(lines, "")
+		lines = append(lines, m.reviewerLines(width)...)
+	}
 	if width > 0 {
 		for i, l := range lines {
 			lines[i] = ansi.Truncate(l, width, "")
 		}
 	}
 	return lines
+}
+
+// unavailLines is the body of the detail view of an unavailable saved PR
+// (D-11): the reason, the help text when there is one, and how to remove the
+// entry. The texts are fixed strings or cleaned at the seam.
+func (m Model) unavailLines() []string {
+	u := m.detail.pr.Unavail
+	lines := []string{warnStyle.Render("⚠ unavailable: " + u.Reason)}
+	if u.Help != "" {
+		lines = append(lines, u.Help)
+	}
+	return append(lines, "", faintStyle.Render("saved in your watch list · esc, then d to remove it"))
 }
 
 // detailTitle is the title and the "STATE · REVIEW · MERGE" status. Side by
