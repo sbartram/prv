@@ -20,6 +20,22 @@ import (
 // Version is the file format version.
 const Version = 1
 
+// ErrCorrupt is wrapped by the error Load returns for a file prv cannot use.
+var ErrCorrupt = errors.New("the watch list file is not valid")
+
+// CorruptError says what is wrong with the file and where the copy is.
+type CorruptError struct {
+	Backup  string
+	Problem string
+}
+
+func (e *CorruptError) Error() string { return "watchlist.json " + e.Problem }
+
+func (e *CorruptError) Unwrap() error { return ErrCorrupt }
+
+// MaxEntries is the most PRs that are watched.
+const MaxEntries = 500
+
 // maxFileSize caps what is read: a watch list is a few hundred bytes.
 const maxFileSize = 1 << 20
 
@@ -54,12 +70,13 @@ func (e entry) ref() domain.Ref { return domain.Ref{Repo: e.Repo, Number: e.Numb
 // Store is the watch list file. It keeps no state in memory: every call reads
 // the file, so two prv instances and hand edits stay in sync (D-16).
 type Store struct {
-	path string
-	now  func() time.Time
+	path   string
+	now    func() time.Time
+	rename func(oldpath, newpath string) error
 }
 
 // New returns a Store for path. It touches no file.
-func New(path string) *Store { return &Store{path: path, now: time.Now} }
+func New(path string) *Store { return &Store{path: path, now: time.Now, rename: os.Rename} }
 
 // Path returns the file path of the store.
 func (s *Store) Path() string { return s.path }
