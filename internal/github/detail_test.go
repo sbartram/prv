@@ -373,4 +373,57 @@ func TestFetchDetailPartial(t *testing.T) {
 				len(d.Checks), d.Read, d.Total, d.Truncated)
 		}
 	})
+	const keptError = `[{"type":"FORBIDDEN","path":["node","reviewRequests","nodes",0,"requestedReviewer"],` +
+		`"message":"Resource not accessible by integration"}]`
+
+	t.Run("page 1 kept a GraphQL error", func(t *testing.T) {
+		c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
+			return jsonResp(req, 200, withErrorsBody(t, builtPage(t, "p", 3, 3, false, ""), keptError)), nil
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatalf("FetchDetail: %v", err)
+		}
+		if len(d.Checks) != 3 || d.Read != 3 || d.Total != 3 || !d.Truncated {
+			t.Errorf("checks/Read/Total/Truncated = %d/%d/%d/%v, want 3/3/3/true: GitHub reported an error next to the data",
+				len(d.Checks), d.Read, d.Total, d.Truncated)
+		}
+	})
+
+	t.Run("a later page kept a GraphQL error", func(t *testing.T) {
+		var afters []string
+		c := clientWith(t, pagedTransport(t, &afters, func(req *http.Request, n int) *http.Response {
+			if n == 1 {
+				return jsonResp(req, 200, builtPage(t, "p1", 100, 150, true, "CUR1"))
+			}
+			return jsonResp(req, 200, withErrorsBody(t, builtPage(t, "p2", 50, 150, false, ""), keptError))
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatalf("FetchDetail: %v", err)
+		}
+		if len(afters) != 2 {
+			t.Errorf("requests = %d, want 2", len(afters))
+		}
+		if d.Read != 150 || d.Total != 150 || !d.Truncated {
+			t.Errorf("Read/Total/Truncated = %d/%d/%v, want 150/150/true: the error on page 2 makes the read partial",
+				d.Read, d.Total, d.Truncated)
+		}
+	})
+}
+
+// withErrorsBody adds an errors[] member to a response body, as withErrors does
+// for a testdata file.
+func withErrorsBody(t *testing.T, body []byte, errorsJSON string) []byte {
+	t.Helper()
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		t.Fatal(err)
+	}
+	m["errors"] = json.RawMessage(errorsJSON)
+	out, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
