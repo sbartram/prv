@@ -45,7 +45,7 @@ findings:
     title: "The partial notice is untested at widths below its own length, and its refresh behaviour is untested"
   - id: WR-05
     severity: warning
-    disposition: open
+    disposition: fixed
     title: "A partial detail read is shown as \"read N of N runs\", or hides \"no checks\""
   - id: WR-01
     severity: warning
@@ -59,7 +59,7 @@ findings:
     severity: warning
     disposition: fixed
     title: "Unknown and neutral checks are folded away under the label \"more passing\" and counted as \"skipped\""
-open: 10
+open: 9
 total: 14
 recorded: 2026-10-13T02:31:18.421Z
 ---
@@ -78,7 +78,7 @@ recorded: 2026-10-13T02:31:18.421Z
 | IN-07 | info | open | - |
 | IN-08 | info | open | - |
 | IN-09 | info | open | - |
-| WR-05 | warning | open | UAT 2026-10-12: user chose fix before ship; tracked as gap G-03-6 (not in the current review) |
+| WR-05 | warning | fixed | Fixed by 03-11 (Detail.Partial split from Truncated; faint notice in detailNotes); confirmed resolved by re-review 2026-10-12 (G-03-6) |
 | WR-01 | warning | fixed | Fixed by 03-10 Task 1 (domain.ServerWait clamp in pauseForRateLimit); confirmed resolved by re-review 2026-10-12 (not in the current review) |
 | WR-02 | warning | fixed | Fixed by 03-09 (FetchDetail marks Truncated on partial reads); confirmed resolved in the data layer by re-review 2026-10-12 — display follow-up is WR-05 (not in the current review) |
 | WR-04 | warning | fixed | Fixed by 03-10 Task 2 (CheckCounts.Other, unknown checks listed, fold line reworded); confirmed resolved by re-review 2026-10-12 (not in the current review) |
