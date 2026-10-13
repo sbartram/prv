@@ -65,16 +65,65 @@ type wireRate struct {
 	ResetAt   time.Time
 }
 
+// runes returns s cut to at most n runes.
+func runes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+// unavailFor names why a saved PR did not load, from the errors GitHub gave for
+// its alias (D-10), in this priority: an SSO failure, then not found, then the
+// error GitHub gave. A FORBIDDEN error is an SSO failure when its extensions say
+// saml_failure is true or its message mentions SAML (RESEARCH A1: the shape is
+// constructed, not recorded). The organization is the owner of ref, never text
+// read from a message. Reason and Help are built from fixed strings and cleaned
+// GitHub text cut to 40 and 200 runes; no header, token or raw message reaches
+// them.
+func unavailFor(items []api.GraphQLErrorItem, ref domain.Ref) domain.Unavail {
+	for _, it := range items {
+		if it.Type != "FORBIDDEN" {
+			continue
+		}
+		if saml, _ := it.Extensions["saml_failure"].(bool); saml || strings.Contains(strings.ToLower(it.Message), "saml") {
+			owner, _, _ := strings.Cut(ref.Repo, "/")
+			return domain.SSORequired(owner)
+		}
+	}
+	for _, it := range items {
+		if it.Type == "NOT_FOUND" {
+			return domain.NotFound()
+		}
+	}
+	if len(items) == 0 {
+		return domain.LoadFailed("no data", "")
+	}
+	msg := domain.Clean(items[0].Message)
+	short := runes(strings.ReplaceAll(strings.ToLower(domain.Clean(items[0].Type)), "_", " "), 40)
+	if short == "" {
+		short = runes(msg, 40)
+	}
+	if short == "" {
+		short = "no data"
+	}
+	return domain.LoadFailed(short, runes(msg, 200))
+}
+
 // lookupRefs loads the saved PRs refs in chunks of lookupChunk and returns one
 // PR per ref, in ref order. A ref that could not be read comes back as an
 // unavailable PR (empty ID, Unavail set) and is never dropped. It sends nothing
 // for no refs.
 //
+// Errors are attributed to an alias by errors[].path[0], so one bad ref never
+// changes another ref's result. A null alias takes the reason from its own
+// errors (unavailFor), else from the errors that name no alias. An error under a
+// pull request that loaded keeps it loaded and adds a snapshot warning.
+//
 // A request that fails as a whole (network, 5xx, 401, a rate limit, a cancelled
-// context) returns the error and no PRs: the caller fails the whole refresh, so
-// no row turns unavailable for it (D-12). A GraphQL error that comes with data
-// is the normal path for a missing PR. Plan 04-02 refines the reasons; this
-// signature stays fixed.
+// context, a GraphQL error with no data) returns the error and no PRs: the
+// caller fails the whole refresh, so no row turns unavailable for it (D-12).
+// Only the three rate-limit headers are ever read from a response (T-04-08).
 func (c *Client) lookupRefs(ctx context.Context, refs []domain.Ref, snap *domain.Snapshot) ([]domain.PR, error) {
 	var out []domain.PR
 	for start := 0; start < len(refs); start += lookupChunk {
@@ -102,12 +151,17 @@ func (c *Client) lookupRefs(ctx context.Context, refs []domain.Ref, snap *domain
 		}
 
 		byAlias := map[string][]api.GraphQLErrorItem{}
+		var unattributed []api.GraphQLErrorItem
 		for _, it := range items {
+			alias := ""
 			if len(it.Path) > 0 {
-				if alias, ok := it.Path[0].(string); ok {
-					byAlias[alias] = append(byAlias[alias], it)
-				}
+				alias, _ = it.Path[0].(string)
 			}
+			if alias == "" {
+				unattributed = append(unattributed, it)
+				continue
+			}
+			byAlias[alias] = append(byAlias[alias], it)
 		}
 
 		var rate wireRate
@@ -128,15 +182,21 @@ func (c *Client) lookupRefs(ctx context.Context, refs []domain.Ref, snap *domain
 				_ = json.Unmarshal(raw, &a)
 			}
 			if a == nil || a.PullRequest == nil {
-				u := domain.LoadFailed("GitHub error", "")
-				for _, it := range byAlias[alias] {
-					if it.Type == "NOT_FOUND" {
-						u = domain.NotFound()
-						break
-					}
+				own := byAlias[alias]
+				if len(own) == 0 {
+					own = unattributed
 				}
-				out = append(out, domain.PR{Ref: ref, Watched: ref, Manual: true, URL: ref.URL(), Unavail: u})
+				out = append(out, domain.PR{Ref: ref, Watched: ref, Manual: true, URL: ref.URL(), Unavail: unavailFor(own, ref)})
 				continue
+			}
+			// An error under a PR that loaded (for example its check rollup)
+			// does not make the PR unavailable.
+			for _, it := range byAlias[alias] {
+				msg := "Some data could not be loaded"
+				if m := domain.Clean(it.Message); m != "" {
+					msg += ": " + m
+				}
+				snap.Warnings = addWarning(snap.Warnings, msg)
 			}
 			pr := mapNode(a.PullRequest)
 			pr.Manual = true
