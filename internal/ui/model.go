@@ -50,6 +50,7 @@ type Options struct {
 	Opener     Opener           // opens a PR URL in the browser; nil means "no browser available"
 	Interval   time.Duration    // zero means defaultInterval
 	Now        func() time.Time // nil means time.Now
+	Watchlist  Watchlist        // saves and removes manually added PRs; nil means adding is not available
 }
 
 type viewState int

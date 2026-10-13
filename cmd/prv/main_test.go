@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -24,6 +25,7 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 	"github.com/sbartram/prv/internal/github"
 	"github.com/sbartram/prv/internal/ui"
+	"github.com/sbartram/prv/internal/watchlist"
 )
 
 // useConfig points prv at a config file in a temp dir so no test reads the
@@ -580,14 +582,17 @@ func TestLiveEndToEnd(t *testing.T) {
 // Detail" the detail body. It records every FailingChecks and Detail request,
 // and the order of all operations.
 type routedTransport struct {
-	t          *testing.T
-	watch      string
-	failing    string
-	detail     string
-	failVars   []map[string]any
-	failQuerys []string
-	detailVars []map[string]any
-	ops        []string
+	t            *testing.T
+	watch        string
+	failing      string
+	detail       string
+	lookup       string
+	failVars     []map[string]any
+	failQuerys   []string
+	detailVars   []map[string]any
+	lookupVars   []map[string]any
+	lookupQuerys []string
+	ops          []string
 }
 
 // opIndexes returns the positions of op in the order of all requests.
@@ -622,6 +627,11 @@ func (r *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		body = r.detail
 		r.detailVars = append(r.detailVars, payload.Variables)
 		r.ops = append(r.ops, "Detail")
+	case strings.HasPrefix(payload.Query, "query Lookup"):
+		body = r.lookup
+		r.lookupVars = append(r.lookupVars, payload.Variables)
+		r.lookupQuerys = append(r.lookupQuerys, payload.Query)
+		r.ops = append(r.ops, "Lookup")
 	default:
 		r.t.Errorf("unexpected operation: %.40q", payload.Query)
 	}
@@ -915,4 +925,104 @@ func press(m tea.Model, keys ...string) tea.Model {
 		m, _ = send(m, key(k))
 	}
 	return m
+}
+
+// lookupOKBody is the Lookup answer for octo/tools#42: open, approved, passing.
+const lookupOKBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4985,"resetAt":"2026-10-11T13:00:00Z"},` +
+	`"r0":{"pullRequest":{"id":"PR_42","number":42,"title":"Speed up the build","url":"https://github.com/octo/tools/pull/42",` +
+	`"isDraft":false,"state":"OPEN","createdAt":"2026-10-10T08:00:00Z","closedAt":null,"mergedAt":null,"updatedAt":"2026-10-11T08:00:00Z",` +
+	`"repository":{"nameWithOwner":"octo/tools"},"author":{"login":"alice"},"reviewDecision":"APPROVED",` +
+	`"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE","latestOpinionatedReviews":{"nodes":[]},` +
+	`"reviewRequests":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}}}}`
+
+// drain runs cmd and then, for at most 6 rounds, the Cmds that the messages
+// made. step drops the Cmds that take longer than 250 ms, so a refresh tick never
+// blocks it.
+func drain(m tea.Model, cmd tea.Cmd) tea.Model {
+	cmds := []tea.Cmd{cmd}
+	for round := 0; round < 6 && len(cmds) > 0; round++ {
+		var next []tea.Cmd
+		for _, c := range cmds {
+			var n []tea.Cmd
+			m, n = step(m, c)
+			next = append(next, n...)
+		}
+		cmds = next
+	}
+	return m
+}
+
+// addViaPrompt adds a PR the way the user does: a opens the prompt, the text is
+// pasted, enter checks and saves it.
+func addViaPrompt(t *testing.T, m tea.Model, text string) tea.Model {
+	t.Helper()
+	m, _ = send(m, key("a"))
+	m, _ = send(m, tea.PasteMsg{Content: text})
+	m, cmd := send(m, key("enter"))
+	return drain(m, cmd)
+}
+
+// TestAddEndToEnd is the phase tracer: a real github.Client, a real
+// watchlist.Store in a temp dir and the real ui.Model. Pasting a PR link checks
+// the PR with one variables-only Lookup request, saves it and lists it with its
+// full status, the + marker and the cursor on it.
+func TestAddEndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	store := watchlist.New(path)
+	rt := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupOKBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14, Watchlist: store})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	m = addViaPrompt(t, m, "https://github.com/octo/tools/pull/42/files\n")
+
+	if len(rt.lookupVars) != 1 {
+		t.Fatalf("Lookup requests = %d, want exactly 1 (%v)", len(rt.lookupVars), rt.ops)
+	}
+	v := rt.lookupVars[0]
+	if v["o0"] != "octo" || v["n0"] != "tools" || v["p0"] != float64(42) || len(v) != 3 {
+		t.Errorf("Lookup variables = %v, want {o0: octo, n0: tools, p0: 42}", v)
+	}
+	for _, bad := range []string{"octo", "tools", "42"} {
+		if strings.Contains(rt.lookupQuerys[0], bad) {
+			t.Errorf("the Lookup query text holds %q: owner, repo and number travel only as variables", bad)
+		}
+	}
+
+	view := plain(m)
+	row := lineWith(view, "octo/tools#42")
+	if !strings.HasPrefix(row, ">") {
+		t.Errorf("the cursor is not on the new row:\n%s", view)
+	}
+	for _, want := range []string{"+ octo/tools#42", "✓ approved", "✓ passing"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("row = %q, want it to contain %q", row, want)
+		}
+	}
+	if strings.Contains(view, "add PR:") {
+		t.Errorf("the prompt is still open:\n%s", view)
+	}
+
+	refs, _, err := store.Load()
+	if err != nil || len(refs) != 1 || refs[0] != (domain.Ref{Repo: "octo/tools", Number: 42}) {
+		t.Errorf("store.Load() = %v, %v, want [octo/tools#42]", refs, err)
+	}
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Mode().Perm() != 0o600 {
+			t.Errorf("watchlist.json mode = %v, want 0600", fi.Mode().Perm())
+		}
+	}
 }
