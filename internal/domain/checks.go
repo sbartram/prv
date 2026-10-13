@@ -275,14 +275,22 @@ func SortChecks(checks []Check) {
 //
 // Checks are de-duplicated (LatestChecks) and sorted (SortChecks). Counts are
 // always CountChecks(Checks), the de-duplicated checks, never GitHub's own
-// per-state counts, which include superseded runs (D-03). Truncated means not
-// every check run was read; Read is the number of check runs read and Total the
-// number GitHub reports, so the view can say "read N of M".
+// per-state counts, which include superseded runs (D-03).
+//
+// Truncated means that not every check run was read: paging stopped at the page
+// cap or at an empty cursor, a later page failed, or fewer runs were read than
+// GitHub reports. Read is the number of check runs read and Total the number
+// GitHub reports, so the view can say "read N of M" (D-03, D-08).
+//
+// Partial means that GitHub returned a GraphQL error next to the data of some
+// page, so a check, a reviewer or a review request may be missing. Partial says
+// nothing about the run count (G-03-6, WR-05).
 type Detail struct {
 	Checks    []Check
 	Reviewers []Reviewer
 	Counts    CheckCounts
 	Truncated bool
+	Partial   bool
 	Read      int
 	Total     int
 }

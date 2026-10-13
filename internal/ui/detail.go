@@ -263,11 +263,16 @@ func (m Model) detailTitle(width int) []string {
 }
 
 // detailNotes are the lines right under the title: the PR left the list (D-12),
-// and the last detail refresh failed while older data is still on screen (D-11).
+// GitHub kept a GraphQL error next to the detail data so something may be
+// missing (G-03-6, WR-05), and the last detail refresh failed while older data
+// is still on screen (D-11).
 func (m Model) detailNotes() []string {
 	var notes []string
 	if m.detail.gone {
 		notes = append(notes, faintStyle.Render("no longer in list"))
+	}
+	if m.detail.data != nil && m.detail.data.Partial {
+		notes = append(notes, faintStyle.Render("some details could not be loaded"))
 	}
 	if d := m.detail; d.err != nil && d.data != nil {
 		notes = append(notes, warnStyle.Render("✗ refresh failed "+m.clock(d.errAt, "15:04")+
@@ -306,7 +311,9 @@ func (m Model) checksSummary() string {
 	add(c.Neutral, "skipped", domain.CheckNeutral)
 	add(c.Other, "unknown", domain.CheckOther) // G-03-6-WR04: never counted as skipped
 	if d.data.Truncated {
-		// D-03, D-08: keep the exact counts and say how much was read.
+		// D-03, D-08: keep the exact counts and say how much was read. Truncated
+		// means only that runs were not read; a kept GraphQL error is Partial,
+		// shown by detailNotes, and is never a run count (G-03-6, WR-05).
 		segs = append(segs, faintStyle.Render("read "+strconv.Itoa(d.data.Read)+" of "+strconv.Itoa(d.data.Total)+" runs"))
 	}
 	if len(segs) == 0 {

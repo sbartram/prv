@@ -720,6 +720,25 @@ var partialDetailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining"
 	`"errors":[{"type":"FORBIDDEN","path":["node","statusCheckRollup","contexts","nodes",1],` +
 	`"message":"Resource not accessible by integration"}]}`
 
+// keptErrorDetailBody is the Detail answer for PR_7 when GitHub keeps an error
+// about a review request next to complete check data: one run, totalCount 1.
+var keptErrorDetailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4986,"resetAt":"2026-10-11T13:00:00Z"},"node":` +
+	`{"__typename":"PullRequest","id":"PR_7",` +
+	`"latestOpinionatedReviews":{"nodes":[]},"latestReviews":{"nodes":[]},"reviewRequests":{"nodes":[{"requestedReviewer":null}]},` +
+	`"statusCheckRollup":{"state":"FAILURE","contexts":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":"x"},"nodes":[` +
+	ctxRun(11, "lint", "FAILURE", "2026-10-11T09:00:00Z") + `]}}}},` +
+	`"errors":[{"type":"FORBIDDEN","path":["node","reviewRequests","nodes",0,"requestedReviewer"],` +
+	`"message":"Resource not accessible by integration"}]}`
+
+// keptErrorNoChecksDetailBody is the same answer for a PR with no
+// statusCheckRollup (G-03-6, WR-05 case 2).
+var keptErrorNoChecksDetailBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4986,"resetAt":"2026-10-11T13:00:00Z"},"node":` +
+	`{"__typename":"PullRequest","id":"PR_7",` +
+	`"latestOpinionatedReviews":{"nodes":[]},"latestReviews":{"nodes":[]},"reviewRequests":{"nodes":[{"requestedReviewer":null}]},` +
+	`"statusCheckRollup":null}},` +
+	`"errors":[{"type":"FORBIDDEN","path":["node","reviewRequests","nodes",0,"requestedReviewer"],` +
+	`"message":"Resource not accessible by integration"}]}`
+
 // step runs cmd and passes every message it yields to Update once, like
 // runCmd, and returns the commands Update returned. A command that takes longer
 // than 250 ms is a timer (the refresh tick) and is dropped, so no test waits
@@ -839,8 +858,55 @@ func TestDetailPartialEndToEnd(t *testing.T) {
 	if len(rt.detailVars) != 1 {
 		t.Fatalf("Detail requests = %v, want exactly one", rt.detailVars)
 	}
-	if v := plain(m); !strings.Contains(v, "✗ lint") || !strings.Contains(v, "read 1 of 2 runs") {
-		t.Errorf("the detail view must show the lint failure and \"read 1 of 2 runs\":\n%s", v)
+	if v := plain(m); !strings.Contains(v, "✗ lint") || !strings.Contains(v, "read 1 of 2 runs") ||
+		!strings.Contains(v, "some details could not be loaded") {
+		t.Errorf("the detail view must show the lint failure, \"read 1 of 2 runs\" and the partial notice:\n%s", v)
+	}
+}
+
+// TestDetailKeptErrorEndToEnd: through the real client and model, a GraphQL
+// error kept next to the data shows the notice and never a run count, both
+// with every run read and with no checks at all (G-03-6, WR-05).
+func TestDetailKeptErrorEndToEnd(t *testing.T) {
+	const notice = "some details could not be loaded"
+	for _, tc := range []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"every run read", keptErrorDetailBody, []string{"✗ lint", notice}},
+		{"no checks", keptErrorNoChecksDetailBody, []string{"CHECKS  no checks", notice}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rt := &routedTransport{t: t, watch: failingWatchBody, failing: failingStepBody, detail: tc.body}
+			client, err := github.NewClient(github.Options{
+				Token:      "test-token-not-real",
+				ClosedDays: 14,
+				Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+				Transport:  rt,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14})
+			m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+			m = runCmd(m, m.Init())
+
+			m, cmd := send(m, key("enter"))
+			m = settle(m, cmd)
+			if len(rt.detailVars) != 1 {
+				t.Fatalf("Detail requests = %v, want exactly one", rt.detailVars)
+			}
+			v := plain(m)
+			for _, w := range tc.want {
+				if !strings.Contains(v, w) {
+					t.Errorf("the detail view must contain %q:\n%s", w, v)
+				}
+			}
+			if strings.Contains(v, " runs") {
+				t.Errorf("the detail view must not show a run count:\n%s", v)
+			}
+		})
 	}
 }
 

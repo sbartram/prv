@@ -308,12 +308,14 @@ func (c *Client) detailPage(ctx context.Context, vars map[string]any) (*wireDeta
 //
 // Contexts are read 100 at a time for at most maxPages pages. Counts always
 // come from the de-duplicated checks of the pages read (D-03), so a run
-// superseded on another page is not counted. When the pull request has more
-// check runs than were read, a later page fails, fewer runs were read than
-// GitHub reports (for example nodes that GraphQL returned as null), or any page
-// came back with a GraphQL error whose data was kept, Truncated is set. Read
-// and Total say how many runs were read of how many exist. A failure on page 1
-// is returned; so are a rate limit and a cancelled context on any page.
+// superseded on another page is not counted. Truncated is set only when check
+// runs were not read: the pull request has more runs than the page cap reads,
+// a later page fails, or fewer runs were read than GitHub reports (for example
+// nodes that GraphQL returned as null). Read and Total say how many runs were
+// read of how many exist. Partial is set separately when any page came back
+// with a GraphQL error whose data was kept, because a check, a reviewer or a
+// review request may then be missing (G-03-6, WR-05). A failure on page 1 is
+// returned; so are a rate limit and a cancelled context on any page.
 func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
 	vars := map[string]any{"id": id}
 	var d domain.Detail
@@ -329,9 +331,10 @@ func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, err
 			break
 		}
 		if partial {
-			// GitHub reported an error next to this page's data, so nodes (a
-			// check, a reviewer or a review request) may be missing (G-03-6-WR02).
-			d.Truncated = true
+			// GitHub reported an error next to this page's data, so a check,
+			// reviewer or review request may be missing. That is Partial, not a
+			// run count (G-03-6, WR-05).
+			d.Partial = true
 		}
 		if page == 1 {
 			d.Reviewers = detailReviewers(n)

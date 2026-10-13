@@ -357,8 +357,9 @@ func TestFetchDetailPaging(t *testing.T) {
 	})
 }
 
-// TestFetchDetailPartial: a Detail read that GraphQL cut short is marked
-// Truncated, so the summary says how much was read (G-03-6-WR02, D-03, D-08).
+// TestFetchDetailPartial: a short read (a null context node) is Truncated, so
+// the summary says how much was read; a kept GraphQL error is Partial and is
+// never a run count (G-03-6, WR-05, D-03, D-08).
 func TestFetchDetailPartial(t *testing.T) {
 	t.Run("a null context node", func(t *testing.T) {
 		c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
@@ -368,9 +369,9 @@ func TestFetchDetailPartial(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchDetail: %v", err)
 		}
-		if len(d.Checks) != 2 || d.Read != 2 || d.Total != 3 || !d.Truncated {
-			t.Errorf("checks/Read/Total/Truncated = %d/%d/%d/%v, want 2/2/3/true: the null node is a run that was not read",
-				len(d.Checks), d.Read, d.Total, d.Truncated)
+		if len(d.Checks) != 2 || d.Read != 2 || d.Total != 3 || !d.Truncated || d.Partial {
+			t.Errorf("checks/Read/Total/Truncated/Partial = %d/%d/%d/%v/%v, want 2/2/3/true/false: the null node is a run that was not read and no error was kept",
+				len(d.Checks), d.Read, d.Total, d.Truncated, d.Partial)
 		}
 	})
 	const keptError = `[{"type":"FORBIDDEN","path":["node","reviewRequests","nodes",0,"requestedReviewer"],` +
@@ -384,9 +385,9 @@ func TestFetchDetailPartial(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchDetail: %v", err)
 		}
-		if len(d.Checks) != 3 || d.Read != 3 || d.Total != 3 || !d.Truncated {
-			t.Errorf("checks/Read/Total/Truncated = %d/%d/%d/%v, want 3/3/3/true: GitHub reported an error next to the data",
-				len(d.Checks), d.Read, d.Total, d.Truncated)
+		if len(d.Checks) != 3 || d.Read != 3 || d.Total != 3 || d.Truncated || !d.Partial {
+			t.Errorf("checks/Read/Total/Truncated/Partial = %d/%d/%d/%v/%v, want 3/3/3/false/true: every run was read and GitHub reported an error next to the data",
+				len(d.Checks), d.Read, d.Total, d.Truncated, d.Partial)
 		}
 	})
 
@@ -405,9 +406,26 @@ func TestFetchDetailPartial(t *testing.T) {
 		if len(afters) != 2 {
 			t.Errorf("requests = %d, want 2", len(afters))
 		}
-		if d.Read != 150 || d.Total != 150 || !d.Truncated {
-			t.Errorf("Read/Total/Truncated = %d/%d/%v, want 150/150/true: the error on page 2 makes the read partial",
-				d.Read, d.Total, d.Truncated)
+		if d.Read != 150 || d.Total != 150 || d.Truncated || !d.Partial {
+			t.Errorf("Read/Total/Truncated/Partial = %d/%d/%v/%v, want 150/150/false/true: the error on page 2 makes the read partial, not short",
+				d.Read, d.Total, d.Truncated, d.Partial)
+		}
+	})
+
+	t.Run("no rollup and a kept GraphQL error", func(t *testing.T) {
+		node := []byte(`{"data":{"node":{"__typename":"PullRequest","id":"PR_11",` +
+			`"latestOpinionatedReviews":{"nodes":[]},"latestReviews":{"nodes":[]},"reviewRequests":{"nodes":[]},` +
+			`"statusCheckRollup":null}}}`)
+		c := clientWith(t, rtFunc(func(req *http.Request) (*http.Response, error) {
+			return jsonResp(req, 200, withErrorsBody(t, node, keptError)), nil
+		}))
+		d, err := c.FetchDetail(context.Background(), "PR_11")
+		if err != nil {
+			t.Fatalf("FetchDetail: %v", err)
+		}
+		if len(d.Checks) != 0 || d.Read != 0 || d.Total != 0 || d.Truncated || !d.Partial {
+			t.Errorf("checks/Read/Total/Truncated/Partial = %d/%d/%d/%v/%v, want 0/0/0/false/true: there are no check runs to be short of",
+				len(d.Checks), d.Read, d.Total, d.Truncated, d.Partial)
 		}
 	})
 }
