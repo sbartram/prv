@@ -1,9 +1,17 @@
 // Package watchlist stores the PRs the user added by hand as versioned JSON. It
-// holds PR refs only, never PR data or the token. Only Add and Remove write,
-// and they write atomically. It prints nothing.
+// holds PR refs and the time each was added, never PR data or the token. Only
+// Add and Remove write, and they write atomically (temp file, then rename). A
+// read never changes the file. A file prv cannot use (not valid JSON, another
+// version, over 1 MiB) is first copied byte for byte to watchlist.json.corrupt-
+// plus 8 hex digits of its SHA-256, once; only then may an Add start a fresh
+// file. A file prv cannot read at all is never written over. Entries that are
+// not PR references stay in the file and are skipped when loading. At most
+// MaxEntries PRs are watched. It prints nothing.
 package watchlist
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +37,9 @@ type CorruptError struct {
 	Problem string
 }
 
-func (e *CorruptError) Error() string { return "watchlist.json " + e.Problem }
+func (e *CorruptError) Error() string {
+	return "watchlist.json " + e.Problem + " (a copy is in " + filepath.Base(e.Backup) + ")"
+}
 
 func (e *CorruptError) Unwrap() error { return ErrCorrupt }
 
@@ -82,8 +92,10 @@ func New(path string) *Store { return &Store{path: path, now: time.Now, rename: 
 func (s *Store) Path() string { return s.path }
 
 // read returns the file contents. A missing file is an empty list. A file that
-// cannot be read, is too large or is not a version 1 watch list is an error, so
-// that no caller writes over it.
+// is too large, is not valid JSON or is not version 1 is copied to a backup (once)
+// and reported as a *CorruptError. A file that cannot be read, or whose backup
+// cannot be made, is a plain error. In every error case the file is untouched, so
+// that no caller writes over it by accident.
 func (s *Store) read() (fileShape, error) {
 	f, err := os.Open(s.path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -97,27 +109,64 @@ func (s *Store) read() (fileShape, error) {
 	if err != nil {
 		return fileShape{}, fmt.Errorf("reading %s: %w", s.path, err)
 	}
-	if len(data) > maxFileSize {
-		return fileShape{}, errors.New("watchlist.json is larger than 1 MiB")
-	}
+	problem := ""
 	var shape fileShape
-	if err := json.Unmarshal(data, &shape); err != nil || shape.Version != Version {
-		return fileShape{}, errors.New("watchlist.json is not a valid watch list")
+	switch {
+	case len(data) > maxFileSize:
+		problem = "is larger than 1 MiB"
+	case json.Unmarshal(data, &shape) != nil || shape.Version != Version:
+		problem = "is not a valid watch list"
+	default:
+		return shape, nil
 	}
-	return shape, nil
+	name, err := s.backup(data)
+	if err != nil {
+		return fileShape{}, fmt.Errorf("could not back up watchlist.json: %w", err)
+	}
+	return fileShape{}, &CorruptError{Backup: name, Problem: problem}
 }
 
-// Load returns the saved refs in file order. An entry that is not a valid PR
-// ref, or repeats an earlier entry (same Key), is skipped; skipped invalid
-// entries come back as one warning.
-func (s *Store) Load() ([]domain.Ref, []string, error) {
-	shape, err := s.read()
-	if err != nil {
-		return nil, nil, err
+// backup copies the file to watchlist.json.corrupt-HASH8, where HASH8 is the
+// first 8 hex digits of the SHA-256 of what was read. The copy is made once: an
+// existing copy of the same bytes is left alone. The whole file is copied, also
+// when it is larger than what read keeps in memory.
+func (s *Store) backup(data []byte) (name string, err error) {
+	sum := sha256.Sum256(data)
+	name = s.path + ".corrupt-" + hex.EncodeToString(sum[:])[:8]
+	dst, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, fs.ErrExist) {
+		return name, nil
 	}
-	var refs []domain.Ref
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			dst.Close()
+			os.Remove(name) // never leave a partial copy that would count as done
+		}
+	}()
+	src, err := os.Open(s.path)
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	if _, err = io.Copy(dst, src); err != nil {
+		return "", err
+	}
+	if err = dst.Sync(); err != nil {
+		return "", err
+	}
+	if err = dst.Close(); err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// validRefs returns the entries that are PR references, in file order, without
+// repeats (same Key), and how many entries were not PR references.
+func validRefs(shape fileShape) (refs []domain.Ref, skipped int) {
 	seen := map[domain.Ref]bool{}
-	skipped := 0
 	for _, e := range shape.PRs {
 		r := e.ref()
 		if !domain.ValidRef(r) {
@@ -130,22 +179,52 @@ func (s *Store) Load() ([]domain.Ref, []string, error) {
 		seen[r.Key()] = true
 		refs = append(refs, r)
 	}
+	return refs, skipped
+}
+
+// Load returns the saved refs in file order, at most MaxEntries. An entry that
+// is not a valid PR ref, or repeats an earlier entry (same Key), is skipped;
+// skipped invalid entries come back as one warning. Load never writes the file.
+func (s *Store) Load() ([]domain.Ref, []string, error) {
+	shape, err := s.read()
+	if err != nil {
+		return nil, nil, err
+	}
+	refs, skipped := validRefs(shape)
 	var warns []string
-	if skipped > 0 {
+	switch {
+	case skipped == 1:
+		warns = append(warns, "watchlist.json: 1 entry skipped (not a PR reference)")
+	case skipped > 1:
 		warns = append(warns, "watchlist.json: "+strconv.Itoa(skipped)+" entries skipped (not a PR reference)")
 	}
+	if len(refs) > MaxEntries {
+		refs = refs[:MaxEntries]
+		warns = append(warns, "watchlist.json: only the first "+strconv.Itoa(MaxEntries)+" PRs are watched")
+	}
 	return refs, warns, nil
+}
+
+// readForWrite reads the file for Add and Remove. A file that was copied to a
+// backup starts over as an empty list (the backup holds the old bytes); any other
+// error means nothing may be written.
+func (s *Store) readForWrite() (fileShape, error) {
+	shape, err := s.read()
+	if errors.Is(err, ErrCorrupt) {
+		return fileShape{Version: Version}, nil
+	}
+	return shape, err
 }
 
 // Add saves ref. It reports false, and writes nothing, when an entry with the
 // same Key is already there. A file that cannot be read is an error and is left
 // as it is. Entries that fail validation stay in the file: a hand edit is never
-// deleted by an Add.
+// deleted by an Add. It refuses to grow the list past MaxEntries.
 func (s *Store) Add(ref domain.Ref) (bool, error) {
 	if !domain.ValidRef(ref) {
 		return false, errors.New("not a PR reference")
 	}
-	shape, err := s.read()
+	shape, err := s.readForWrite()
 	if err != nil {
 		return false, err
 	}
@@ -153,6 +232,9 @@ func (s *Store) Add(ref domain.Ref) (bool, error) {
 		if e.ref().Key() == ref.Key() {
 			return false, nil
 		}
+	}
+	if refs, _ := validRefs(shape); len(refs) >= MaxEntries {
+		return false, fmt.Errorf("the watch list is full (%d PRs)", MaxEntries)
 	}
 	shape.PRs = append(shape.PRs, entry{Repo: ref.Repo, Number: ref.Number, AddedAt: s.now().UTC()})
 	if err := s.write(shape); err != nil {
@@ -162,9 +244,9 @@ func (s *Store) Add(ref domain.Ref) (bool, error) {
 }
 
 // Remove drops every entry with the same Key as ref. It reports false, and
-// writes nothing, when there was none.
+// writes nothing, when there was none (for example another pane removed it).
 func (s *Store) Remove(ref domain.Ref) (bool, error) {
-	shape, err := s.read()
+	shape, err := s.readForWrite()
 	if err != nil {
 		return false, err
 	}
@@ -218,7 +300,7 @@ func (s *Store) write(f fileShape) (err error) {
 	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("writing %s: %w", s.path, err)
 	}
-	if err = os.Rename(tmp.Name(), s.path); err != nil {
+	if err = s.rename(tmp.Name(), s.path); err != nil {
 		return fmt.Errorf("writing %s: %w", s.path, err)
 	}
 	return nil

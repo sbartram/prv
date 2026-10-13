@@ -124,24 +124,6 @@ func TestLoadMissingFile(t *testing.T) {
 	}
 }
 
-func TestUnreadableFileIsNeverOverwritten(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "watchlist.json")
-	const junk = "this is not json"
-	if err := os.WriteFile(path, []byte(junk), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	s := New(path)
-	if _, err := s.Add(domain.Ref{Repo: "o/r", Number: 1}); err == nil {
-		t.Error("Add on an unreadable file returned no error")
-	}
-	if _, err := s.Remove(domain.Ref{Repo: "o/r", Number: 1}); err == nil {
-		t.Error("Remove on an unreadable file returned no error")
-	}
-	if data, _ := os.ReadFile(path); string(data) != junk {
-		t.Errorf("the unreadable file was changed: %q", data)
-	}
-}
-
 func TestRemove(t *testing.T) {
 	s := New(filepath.Join(t.TempDir(), "watchlist.json"))
 	for _, r := range []domain.Ref{{Repo: "a/a", Number: 1}, {Repo: "b/b", Number: 2}} {
