@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -1024,5 +1025,59 @@ func TestAddEndToEnd(t *testing.T) {
 		if fi.Mode().Perm() != 0o600 {
 			t.Errorf("watchlist.json mode = %v, want 0600", fi.Mode().Perm())
 		}
+	}
+}
+
+// TestRestartEndToEnd: a PR added in one session is listed again after a restart,
+// with its full status and the + marker. A saved PR that discovery already found
+// is one row and costs no Lookup; only the other saved PR is looked up.
+func TestRestartEndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	now := func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) }
+
+	// Session 1: add octo/tools#42 through the prompt; no saved list is read.
+	rt1 := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupOKBody}
+	c1, err := github.NewClient(github.Options{Token: "test-token-not-real", ClosedDays: 14, Now: now, Transport: rt1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m1 tea.Model = ui.New(context.Background(), c1, ui.Options{ClosedDays: 14, Watchlist: watchlist.New(path)})
+	m1, _ = send(m1, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m1 = runCmd(m1, m1.Init())
+	_ = addViaPrompt(t, m1, "octo/tools#42")
+
+	// Another saved PR that discovery returns, saved in another letter case.
+	if _, err := watchlist.New(path).Add(domain.Ref{Repo: "ACME/API", Number: 481}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Session 2: a new client, a new model, the same file.
+	rt2 := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupOKBody}
+	c2, err := github.NewClient(github.Options{Token: "test-token-not-real", ClosedDays: 14, Now: now, Transport: rt2, Watch: watchlist.New(path)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m2 tea.Model = ui.New(context.Background(), c2, ui.Options{ClosedDays: 14, Watchlist: watchlist.New(path)})
+	m2, _ = send(m2, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m2 = runCmd(m2, m2.Init())
+
+	if want := []string{"Watch", "Lookup"}; !slices.Equal(rt2.ops, want) {
+		t.Fatalf("requests = %v, want %v", rt2.ops, want)
+	}
+	if v := rt2.lookupVars[0]; v["o0"] != "octo" || v["n0"] != "tools" || v["p0"] != float64(42) {
+		t.Errorf("Lookup variables = %v, want {o0: octo, n0: tools, p0: 42}", v)
+	} else if _, ok := v["o1"]; ok {
+		t.Errorf("Lookup asked for a second ref although discovery returned acme/api#481: %v", v)
+	}
+
+	view := plain(m2)
+	if row := lineWith(view, "octo/tools#42"); !strings.Contains(row, "+ octo/tools#42") || !strings.Contains(row, "✓ passing") {
+		t.Errorf("octo/tools#42 row = %q, want the + marker and ✓ passing\n%s", row, view)
+	}
+	if n := strings.Count(view, "acme/api#481"); n != 1 {
+		t.Errorf("acme/api#481 is on %d lines, want exactly 1\n%s", n, view)
+	}
+	if row := lineWith(view, "acme/api#481"); !strings.Contains(row, "+ acme/api#481") {
+		t.Errorf("acme/api#481 row = %q, want the + marker", row)
 	}
 }

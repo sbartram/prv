@@ -16,12 +16,19 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 )
 
+// WatchSource supplies the saved watch list. *watchlist.Store implements it.
+// RED stub.
+type WatchSource interface {
+	Load() ([]domain.Ref, []string, error)
+}
+
 // Options configures a Client.
 type Options struct {
 	Token      string
 	ClosedDays int
 	Now        func() time.Time
 	Transport  http.RoundTripper // nil means the default transport; tests inject a fake
+	Watch      WatchSource       // nil means no saved list
 }
 
 // Client fetches pull requests. It implements ui.Fetcher.
