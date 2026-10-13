@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-10-13T23:48:18.202Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-10-13T23:54:10.332Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: c1c4e726804cd5008e86dd5821255b659ac12ce4
+state_head: 2646c1ad03578136e2d9b4317e3e7f6d1823c587
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 30
+  completed_plans: 31
   percent: 75
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-10-13 — Phase 04 execution started
 
@@ -88,6 +88,7 @@ Progress: [████████░░] 75%
 | Phase 04 P03 | 25 min | 2 tasks | 4 files |
 | Phase 04 P04 | 25 min | 2 tasks | 5 files |
 | Phase 04 P05 | 35 min | 2 tasks | 9 files |
+| Phase 04 P06 | 10 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Startup watch-list problems join config warnings in ui.Options.Warnings via watchWarnings; prv never exits for them
 - [Phase 04]: 04-05: Reconcile re-sorts only when it replaced a row with its last data (an always-sort reordered existing unsorted test fixtures; Fetch already sorts)
 - [Phase 04]: 04-05: unavailable rows are drawn by unavailLine after the table renders, with blank table cells so the reason never widens a column
+- [Phase 04]: 04-06: confirmKey closes the remove confirm before it reads the key, so only y removes, only ctrl+c quits and every other key (q included) cancels
+- [Phase 04]: 04-06: d remove hint left out of the footer and help; plan 04-07 adds it with the goldens
 
 ### Pending Todos
 
@@ -183,6 +186,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:48:18.141Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-10-13T23:54:10.279Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None

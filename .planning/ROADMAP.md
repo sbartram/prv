@@ -155,7 +155,7 @@ Plans:
   4. When a saved PR later can't be fetched (deleted, access revoked, SSO not authorized), it shows as an "unavailable" row with the reason. The other PRs still display, and the saved entry is never deleted automatically.
 
 **Pitfalls first addressed here**: Batched aliased lookups use GraphQL variables, never string interpolation, in chunks of 25-50 aliases. Parse the response envelope yourself and attribute `errors[].path[0]` to its alias, using the Phase 1 spike findings (Q3, Q6) for the NOT_FOUND and SAML FORBIDDEN shapes. Validate a PR by fetching it before you persist it. Support bracketed paste. The store holds PR refs only, as versioned JSON at `$XDG_DATA_HOME/prv/watchlist.json` with an atomic write, a tolerant load, and a backup of a corrupt file. Never remove manual entries automatically. Show an SSO hint when a PR is inaccessible.
-**Plans**: 5/7 plans executed
+**Plans**: 6/7 plans executed
 
 Plans:
 **Wave 1**
@@ -170,7 +170,7 @@ Plans:
 - [x] 04-05-PLAN.md — Saved PRs never vanish: "⚠ unavailable: REASON" rows in bucket 0, never hidden by 1/2/3, "N unavailable" header, compact marker and glyph; closed saved PRs stay (WATCH-07); two-strike rule via domain.Reconcile (D-09, D-11..D-15)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 04-06-PLAN.md — d then y removes a saved PR; any other key (q included) cancels; unpin keeps authored/assigned rows; note for discovery-only rows; works on unavailable rows (D-06, D-07, D-08, D-11)
+- [x] 04-06-PLAN.md — d then y removes a saved PR; any other key (q included) cancels; unpin keeps authored/assigned rows; note for discovery-only rows; works on unavailable rows (D-06, D-07, D-08, D-11)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 04-07-PLAN.md — Reason-only detail for unavailable rows with the SSO hint and o; a add / d remove hints, empty-screen hint, ? legend; goldens for every new screen at 0x0, 60x15, 80x24, 120x40 (D-05, D-11, D-15, D-17)
@@ -187,4 +187,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
 | 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
-| 4. Curated Watch List | 5/7 | In Progress | - |
+| 4. Curated Watch List | 6/7 | In Progress | - |
