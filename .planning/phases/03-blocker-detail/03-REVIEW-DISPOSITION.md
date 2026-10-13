@@ -63,10 +63,10 @@ recorded: 2026-10-13T01:46:07.404Z
 | WR-05 | warning | open | - |
 | IN-06 | info | open | - |
 | IN-07 | info | open | - |
-| WR-01 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR01) (not in the current review) |
-| WR-02 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR02) (not in the current review) |
+| WR-01 | warning | fixed | Fixed by 03-10 Task 1 (domain.ServerWait clamp in pauseForRateLimit); confirmed resolved by re-review 2026-10-12 |
+| WR-02 | warning | fixed | Fixed by 03-09 (FetchDetail marks Truncated on partial reads); confirmed resolved in the data layer by re-review 2026-10-12 — display follow-up is WR-05 |
 | WR-03 | warning | deferred | UAT 2026-10-12: deferred by user; per-request header capture and detail budget accounting left for a later phase (not in the current review) |
-| WR-04 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR04) (not in the current review) |
+| WR-04 | warning | fixed | Fixed by 03-10 Task 2 (CheckCounts.Other, unknown checks listed, fold line reworded); confirmed resolved by re-review 2026-10-12 |
 | IN-01 | info | open | - (not in the current review) |
 | IN-02 | info | open | - (not in the current review) |
 | IN-03 | info | open | - (not in the current review) |
