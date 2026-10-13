@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-10-13T23:39:45.599Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-10-13T23:48:18.202Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: c43be98cfc49efac2a65db71e1d12cfa4983759f
+state_head: c1c4e726804cd5008e86dd5821255b659ac12ce4
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 29
+  completed_plans: 30
   percent: 75
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-10-13 — Phase 04 execution started
 
@@ -87,6 +87,7 @@ Progress: [████████░░] 75%
 | Phase 04 P02 | 25min | 2 tasks | 6 files |
 | Phase 04 P03 | 25 min | 2 tasks | 4 files |
 | Phase 04 P04 | 25 min | 2 tasks | 5 files |
+| Phase 04 P05 | 35 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Corrupt, unknown-version or oversized watchlist.json is copied once to watchlist.json.corrupt-HASH8 (O_EXCL, SHA-256 name); reads never write and Add over a backed-up file starts fresh
 - [Phase 04]: Watch list capped at 500 PRs: Load keeps the first 500 with a warning, Add refuses a 501st
 - [Phase 04]: Startup watch-list problems join config warnings in ui.Options.Warnings via watchWarnings; prv never exits for them
+- [Phase 04]: 04-05: Reconcile re-sorts only when it replaced a row with its last data (an always-sort reordered existing unsorted test fixtures; Fetch already sorts)
+- [Phase 04]: 04-05: unavailable rows are drawn by unavailLine after the table renders, with blank table cells so the reason never widens a column
 
 ### Pending Todos
 
@@ -180,6 +183,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:39:45.545Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-10-13T23:48:18.141Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
