@@ -13,7 +13,7 @@ findings:
     title: "FetchDetail silently undercounts checks and reviewers on partial data"
   - id: WR-03
     severity: warning
-    disposition: open
+    disposition: deferred
     title: "Shared \"latest response headers\" is now racy, and detail requests are invisible to the budget"
   - id: WR-04
     severity: warning
@@ -39,7 +39,7 @@ findings:
     severity: info
     disposition: open
     title: "Detail view is line-scroll only; help legend omits the commented and dismissed glyphs"
-open: 9
+open: 8
 total: 9
 recorded: 2026-10-12T23:59:33.648Z
 ---
@@ -48,10 +48,10 @@ recorded: 2026-10-12T23:59:33.648Z
 
 | Finding | Severity | Disposition | Source |
 |---------|----------|-------------|--------|
-| WR-01 | warning | open | - |
-| WR-02 | warning | open | - |
-| WR-03 | warning | open | - |
-| WR-04 | warning | open | - |
+| WR-01 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR01) |
+| WR-02 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR02) |
+| WR-03 | warning | deferred | UAT 2026-10-12: deferred by user; per-request header capture and detail budget accounting left for a later phase |
+| WR-04 | warning | open | UAT 2026-10-12: fix before ship (gap G-03-6-WR04) |
 | IN-01 | info | open | - |
 | IN-02 | info | open | - |
 | IN-03 | info | open | - |
