@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-10-13T23:34:27.192Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-10-13T23:39:45.599Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: b4bdae1641929c41544368f4dad8b628cf83d676
+state_head: c43be98cfc49efac2a65db71e1d12cfa4983759f
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 28
+  completed_plans: 29
   percent: 75
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-10-13 — Phase 04 execution started
 
@@ -86,6 +86,7 @@ Progress: [████████░░] 75%
 | Phase 04 P01 | 40 min | 2 tasks | 14 files |
 | Phase 04 P02 | 25min | 2 tasks | 6 files |
 | Phase 04 P03 | 25 min | 2 tasks | 4 files |
+| Phase 04 P04 | 25 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,9 @@ Recent decisions affecting current work:
 - [Phase 04]: [04-02] Reason priority per alias: SSO (FORBIDDEN with saml_failure true or SAML in message), then NOT_FOUND, then the first error's type
 - [Phase 04]: [04-03] Fetch results are discarded by epoch (fetchEpoch/mutEpoch), not by generation: a refresh that began before a local watch-list change is re-run, or the tick waits out a rate-limit pause
 - [Phase 04]: [04-03] A save that finds the PR already listed marks that row Manual with the saved ref; a visible new row gets no flash, hidden and already-watching outcomes do
+- [Phase 04]: Corrupt, unknown-version or oversized watchlist.json is copied once to watchlist.json.corrupt-HASH8 (O_EXCL, SHA-256 name); reads never write and Add over a backed-up file starts fresh
+- [Phase 04]: Watch list capped at 500 PRs: Load keeps the first 500 with a warning, Add refuses a 501st
+- [Phase 04]: Startup watch-list problems join config warnings in ui.Options.Warnings via watchWarnings; prv never exits for them
 
 ### Pending Todos
 
@@ -176,6 +180,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:34:27.139Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-10-13T23:39:45.545Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
