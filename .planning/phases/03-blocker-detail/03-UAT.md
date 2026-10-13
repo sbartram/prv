@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: complete
 phase: 03-blocker-detail
 source: [03-VERIFICATION.md]
 started: 2026-10-13T01:48:49Z
-updated: 2026-10-13T02:05:03.689Z
+updated: 2026-10-13T02:35:15.561Z
 ---
 
 ## Current Test
@@ -54,7 +54,9 @@ blocked: 0
 
 - gap_id: G-03-6
   truth: "The detail view reports a partial read accurately: 'read N of M runs' only when runs are missing, a distinct notice when a GraphQL error was kept next to the data, and 'no checks' when the PR has no checks (WR-05)"
-  status: failed
+  status: resolved
+  resolved_by: 03-11-PLAN.md
+  resolved_at: 2026-10-12
   reason: "User reported: fix before ship"
   severity: major
   test: 6
