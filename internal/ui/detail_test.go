@@ -469,7 +469,7 @@ func bigDetail() domain.Detail {
 }
 
 func TestDetailFold(t *testing.T) {
-	const fold = "… +12 more passing"
+	const fold = "… +12 more passing or skipped"
 	always := []string{"fail-a", "fail-b", "cancel-a", "run-a"}
 	folded := []string{"pass-01", "pass-05", "pass-10", "skip-a", "skip-b"}
 	open := func(d domain.Detail) tea.Model {
@@ -502,7 +502,7 @@ func TestDetailFold(t *testing.T) {
 			t.Errorf("expanded view missing %q:\n%s", want, v)
 		}
 	}
-	if strings.Contains(v, "more passing") {
+	if strings.Contains(v, "more passing or skipped") {
 		t.Errorf("expanded view still has the fold line:\n%s", v)
 	}
 
@@ -514,16 +514,29 @@ func TestDetailFold(t *testing.T) {
 	t.Run("failing, cancelled and running checks are never folded", func(t *testing.T) {
 		d := bigDetail()
 		d.Checks = d.Checks[:4]
-		if v := plain(open(d)); strings.Contains(v, "more passing") {
+		if v := plain(open(d)); strings.Contains(v, "more passing or skipped") {
 			t.Errorf("a fold line with nothing folded:\n%s", v)
 		}
 	})
-	t.Run("an unknown check folds too", func(t *testing.T) {
+	t.Run("an unknown check is listed, never folded", func(t *testing.T) {
 		d := fixtureDetail()
 		d.Checks = append(d.Checks, domain.Check{Name: "mystery", State: domain.CheckOther, Word: "unknown"})
+		domain.SortChecks(d.Checks)
+		d.Counts = domain.CountChecks(d.Checks)
+		d.Read, d.Total = len(d.Checks), len(d.Checks)
+
 		v := plain(open(d))
-		if strings.Contains(v, "mystery") || !strings.Contains(v, "… +5 more passing") {
-			t.Errorf("unknown check not folded:\n%s", v)
+		i, j, k := strings.Index(v, "e2e"), strings.Index(v, "? mystery"), strings.Index(v, "… +4 more passing or skipped")
+		if i < 0 || j < 0 || k < 0 || !(i < j && j < k) {
+			t.Errorf("the unknown check should sit after the running check and before the fold line (e2e=%d mystery=%d fold=%d):\n%s", i, j, k, v)
+		}
+		if want := "2 failing · 1 cancelled · 1 running · 3 passing · 1 skipped · 1 unknown"; !strings.Contains(v, want) {
+			t.Errorf("summary missing %q:\n%s", want, v)
+		}
+
+		narrow := runDetailOpen(t, detailModel(t, newDetailFake(d), Options{}, 36, 40))
+		if v := plain(narrow); !strings.Contains(v, "? mystery") {
+			t.Errorf("the compact view folded the unknown check:\n%s", v)
 		}
 	})
 	t.Run("e scrolls back into range", func(t *testing.T) {

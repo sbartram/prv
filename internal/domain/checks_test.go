@@ -253,7 +253,7 @@ func TestSortChecks(t *testing.T) {
 }
 
 func TestCountChecks(t *testing.T) {
-	want := CheckCounts{Failing: 2, Cancelled: 1, Running: 1, Passing: 1, Neutral: 2}
+	want := CheckCounts{Failing: 2, Cancelled: 1, Running: 1, Passing: 1, Neutral: 1, Other: 1}
 	if got := CountChecks(detailList()); got != want {
 		t.Errorf("CountChecks = %+v, want %+v", got, want)
 	}
