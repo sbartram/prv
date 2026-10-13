@@ -437,8 +437,10 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 	case "filtered":
 		var m tea.Model = newTestModel(t, fixtureSix(), w, h)
 		return press(m, "1", "2", "3").(Model)
-	case "detail", "detail-expanded", "detail-loading", "detail-error", "detail-gone", "detail-scrolled":
-		var m tea.Model = New(t.Context(), newDetailFake(bigDetail()), Options{ClosedDays: 14, Now: fixedNow})
+	case "detail", "detail-expanded", "detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial":
+		d := bigDetail()
+		d.Partial = state == "detail-partial"
+		var m tea.Model = New(t.Context(), newDetailFake(d), Options{ClosedDays: 14, Now: fixedNow})
 		m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 		m, _ = m.Update(fetchedMsg{snap: fixtureThirty()})
 		if state == "detail-loading" {
@@ -469,7 +471,7 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 func TestGolden(t *testing.T) {
 	sizes := [][2]int{{60, 15}, {80, 24}, {120, 40}, {0, 0}}
 	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
-		"detail-loading", "detail-error", "detail-gone", "detail-scrolled"} {
+		"detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
 			t.Run(name, func(t *testing.T) {

@@ -567,6 +567,102 @@ func TestDetailTruncatedSummary(t *testing.T) {
 	}
 }
 
+// TestDetailPartialNotice pins the rendered text of every combination of
+// Truncated (check runs were not read) and Partial (a GraphQL error was kept
+// next to the data): "read N of M runs" only for the first, the faint notice
+// only for the second, and neither one makes "no checks" read as a run count
+// (G-03-6, WR-05, D-03, D-08).
+func TestDetailPartialNotice(t *testing.T) {
+	const notice = "some details could not be loaded"
+	const counts = "CHECKS  2 failing · 1 cancelled · 1 running · 3 passing · 1 skipped"
+	build := func(f func(d *domain.Detail)) domain.Detail {
+		d := fixtureDetail()
+		f(&d)
+		return d
+	}
+	for _, tc := range []struct {
+		name          string
+		d             domain.Detail
+		width         int
+		want, wantNot []string
+		noticeFirst   bool
+	}{
+		{
+			name: "every run read", width: 120, noticeFirst: true,
+			d: build(func(d *domain.Detail) {
+				d.Partial = true
+				d.Read, d.Total = len(d.Checks), len(d.Checks)
+			}),
+			want:    []string{notice, counts},
+			wantNot: []string{" runs"},
+		},
+		{
+			name: "no checks", width: 120,
+			d:       domain.Detail{Partial: true},
+			want:    []string{"CHECKS  no checks", "REVIEWERS  none", notice},
+			wantNot: []string{" runs"},
+		},
+		{
+			name: "Truncated only", width: 120,
+			d: build(func(d *domain.Detail) {
+				d.Truncated, d.Read, d.Total = true, 500, 731
+			}),
+			want:    []string{"read 500 of 731 runs"},
+			wantNot: []string{notice},
+		},
+		{
+			name: "Truncated and Partial", width: 120,
+			d: build(func(d *domain.Detail) {
+				d.Truncated, d.Partial, d.Read, d.Total = true, true, 500, 731
+			}),
+			want: []string{"read 500 of 731 runs", notice},
+		},
+		{
+			name: "neither", width: 120,
+			d:       fixtureDetail(),
+			want:    []string{counts},
+			wantNot: []string{" runs", notice},
+		},
+		{
+			name: "compact pane", width: 36,
+			d:       domain.Detail{Partial: true},
+			want:    []string{notice},
+			wantNot: []string{" runs"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.noticeFirst && (tc.d.Read != tc.d.Total || tc.d.Total == 0) {
+				t.Fatalf("Read/Total = %d/%d, want Read == Total > 0 (WR-05 case 1)", tc.d.Read, tc.d.Total)
+			}
+			v := plain(runDetailOpen(t, detailModel(t, newDetailFake(tc.d), Options{}, tc.width, 40)))
+			for _, w := range tc.want {
+				if !strings.Contains(v, w) {
+					t.Errorf("view missing %q:\n%s", w, v)
+				}
+			}
+			for _, w := range tc.wantNot {
+				if strings.Contains(v, w) {
+					t.Errorf("view must not contain %q:\n%s", w, v)
+				}
+			}
+			if tc.noticeFirst {
+				noticeAt, checksAt := -1, -1
+				for i, l := range strings.Split(v, "\n") {
+					if noticeAt < 0 && strings.Contains(l, notice) {
+						noticeAt = i
+					}
+					if checksAt < 0 && strings.HasPrefix(strings.TrimSpace(l), "CHECKS") {
+						checksAt = i
+					}
+				}
+				if noticeAt < 0 || checksAt < 0 || noticeAt >= checksAt {
+					t.Errorf("notice line = %d, CHECKS line = %d, want the notice above CHECKS:\n%s", noticeAt, checksAt, v)
+				}
+			}
+		})
+	}
+}
+
 func TestDetailFooterHints(t *testing.T) {
 	m := runDetailOpen(t, detailModel(t, newDetailFake(fixtureDetail()), Options{}, 120, 40))
 	ls := strings.Split(plain(m), "\n")
