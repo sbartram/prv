@@ -26,6 +26,7 @@ func InWindow(pr PR, now time.Time, closedDays int) bool {
 // Bucket returns the attention bucket of a PR (D-01); a lower number needs
 // attention sooner:
 //
+//	0 unavailable: a saved PR GitHub could not return (D-11)
 //	1 open, failing CI
 //	2 open, changes requested
 //	3 open, approved and CI passing (ready to merge)
@@ -41,6 +42,9 @@ func InWindow(pr PR, now time.Time, closedDays int) bool {
 // 2026-10-12): only an open draft sorts in bucket 6; a merged or closed draft
 // sorts with merged or closed PRs.
 func Bucket(pr PR) int {
+	if pr.Unavail.Kind != UnavailNone {
+		return 0
+	}
 	switch pr.State {
 	case StateMerged:
 		return 7
@@ -68,11 +72,22 @@ func Bucket(pr PR) int {
 // by creation time newest first, then repository ascending, then PR number
 // ascending as an integer (D-02). The last-update time is deliberately not a
 // key: comments and pushes would swap rows between refreshes. Equal keys keep
-// their input order.
+// their input order. Unavailable rows (bucket 0) have no creation time: they go
+// by ref, the repository compared without letter case, then the number (D-11).
 func Sort(prs []PR) {
 	slices.SortStableFunc(prs, func(a, b PR) int {
-		if c := cmp.Compare(Bucket(a), Bucket(b)); c != 0 {
+		ba, bb := Bucket(a), Bucket(b)
+		if c := cmp.Compare(ba, bb); c != 0 {
 			return c
+		}
+		if ba == 0 {
+			if c := cmp.Compare(strings.ToLower(a.Ref.Repo), strings.ToLower(b.Ref.Repo)); c != 0 {
+				return c
+			}
+			if c := cmp.Compare(a.Ref.Number, b.Ref.Number); c != 0 {
+				return c
+			}
+			return cmp.Compare(a.Ref.Repo, b.Ref.Repo)
 		}
 		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
 			return c
@@ -103,11 +118,12 @@ func (s StateSet) Toggle(st State) StateSet { return s ^ (1 << uint(st)) }
 // number is not empty, its PR number starts with the digits in number (so "12"
 // keeps #12, #120 and #1234, never #312). A PR in an unknown state is never
 // hidden by show (same rule as InWindow): it must not vanish silently. The
-// number filter still applies to it.
+// same goes for an unavailable row, whose state is not known (D-13). The number
+// filter still applies to both.
 func Visible(prs []PR, show StateSet, number string) []PR {
 	out := make([]PR, 0, len(prs))
 	for _, pr := range prs {
-		if pr.State != StateUnknown && !show.Has(pr.State) {
+		if pr.State != StateUnknown && pr.Unavail.Kind == UnavailNone && !show.Has(pr.State) {
 			continue
 		}
 		if number != "" && !strings.HasPrefix(strconv.Itoa(pr.Ref.Number), number) {

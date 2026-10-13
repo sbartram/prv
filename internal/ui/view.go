@@ -273,7 +273,7 @@ func fit(segs []segment, sep string, width int) string {
 }
 
 // header builds the first line of the list view. The filter segment takes
-// prio 3 and the rate warning 6.
+// prio 3, the rate warning and the unavailable count 6.
 func (m Model) header() string {
 	count := strconv.Itoa(len(m.rows)) + " PRs"
 	if len(m.rows) != len(m.snap.PRs) {
@@ -287,7 +287,24 @@ func (m Model) header() string {
 		{m.filterLabel(), 3},
 		{count, 4},
 	}
+	// D-15: an integrity note. It counts the unavailable rows of the whole
+	// snapshot, so a filter never hides the note. On a tie with the rate warning
+	// the leftmost segment is dropped first, and this one sits left of it.
+	if n := m.unavailable(); n > 0 {
+		segs = append(segs, segment{warnStyle.Render(strconv.Itoa(n) + " unavailable"), 6})
+	}
 	return fit(append(segs, m.statusSegments()...), " · ", m.w)
+}
+
+// unavailable is how many PRs of the snapshot could not be loaded (LIST-09).
+func (m Model) unavailable() int {
+	n := 0
+	for _, pr := range m.snap.PRs {
+		if pr.Unavail.Kind != domain.UnavailNone {
+			n++
+		}
+	}
+	return n
 }
 
 // statusSegments are the header segments that tell how fresh the data is: the
@@ -408,9 +425,17 @@ func (m Model) renderList() string {
 			colReview: pr.Review.Badge(), colReviewers: reviewersCell(pr.Reviewers, m.snap.Viewer, 0),
 			colMerge: pr.Merge.Badge(), colCI: ciCell(pr, maxCIColW),
 		}
+		if unavail(pr) {
+			// D-09: only the marker and the ref; the reason is drawn across the
+			// other columns and never widens one.
+			row = [colCount]string{colMarker: marker, colPR: row[colPR]}
+		}
 		cells = append(cells, row)
 		for c, text := range row {
 			sz.natural[c] = max(sz.natural[c], lipgloss.Width(text))
+		}
+		if unavail(pr) {
+			continue
 		}
 		// The CI cell can shrink to its bare badge and no further.
 		minCI = max(minCI, lipgloss.Width(pr.CI.Badge()))
@@ -446,6 +471,9 @@ func (m Model) renderList() string {
 		shownRows[r] = make([]string, len(vis))
 		for i, c := range vis {
 			text := cells[r][c]
+			if unavail(pr) && c != colMarker && c != colPR {
+				continue // blank: unavailLine draws the row
+			}
 			switch c {
 			case colPR:
 				text = prefix(pr) + trimLeft(pr.Ref.String(), max(lay.width[c]-markW, 1))
@@ -504,7 +532,48 @@ func (m Model) renderList() string {
 		})
 
 	tableLines := strings.Split(t.String(), "\n")
+	// The rows on screen are m.rows[m.offset:end], one table line each after the
+	// column-header line. An unavailable row's line is drawn by hand (D-09).
+	headerW := lipgloss.Width(tableLines[0])
+	for idx := m.offset; idx < end; idx++ {
+		if j := 1 + idx - m.offset; unavail(m.rows[idx]) && j < len(tableLines) {
+			pr := m.rows[idx]
+			prCell := prefix(pr) + trimLeft(pr.Ref.String(), max(lay.width[colPR]-markW, 1))
+			tableLines[j] = m.unavailLine(pr, idx == m.cursor, cells[idx][colMarker], prCell, lay, headerW)
+		}
+	}
 	return m.stack(tableLines[0], tableLines[1:])
+}
+
+// unavail reports whether pr is a saved PR that could not be loaded.
+func unavail(pr domain.PR) bool { return pr.Unavail.Kind != domain.UnavailNone }
+
+// padCells pads s with spaces to w terminal cells; a wider s is returned as is.
+func padCells(s string, w int) string {
+	if n := w - lipgloss.Width(s); n > 0 {
+		return s + strings.Repeat(" ", n)
+	}
+	return s
+}
+
+// unavailLine draws the line of an unavailable row (D-09): the cursor marker and
+// the PR cell as in every other row, then "⚠ unavailable: REASON" across the
+// space of the TITLE..CI columns in the warning colour, never faint. The reason
+// is cut to that space with an ellipsis. Each segment is styled on its own, so
+// text with escape codes is never wrapped in a style; widths are display cells.
+// headerW is the width of the column-header line.
+func (m Model) unavailLine(pr domain.PR, selected bool, marker, prCell string, lay layout, headerW int) string {
+	base := lipgloss.NewStyle()
+	if selected {
+		base = selectedStyle
+	}
+	head := padCells(marker, lay.width[colMarker]+columnGap) + padCells(prCell, lay.width[colPR]+columnGap)
+	out := base.Render(head)
+	if rest := headerW - lipgloss.Width(head); rest > 0 {
+		reason := ansi.Truncate("⚠ unavailable: "+pr.Unavail.Reason, rest, "…")
+		out += base.Inherit(warnStyle).Render(padCells(reason, rest))
+	}
+	return out
 }
 
 // stack joins the header line, the column-header line, the rows and the
@@ -562,20 +631,29 @@ func (m Model) renderCompact() string {
 	return m.stack(headerStyle.Render("  PR")+faintStyle.Render("  widen for columns"), rows)
 }
 
-// compactRow draws row i as "> ref ✓✓✓". Each segment is styled on its own and
-// the selected row's segments each carry the reverse style, so a style never
-// wraps text that already holds escape codes. A ref that does not fit is cut
-// from the left and keeps its number; when there is no room for even one cell
-// of it, only the marker and the glyphs are drawn.
+// compactRow draws row i as "> + ref ✓✓✓". A saved PR has "+ " after the cursor
+// marker, and an unavailable one has a single warning glyph instead of the
+// three (D-05, D-09). Each segment is styled on its own and the selected row's
+// segments each carry the reverse style, so a style never wraps text that
+// already holds escape codes. A ref that does not fit is cut from the left and
+// keeps its number; when there is no room for even one cell of it, only the
+// marker, the "+ " and the glyphs are drawn.
 func (m Model) compactRow(i int) string {
 	pr := m.rows[i]
 	marker := "  "
 	if i == m.cursor {
 		marker = "> "
 	}
+	if pr.Manual {
+		marker += "+ "
+	}
 	review, merge, ci := pr.Review.Glyph(), pr.Merge.Glyph(), pr.CI.Glyph()
+	glyphW := lipgloss.Width(review) + lipgloss.Width(merge) + lipgloss.Width(ci)
+	if unavail(pr) {
+		glyphW = lipgloss.Width("⚠")
+	}
 	ref := shortRef(pr.Ref)
-	if budget := m.w - lipgloss.Width(marker) - 1 - lipgloss.Width(review) - lipgloss.Width(merge) - lipgloss.Width(ci); m.w > 0 {
+	if budget := m.w - lipgloss.Width(marker) - 1 - glyphW; m.w > 0 {
 		if budget < 1 {
 			ref = ""
 		} else {
@@ -592,6 +670,9 @@ func (m Model) compactRow(i int) string {
 	}
 	if i == m.cursor {
 		base = base.Inherit(selectedStyle)
+	}
+	if unavail(pr) {
+		return m.cut(base.Render(text) + base.Inherit(warnStyle).Render("⚠"))
 	}
 	return m.cut(base.Render(text) +
 		base.Inherit(reviewStyle(pr.Review)).Render(review) +

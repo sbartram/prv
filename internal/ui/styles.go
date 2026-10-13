@@ -47,8 +47,13 @@ func ciStyle(c domain.CI) lipgloss.Style {
 }
 
 // dimmed reports whether the whole row is dimmed: drafts (D-04) and merged or
-// closed PRs (D-07). An unknown state is not dimmed.
+// closed PRs (D-07). An unknown state is not dimmed, and neither is an
+// unavailable row: faint means draft, merged or closed, and that row is drawn in
+// the warning colour (D-09).
 func dimmed(pr domain.PR) bool {
+	if pr.Unavail.Kind != domain.UnavailNone {
+		return false
+	}
 	return pr.IsDraft || pr.State == domain.StateMerged || pr.State == domain.StateClosed
 }
 
