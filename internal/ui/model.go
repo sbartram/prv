@@ -95,6 +95,9 @@ type Model struct {
 	add       addState
 	addSeq    int
 
+	// confirm is the remove confirm line (D-06): open from d until the next key.
+	confirm confirmState
+
 	// showHelp is true while the full-screen help overlay is open (D-17).
 	// Refreshes carry on behind it.
 	showHelp bool
@@ -235,6 +238,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.addKey(msg)
 			return m, cmd
 		}
+		if m.confirm.open {
+			cmd := m.confirmKey(msg)
+			return m, cmd
+		}
 		if m.prompting {
 			m.promptKey(msg)
 			if msg.String() == "ctrl+c" {
@@ -262,6 +269,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case bkey.Matches(msg, m.keys.Add):
 			if m.state == stateList || m.state == stateEmpty { // the prompt line exists on these screens only
 				cmd := m.openAdd()
+				return m, cmd
+			}
+		case bkey.Matches(msg, m.keys.Remove):
+			if m.state == stateList && len(m.rows) > 0 {
+				cmd := m.askRemove()
 				return m, cmd
 			}
 		case bkey.Matches(msg, m.keys.Filter):
@@ -332,6 +344,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case addSavedMsg:
 		cmd := m.applyAddSaved(msg)
 		return m, cmd
+	case removedMsg:
+		cmd := m.applyRemoved(msg)
+		return m, cmd
 	case detailMsg:
 		m.applyDetail(msg)
 	case redrawMsg:
@@ -397,9 +412,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// markMutation records a local watch-list change (an add; from plan 04-06 also
-// a removal): a fetch that is running now started before it, so its result is
-// discarded when it arrives.
+// markMutation records a local watch-list change (an add or a removal): a fetch
+// that is running now started before it, so its result is discarded when it
+// arrives.
 func (m *Model) markMutation() { m.mutEpoch = m.fetchEpoch + 1 }
 
 // openURL opens raw in the browser, after safeURL has checked it. The launch

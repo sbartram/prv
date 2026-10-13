@@ -31,12 +31,20 @@ type keyMap struct {
 	// Add opens the add-PR prompt (D-01); the list and empty screens only. It is
 	// not in the footer hints or the help yet.
 	Add bkey.Binding
+
+	// Remove asks to take the selected PR off the watch list (D-06); the list
+	// screen only, and only rows marked +. It is not in the footer hints or the
+	// help yet.
+	Remove bkey.Binding
 }
 
 // promptKeys are the keys the number prompt handles while it is open. Every
 // other key is ignored, apart from ctrl+c.
 type promptKeys struct {
 	Accept, Cancel, Delete bkey.Binding
+
+	// Yes is the one key that accepts the remove confirm line.
+	Yes bkey.Binding
 }
 
 func defaultPromptKeys() promptKeys {
@@ -44,6 +52,7 @@ func defaultPromptKeys() promptKeys {
 		Accept: bkey.NewBinding(bkey.WithKeys("enter")),
 		Cancel: bkey.NewBinding(bkey.WithKeys("esc")),
 		Delete: bkey.NewBinding(bkey.WithKeys("backspace")),
+		Yes:    bkey.NewBinding(bkey.WithKeys("y")),
 	}
 }
 
@@ -71,7 +80,8 @@ func defaultKeys() keyMap {
 		Filter: bkey.NewBinding(bkey.WithKeys("/"), bkey.WithHelp("/", "PR #")),
 		Clear:  bkey.NewBinding(bkey.WithKeys("esc"), bkey.WithHelp("esc", "clear #")),
 
-		Add: bkey.NewBinding(bkey.WithKeys("a"), bkey.WithHelp("a", "add")),
+		Add:    bkey.NewBinding(bkey.WithKeys("a"), bkey.WithHelp("a", "add")),
+		Remove: bkey.NewBinding(bkey.WithKeys("d"), bkey.WithHelp("d", "remove")),
 	}
 }
 

@@ -121,6 +121,9 @@ func (m Model) bottom() string {
 	if m.add.open {
 		return m.addLine()
 	}
+	if m.confirm.open {
+		return m.confirmLine()
+	}
 	if !m.prompting {
 		return m.footer()
 	}
