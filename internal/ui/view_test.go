@@ -60,6 +60,43 @@ func fixtureSix() domain.Snapshot {
 	}}
 }
 
+// fixtureWatch is a list with saved (+) rows and unavailable rows: a discovered
+// failing PR, a saved loaded PR, a PR that is both discovered and saved, a
+// merged saved PR, and two unavailable saved PRs (not found, SSO).
+func fixtureWatch() domain.Snapshot {
+	at := time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)
+	snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
+		{ID: "PR_1", Ref: domain.Ref{Repo: "acme/api", Number: 1}, Title: "Rework the cache layer", Author: "alice", Auto: true,
+			State: domain.StateOpen, Review: domain.ReviewChangesRequested, CI: domain.CIFailing, Merge: domain.MergeBlocked, UpdatedAt: at},
+		{ID: "PR_42", Ref: domain.Ref{Repo: "octo/tools", Number: 42}, Title: "Speed up the build", Author: "alice", Manual: true,
+			Watched: domain.Ref{Repo: "octo/tools", Number: 42}, State: domain.StateOpen, Review: domain.ReviewApproved,
+			CI: domain.CIPassing, Merge: domain.MergeMergeable, UpdatedAt: at, URL: "https://github.com/octo/tools/pull/42"},
+		{ID: "PR_7", Ref: domain.Ref{Repo: "acme/api", Number: 7}, Title: "Add retry to the client", Author: "octo", Auto: true, Manual: true,
+			Watched: domain.Ref{Repo: "ACME/API", Number: 7}, State: domain.StateOpen, Review: domain.ReviewRequired,
+			CI: domain.CIRunning, UpdatedAt: at},
+		{ID: "PR_8", Ref: domain.Ref{Repo: "octo/old", Number: 8}, Title: "Drop the legacy flag", Author: "bob", Manual: true,
+			Watched: domain.Ref{Repo: "octo/old", Number: 8}, State: domain.StateMerged, Review: domain.ReviewApproved,
+			CI: domain.CIPassing, UpdatedAt: at, ClosedAt: at},
+		{Ref: domain.Ref{Repo: "acme/gone", Number: 5}, Manual: true, Watched: domain.Ref{Repo: "acme/gone", Number: 5},
+			URL: "https://github.com/acme/gone/pull/5", Unavail: domain.NotFound()},
+		{Ref: domain.Ref{Repo: "samlcorp/app", Number: 3}, Manual: true, Watched: domain.Ref{Repo: "samlcorp/app", Number: 3},
+			URL: "https://github.com/samlcorp/app/pull/3", Unavail: domain.SSORequired("samlcorp")},
+	}}
+	domain.Sort(snap.PRs)
+	return snap
+}
+
+// watchModel is a model with the add fakes, loaded with fixtureWatch.
+func watchModel(t *testing.T, f Fetcher, w, h int) tea.Model {
+	t.Helper()
+	nm := New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Watchlist: &memWatch{}})
+	nm.after = func(time.Duration, tea.Msg) tea.Cmd { return nil }
+	var m tea.Model = nm
+	m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: h})
+	m, _ = m.Update(fetchedMsg{snap: fixtureWatch()})
+	return m
+}
+
 func TestGoldenListColor(t *testing.T) {
 	m := newTestModel(t, fixtureSix(), 120, 40)
 	golden.RequireEqual(t, m.View().Content)
@@ -437,6 +474,27 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 	case "filtered":
 		var m tea.Model = newTestModel(t, fixtureSix(), w, h)
 		return press(m, "1", "2", "3").(Model)
+	case "watch":
+		return newTestModel(t, fixtureWatch(), w, h)
+	case "add-checking":
+		// The lookup Cmd is not run: the answer never arrives.
+		m, _ := watchModel(t, &addFetcher{snap: fixtureWatch()}, w, h).Update(key("a"))
+		m, _ = m.Update(tea.PasteMsg{Content: "acme/api#42"})
+		m, _ = m.Update(special(tea.KeyEnter))
+		return m.(Model)
+	case "add-error":
+		m, _ := watchModel(t, &addFetcher{snap: fixtureWatch()}, w, h).Update(key("a"))
+		m, _ = m.Update(tea.PasteMsg{Content: "github.com/o/r/issues/3"})
+		m, _ = m.Update(special(tea.KeyEnter))
+		return m.(Model)
+	case "confirm":
+		m := selectRef(t, watchModel(t, &addFetcher{snap: fixtureWatch()}, w, h), domain.Ref{Repo: "octo/tools", Number: 42})
+		return press(m, "d").(Model)
+	case "watch-detail":
+		f := &unavailDetailFetcher{addFetcher: &addFetcher{snap: fixtureWatch()}}
+		m := selectRef(t, watchModel(t, f, w, h), domain.Ref{Repo: "samlcorp/app", Number: 3})
+		m, _ = m.Update(key("enter"))
+		return m.(Model)
 	case "detail", "detail-expanded", "detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial":
 		d := bigDetail()
 		d.Partial = state == "detail-partial"
@@ -471,7 +529,8 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 func TestGolden(t *testing.T) {
 	sizes := [][2]int{{60, 15}, {80, 24}, {120, 40}, {0, 0}}
 	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
-		"detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial"} {
+		"detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial",
+		"watch", "add-checking", "add-error", "confirm", "watch-detail"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
 			t.Run(name, func(t *testing.T) {
@@ -486,6 +545,55 @@ func TestGolden(t *testing.T) {
 func TestGoldenCompact(t *testing.T) {
 	m := newTestModel(t, fixtureSix(), 36, 12)
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestGoldenCompactWatch is the compact list of a 36-cell pane with a saved and
+// an unavailable row: the + marker and the warning glyph (D-14).
+func TestGoldenCompactWatch(t *testing.T) {
+	m := newTestModel(t, fixtureWatch(), 36, 12)
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+func TestFooterAddRemoveHints(t *testing.T) {
+	const wide = "j/k move · r refresh · enter details · o open · a add · "
+	f := func() Fetcher { return &unavailDetailFetcher{addFetcher: &addFetcher{snap: fixtureWatch()}} }
+
+	// A discovered row is not saved: a add, and no d remove.
+	m := selectRef(t, watchModel(t, f(), 160, 24), domain.Ref{Repo: "acme/api", Number: 1})
+	if got := lastLine(m); !strings.Contains(got, wide+"/ PR # · 1/2/3 states · ? help · q quit") {
+		t.Errorf("discovered row footer = %q", got)
+	}
+	// A saved row (marked +): d remove follows a add.
+	m = selectRef(t, m, domain.Ref{Repo: "octo/tools", Number: 42})
+	if got := lastLine(m); !strings.Contains(got, wide+"d remove · / PR # · 1/2/3 states · ? help · q quit") {
+		t.Errorf("saved row footer = %q", got)
+	}
+	// At 80 columns hints are cut from the end and the footer keeps its width.
+	m = selectRef(t, watchModel(t, f(), 80, 24), domain.Ref{Repo: "octo/tools", Number: 42})
+	got := lastLine(m)
+	if lipgloss.Width(got) > 80 || !strings.Contains(got, "o open · a add") || strings.Contains(got, "q quit") {
+		t.Errorf("80-column footer = %q, want a add kept and q quit dropped", got)
+	}
+	// The detail view hints do not change: no a, no d.
+	m = selectRef(t, watchModel(t, f(), 160, 24), domain.Ref{Repo: "octo/tools", Number: 42})
+	m, cmd := m.Update(key("enter"))
+	m = runCmd(m, cmd)
+	got = lastLine(m)
+	if !strings.Contains(got, "esc back · o open · r refresh") || strings.Contains(got, "add") || strings.Contains(got, "remove") {
+		t.Errorf("detail footer = %q, want the unchanged detail hints", got)
+	}
+}
+
+func TestEmptyAddHint(t *testing.T) {
+	m := newTestModel(t, domain.Snapshot{Viewer: "octo"}, 160, 24)
+	want := "No open PRs authored by or assigned to @octo, and none closed in the last 14 days. · press a to add any PR"
+	if v := plain(m); !strings.Contains(v, want) {
+		t.Errorf("empty screen lacks %q:\n%s", want, v)
+	}
+	m = newTestModel(t, domain.Snapshot{Viewer: "octo", Truncated: true}, 160, 24)
+	if v := plain(m); !strings.Contains(v, "No PRs could be listed for @octo.") || strings.Contains(v, "press a to add") {
+		t.Errorf("truncated empty screen = %q, want no add hint", v)
+	}
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }

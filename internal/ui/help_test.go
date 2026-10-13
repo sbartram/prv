@@ -175,6 +175,35 @@ func TestHelpFromKeymap(t *testing.T) {
 	}
 }
 
+func TestHelpWatchLegend(t *testing.T) {
+	for _, sz := range [][2]int{{80, 24}, {120, 40}} {
+		m := press(helpModel(t, sz[0], sz[1], fixtureThirty(), Options{}), "?")
+		ls := lines(m.View().Content)
+		for _, want := range []string{
+			"  + added by you; d removes it",
+			"  ⚠ unavailable: a saved PR GitHub could not return; enter shows why",
+		} {
+			found := false
+			for _, l := range ls {
+				if strings.TrimRight(l, " ") == want {
+					found = true
+					if lipgloss.Width(l) > 80 {
+						t.Errorf("%dx%d: legend line is %d cells, want at most 80: %q", sz[0], sz[1], lipgloss.Width(l), l)
+					}
+				}
+			}
+			if !found {
+				t.Errorf("%dx%d: overlay lacks the line %q:\n%s", sz[0], sz[1], want, strings.Join(ls, "\n"))
+			}
+		}
+		for _, k := range [][2]string{{"a", "add"}, {"d", "remove"}} {
+			if v := strings.Join(ls, "\n"); !strings.Contains(v, k[0]+" "+k[1]) {
+				t.Errorf("%dx%d: overlay lacks the key %q %q", sz[0], sz[1], k[0], k[1])
+			}
+		}
+	}
+}
+
 func TestFmtInterval(t *testing.T) {
 	for _, tt := range []struct {
 		d    time.Duration
