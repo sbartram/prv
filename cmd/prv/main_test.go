@@ -928,13 +928,22 @@ func press(m tea.Model, keys ...string) tea.Model {
 	return m
 }
 
-// lookupOKBody is the Lookup answer for octo/tools#42: open, approved, passing.
-const lookupOKBody = `{"data":{"rateLimit":{"limit":5000,"cost":1,"remaining":4985,"resetAt":"2026-10-11T13:00:00Z"},` +
-	`"r0":{"pullRequest":{"id":"PR_42","number":42,"title":"Speed up the build","url":"https://github.com/octo/tools/pull/42",` +
+// lookupToolsPR is the Lookup answer for octo/tools#42: open, approved, passing.
+const lookupToolsPR = `{"pullRequest":{"id":"PR_42","number":42,"title":"Speed up the build","url":"https://github.com/octo/tools/pull/42",` +
 	`"isDraft":false,"state":"OPEN","createdAt":"2026-10-10T08:00:00Z","closedAt":null,"mergedAt":null,"updatedAt":"2026-10-11T08:00:00Z",` +
 	`"repository":{"nameWithOwner":"octo/tools"},"author":{"login":"alice"},"reviewDecision":"APPROVED",` +
 	`"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE","latestOpinionatedReviews":{"nodes":[]},` +
-	`"reviewRequests":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}}}}`
+	`"reviewRequests":{"nodes":[]},"statusCheckRollup":{"state":"SUCCESS"}}}`
+
+const lookupRate = `"rateLimit":{"limit":5000,"cost":1,"remaining":4985,"resetAt":"2026-10-11T13:00:00Z"}`
+
+// lookupOKBody is the Lookup answer for octo/tools#42: open, approved, passing.
+const lookupOKBody = `{"data":{` + lookupRate + `,"r0":` + lookupToolsPR + `}}`
+
+// lookupGoneBody answers a Lookup of two refs: r0 is octo/tools#42 and r1 is
+// null with a NOT_FOUND error at ["r1"] (acme/gone#5 does not exist).
+const lookupGoneBody = `{"data":{` + lookupRate + `,"r0":` + lookupToolsPR + `,"r1":null},` +
+	`"errors":[{"type":"NOT_FOUND","path":["r1"],"message":"Could not resolve to a Repository with the name 'acme/gone'."}]}`
 
 // drain runs cmd and then, for at most 6 rounds, the Cmds that the messages
 // made. step drops the Cmds that take longer than 250 ms, so a refresh tick never
@@ -1120,5 +1129,49 @@ func TestWatchWarnings(t *testing.T) {
 	want := []string{"watch list: watchlist.json: 1 entry skipped (not a PR reference)"}
 	if got := watchWarnings(skipped); !slices.Equal(got, want) {
 		t.Errorf("skipped entry: warnings = %v, want %v", got, want)
+	}
+}
+
+// TestUnavailableEndToEnd: a saved PR that GitHub answers NOT_FOUND is a row at
+// the top with its reason, and the other PRs still show every column.
+func TestUnavailableEndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	store := watchlist.New(path)
+	for _, ref := range []domain.Ref{{Repo: "octo/tools", Number: 42}, {Repo: "acme/gone", Number: 5}} {
+		if _, err := store.Add(ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rt := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupGoneBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+		Watch:      store,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m tea.Model = ui.New(context.Background(), client, ui.Options{ClosedDays: 14, Watchlist: store})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	view := plain(m)
+	ls := strings.Split(view, "\n")
+	if len(ls) < 3 || !strings.Contains(ls[2], "acme/gone#5") ||
+		!strings.Contains(ls[2], "⚠ unavailable: not found (deleted, renamed, or no access)") {
+		t.Errorf("the first row under the column header is not the unavailable acme/gone#5:\n%s", view)
+	}
+	if row := lineWith(view, "octo/tools#42"); !strings.Contains(row, "+ octo/tools#42") || !strings.Contains(row, "✓ passing") {
+		t.Errorf("octo/tools#42 row = %q, want the + marker and ✓ passing", row)
+	}
+	for _, want := range []string{"acme/api#481", "acme/web#12"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("the view lacks %s:\n%s", want, view)
+		}
+	}
+	if !strings.Contains(ls[0], "1 unavailable") {
+		t.Errorf("header = %q, want '1 unavailable'", ls[0])
 	}
 }

@@ -408,3 +408,70 @@ func TestVisible(t *testing.T) {
 		}
 	})
 }
+
+func TestBucketUnavailable(t *testing.T) {
+	gone := Ref{Repo: "acme/gone", Number: 5}
+	for _, tt := range []struct {
+		name string
+		pr   PR
+	}{
+		{"not found", PR{Ref: gone, Unavail: NotFound()}},
+		{"SSO", PR{Ref: gone, Unavail: SSORequired("acme")}},
+		{"other error", PR{Ref: gone, Unavail: LoadFailed("rate limited", "")}},
+		{"with failing CI", PR{Ref: gone, CI: CIFailing, Unavail: NotFound()}},
+		{"with state merged", PR{Ref: gone, State: StateMerged, Unavail: NotFound()}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Bucket(tt.pr); got != 0 {
+				t.Errorf("Bucket = %d, want 0 (D-11)", got)
+			}
+		})
+	}
+	if got := Bucket(PR{State: StateOpen, CI: CIFailing}); got != 1 {
+		t.Errorf("failing CI without Unavail: Bucket = %d, want 1", got)
+	}
+}
+
+func TestSortUnavailableByRef(t *testing.T) {
+	un := func(repo string, n int) PR {
+		return PR{Ref: Ref{Repo: repo, Number: n}, Manual: true, Unavail: NotFound()}
+	}
+	prs := []PR{
+		un("acme/web", 9),
+		un("Acme/api", 10),
+		un("acme/api", 2),
+		{ID: "F", Ref: Ref{Repo: "acme/x", Number: 1}, State: StateOpen, CI: CIFailing},
+	}
+	Sort(prs)
+	var got []string
+	for _, p := range prs {
+		got = append(got, p.Ref.String())
+	}
+	want := []string{"acme/api#2", "Acme/api#10", "acme/web#9", "acme/x#1"}
+	if !slices.Equal(got, want) {
+		t.Errorf("order = %v, want %v (repo compared without letter case, then the number)", got, want)
+	}
+}
+
+func TestVisibleUnavailable(t *testing.T) {
+	un := func(n int) PR { return PR{Ref: Ref{Repo: "acme/gone", Number: n}, Manual: true, Unavail: NotFound()} }
+	open := PR{ID: "O", Ref: Ref{Repo: "acme/api", Number: 5}, State: StateOpen}
+	prs := []PR{un(5), un(6), open}
+
+	nums := func(prs []PR) []string {
+		out := []string{}
+		for _, p := range prs {
+			out = append(out, p.Ref.String())
+		}
+		return out
+	}
+	if got, want := nums(Visible(prs, 1<<StateMerged, "")), []string{"acme/gone#5", "acme/gone#6"}; !slices.Equal(got, want) {
+		t.Errorf("only Merged shown: %v, want %v (an unavailable row has no known state, D-13)", got, want)
+	}
+	if got, want := nums(Visible(prs, 0, "")), []string{"acme/gone#5", "acme/gone#6"}; !slices.Equal(got, want) {
+		t.Errorf("no state shown: %v, want %v", got, want)
+	}
+	if got, want := nums(Visible(prs, 1<<StateMerged, "5")), []string{"acme/gone#5"}; !slices.Equal(got, want) {
+		t.Errorf("number 5: %v, want %v (the number filter matches it by number)", got, want)
+	}
+}
