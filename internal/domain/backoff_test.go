@@ -106,3 +106,43 @@ func TestNextDelayNoOverflow(t *testing.T) {
 		t.Errorf("zero interval: Wait = %v, want 1s", got.Wait)
 	}
 }
+
+func TestServerWait(t *testing.T) {
+	T := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	min := func(n int) time.Duration { return time.Duration(n) * time.Minute }
+	sec := func(n int) time.Duration { return time.Duration(n) * time.Second }
+	far := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC) // T.Sub saturates; + 1 s must not wrap
+
+	tests := []struct {
+		name  string
+		after time.Duration
+		reset time.Time
+		want  time.Duration
+	}{
+		{"retry-after 90 s", sec(90), time.Time{}, sec(90)},
+		{"retry-after 1 ms is raised to 1 s", time.Millisecond, time.Time{}, sec(1)},
+		{"retry-after 2147483647 s is cut to 65 min", 2147483647 * time.Second, time.Time{}, min(65)},
+		{"retry-after beats a reset time", sec(30), T.Add(min(10)), sec(30)},
+		{"reset 10 min ahead adds the 1 s margin", 0, T.Add(min(10)), min(10) + sec(1)},
+		{"reset one year ahead is cut to 65 min", 0, T.Add(8760 * time.Hour), min(65)},
+		{"reset in year 9999 is cut to 65 min", 0, far, min(65)},
+		{"reset one hour in the past pauses for the floor", 0, T.Add(-time.Hour), RateLimitFloor},
+		{"reset equal to now pauses for the floor", 0, T, RateLimitFloor},
+		{"no timing at all pauses for the floor", 0, time.Time{}, RateLimitFloor},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ServerWait(T, tc.after, tc.reset)
+			if got != tc.want {
+				t.Errorf("ServerWait = %v, want %v", got, tc.want)
+			}
+			if got < MinServerWait || got > MaxServerWait {
+				t.Errorf("ServerWait = %v, outside [%v, %v]", got, MinServerWait, MaxServerWait)
+			}
+			list := NextDelay(T, time.Minute, 1, RateLimit{}, Outcome{Failed: true, RateLimited: true, RetryAfter: tc.after, ResetAt: tc.reset}).Wait
+			if got != list {
+				t.Errorf("ServerWait = %v but NextDelay waits %v: the detail and list paths disagree", got, list)
+			}
+		})
+	}
+}

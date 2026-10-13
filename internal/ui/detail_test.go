@@ -723,8 +723,8 @@ func TestDetailRateLimitExtendsPause(t *testing.T) {
 	t.Run("a reset time", func(t *testing.T) {
 		reset := clk.t.Add(10 * time.Minute)
 		m, f := open(&limitedErr{reset: reset, limited: true}, 0)
-		if got := m.(Model).pausedUntil; !got.Equal(reset) {
-			t.Fatalf("pausedUntil = %v, want %v", got, reset)
+		if got, want := m.(Model).pausedUntil, reset.Add(time.Second); !got.Equal(want) {
+			t.Fatalf("pausedUntil = %v, want %v", got, want)
 		}
 		m, cmd := m.Update(key("r"))
 		m = runCmd(m, cmd)
@@ -737,6 +737,50 @@ func TestDetailRateLimitExtendsPause(t *testing.T) {
 	})
 	t.Run("Retry-After", func(t *testing.T) {
 		m, _ := open(&limitedErr{after: 5 * time.Minute, limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(5*time.Minute); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("a huge Retry-After is cut to 65 min", func(t *testing.T) {
+		m, _ := open(&limitedErr{after: 2147483647 * time.Second, limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(domain.MaxServerWait); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("a reset ten years ahead is cut to 65 min", func(t *testing.T) {
+		m, _ := open(&limitedErr{reset: clk.t.AddDate(10, 0, 0), limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(domain.MaxServerWait); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("a reset in the past pauses for the floor", func(t *testing.T) {
+		m, f := open(&limitedErr{reset: clk.t.Add(-time.Hour), limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(domain.RateLimitFloor); !got.Equal(want) {
+			t.Fatalf("pausedUntil = %v, want %v", got, want)
+		}
+		m, cmd := m.Update(key("r"))
+		m = runCmd(m, cmd)
+		if mm := m.(Model); mm.inFlight || f.fakeFetcher.calls != 0 {
+			t.Errorf("r during the pause started a request: inFlight=%v calls=%d", mm.inFlight, f.fakeFetcher.calls)
+		}
+		if v := plain(m); !strings.Contains(v, "rate limited — resumes") {
+			t.Errorf("r shows no pause flash:\n%s", v)
+		}
+	})
+	t.Run("a reset equal to now pauses for the floor", func(t *testing.T) {
+		m, _ := open(&limitedErr{reset: clk.t, limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(domain.RateLimitFloor); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("a tiny Retry-After is raised to 1 s", func(t *testing.T) {
+		m, _ := open(&limitedErr{after: time.Millisecond, limited: true}, 0)
+		if got, want := m.(Model).pausedUntil, clk.t.Add(domain.MinServerWait); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v, want %v", got, want)
+		}
+	})
+	t.Run("Retry-After beats a reset time", func(t *testing.T) {
+		m, _ := open(&limitedErr{after: 5 * time.Minute, reset: clk.t.Add(10 * time.Minute), limited: true}, 0)
 		if got, want := m.(Model).pausedUntil, clk.t.Add(5*time.Minute); !got.Equal(want) {
 			t.Errorf("pausedUntil = %v, want %v", got, want)
 		}
@@ -757,8 +801,8 @@ func TestDetailRateLimitExtendsPause(t *testing.T) {
 		reset := clk.t.Add(10 * time.Minute)
 		m, f := open(&limitedErr{reset: reset, limited: true}, 0)
 		m = refresh(m, 1, 2, 3)
-		if got := m.(Model).pausedUntil; !got.Equal(reset) {
-			t.Errorf("pausedUntil = %v after a list result, want %v", got, reset)
+		if got, want := m.(Model).pausedUntil, reset.Add(time.Second); !got.Equal(want) {
+			t.Errorf("pausedUntil = %v after a list result, want %v", got, want)
 		}
 		if len(f.ids) != 1 {
 			t.Errorf("ids = %v: a request went out inside the pause", f.ids)
