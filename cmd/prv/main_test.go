@@ -1081,3 +1081,44 @@ func TestRestartEndToEnd(t *testing.T) {
 		t.Errorf("acme/api#481 row = %q, want the + marker", row)
 	}
 }
+
+// TestWatchWarnings: watch-list problems found at startup become warnings
+// ("watch list: ..."); a missing file has none, and the copy of a corrupt file
+// is made here without changing the file.
+func TestWatchWarnings(t *testing.T) {
+	write := func(t *testing.T, body string) *watchlist.Store {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return watchlist.New(path)
+	}
+
+	missing := watchlist.New(filepath.Join(t.TempDir(), "prv", "watchlist.json"))
+	if got := watchWarnings(missing); len(got) != 0 {
+		t.Errorf("missing file: warnings = %v, want none", got)
+	}
+
+	const bad = "{not json"
+	corrupt := write(t, bad)
+	got := watchWarnings(corrupt)
+	if len(got) != 1 || !strings.HasPrefix(got[0], "watch list: ") || !strings.Contains(got[0], "corrupt-") {
+		t.Fatalf("corrupt file: warnings = %v, want one 'watch list: ...' naming the corrupt- copy", got)
+	}
+	if data, _ := os.ReadFile(corrupt.Path()); string(data) != bad {
+		t.Errorf("startup changed the corrupt file: %q", data)
+	}
+	if backups, _ := filepath.Glob(corrupt.Path() + ".corrupt-*"); len(backups) != 1 {
+		t.Errorf("backups = %v, want one", backups)
+	}
+
+	skipped := write(t, `{"version":1,"prs":[{"repo":"a/a","number":1},{"repo":"bad","number":1}]}`)
+	want := []string{"watch list: watchlist.json: 1 entry skipped (not a PR reference)"}
+	if got := watchWarnings(skipped); !slices.Equal(got, want) {
+		t.Errorf("skipped entry: warnings = %v, want %v", got, want)
+	}
+}

@@ -174,3 +174,11 @@ func displayPath(path, home string) string {
 	}
 	return path
 }
+
+// watchWarnings reads the watch list once at startup and returns what is wrong
+// with it as warnings for the footer and the ? overlay. prv carries on whatever
+// they are. Reading a corrupt file makes its backup copy here, before the TUI
+// starts.
+func watchWarnings(s *watchlist.Store) []string {
+	return nil
+}
