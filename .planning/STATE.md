@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Blocker Detail
 status: executing
-stopped_at: Completed 03-09-PLAN.md
-last_updated: "2026-10-13T01:37:44.601Z"
+stopped_at: Completed 03-10-PLAN.md
+last_updated: "2026-10-13T01:42:06.767Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 03 execution started
-state_head: feddfa6e3ff98a95c65d04ae68dc2a6eb1003c44
+state_head: 6508f2badb0c9a1df93c30d3e3a730de9da5f0aa
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 03 (Blocker Detail) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 03 execution started
 
@@ -80,6 +80,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03 P07 | 30 min | 2 tasks | 35 files |
 | Phase 03 P08 | 6 min | 2 tasks | 22 files |
 | Phase 03 P09 | 3 min | 2 tasks | 3 files |
+| Phase 03 P10 | 4 min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,8 @@ Recent decisions affecting current work:
 - [Phase 03]: schedule() keeps a still-running pause, so a list result cannot end a pause a detail error set
 - [Phase 03]: A gone PR is not refetched; o still opens the detail PR's own URL
 - [Phase 03]: [03-09] Reuse Detail.Truncated for both partial-read causes (Read < Total and kept GraphQL error) so the UI renders 'read N of M runs' unchanged
+- [Phase 03]: 03-10: ServerWait goes straight to RateLimitFloor without timing (no snapshot reset fallback); Retry-After wins over reset on the detail path; detail pause ends at reset+1s
+- [Phase 03]: 03-10: fold line reads '+N more passing or skipped' (user UAT decision supersedes D-10 text); unknown checks always listed and counted in CheckCounts.Other
 
 ### Pending Todos
 
@@ -161,6 +164,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T01:37:44.549Z
-Stopped at: Completed 03-09-PLAN.md
+Last session: 2026-10-13T01:42:06.715Z
+Stopped at: Completed 03-10-PLAN.md
 Resume file: None
