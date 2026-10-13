@@ -27,6 +27,10 @@ type keyMap struct {
 	// PR-number filter (D-11). Filter opens the prompt; Clear drops a kept
 	// number filter in list mode.
 	Filter, Clear bkey.Binding
+
+	// Add opens the add-PR prompt (D-01); the list and empty screens only. It is
+	// not in the footer hints or the help yet.
+	Add bkey.Binding
 }
 
 // promptKeys are the keys the number prompt handles while it is open. Every
@@ -66,6 +70,8 @@ func defaultKeys() keyMap {
 
 		Filter: bkey.NewBinding(bkey.WithKeys("/"), bkey.WithHelp("/", "PR #")),
 		Clear:  bkey.NewBinding(bkey.WithKeys("esc"), bkey.WithHelp("esc", "clear #")),
+
+		Add: bkey.NewBinding(bkey.WithKeys("a"), bkey.WithHelp("a", "add")),
 	}
 }
 

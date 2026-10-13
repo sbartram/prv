@@ -89,6 +89,12 @@ type Model struct {
 	prompting bool
 	pkeys     promptKeys
 
+	// The add prompt (WATCH-04) takes free text and pastes. addSeq is bumped for
+	// every attempt and every close, so a result that arrives late is dropped.
+	watchlist Watchlist
+	add       addState
+	addSeq    int
+
 	// showHelp is true while the full-screen help overlay is open (D-17).
 	// Refreshes carry on behind it.
 	showHelp bool
@@ -173,6 +179,7 @@ func New(ctx context.Context, f Fetcher, opts Options) Model {
 		opts:       opts,
 		keys:       defaultKeys(),
 		pkeys:      defaultPromptKeys(),
+		watchlist:  opts.Watchlist,
 		help:       h,
 		opener:     opts.Opener,
 		state:      stateLoading,
@@ -195,7 +202,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.PasteMsg:
-		if m.prompting {
+		if m.add.open {
+			m.addPaste(msg.Content)
+		} else if m.prompting {
 			for _, r := range msg.Content {
 				if r >= '0' && r <= '9' && len(m.numFilter) < maxFilterDigits {
 					m.numFilter += string(r)
@@ -212,6 +221,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.showHelp = false
 			return m, nil
+		}
+		if m.add.open {
+			cmd := m.addKey(msg)
+			return m, cmd
 		}
 		if m.prompting {
 			m.promptKey(msg)
@@ -237,6 +250,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case bkey.Matches(msg, m.keys.Refresh):
 			cmd := m.manualRefresh()
 			return m, cmd
+		case bkey.Matches(msg, m.keys.Add):
+			if m.state == stateList || m.state == stateEmpty { // the prompt line exists on these screens only
+				cmd := m.openAdd()
+				return m, cmd
+			}
 		case bkey.Matches(msg, m.keys.Filter):
 			if m.state == stateList { // the prompt line only exists on the list screens
 				m.prompting = true
@@ -278,7 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncDetail()
 		}
 	case spinner.TickMsg:
-		if m.inFlight || m.state == stateLoading {
+		if m.inFlight || m.state == stateLoading || m.add.checking {
 			var cmd tea.Cmd
 			m.spin, cmd = m.spin.Update(msg)
 			return m, cmd
@@ -299,6 +317,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.setFlash("could not open the browser", flashFor)
 			return m, cmd
 		}
+	case addCheckedMsg:
+		cmd := m.applyAddChecked(msg)
+		return m, cmd
+	case addSavedMsg:
+		cmd := m.applyAddSaved(msg)
+		return m, cmd
 	case detailMsg:
 		m.applyDetail(msg)
 	case redrawMsg:

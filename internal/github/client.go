@@ -61,6 +61,19 @@ func NewClient(opts Options) (*Client, error) {
 	return c, nil
 }
 
+// prFields is the PullRequest field selection shared by the discovery query
+// and the Lookup query, so a looked-up PR maps exactly like a discovered one.
+const prFields = `id number title url isDraft state createdAt closedAt mergedAt updatedAt
+        repository { nameWithOwner }
+        author { login }
+        reviewDecision
+        mergeStateStatus mergeable
+        latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
+        reviewRequests(first: 20) { nodes { requestedReviewer { __typename
+          ... on User { login } ... on Bot { login } ... on Mannequin { login }
+          ... on Team { combinedSlug } ... on EnterpriseTeam { combinedSlug } } } }
+        statusCheckRollup { state }`
+
 // discoveryQuery is the query proven live in 01-SPIKE.md. The search string is
 // always passed as the variable $q, never concatenated into this document.
 const discoveryQuery = `query Watch($q: String!, $after: String) {
@@ -72,16 +85,7 @@ const discoveryQuery = `query Watch($q: String!, $after: String) {
     nodes {
       __typename
       ... on PullRequest {
-        id number title url isDraft state createdAt closedAt mergedAt updatedAt
-        repository { nameWithOwner }
-        author { login }
-        reviewDecision
-        mergeStateStatus mergeable
-        latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
-        reviewRequests(first: 20) { nodes { requestedReviewer { __typename
-          ... on User { login } ... on Bot { login } ... on Mannequin { login }
-          ... on Team { combinedSlug } ... on EnterpriseTeam { combinedSlug } } } }
-        statusCheckRollup { state }
+        ` + prFields + `
       }
     }
   }
@@ -310,43 +314,49 @@ func mapResponse(resp wireResp) domain.Snapshot {
 		if n == nil || n.Typename != "PullRequest" {
 			continue
 		}
-		author := "ghost"
-		if n.Author != nil {
-			author = domain.Clean(n.Author.Login)
-		}
-		decision := ""
-		if n.ReviewDecision != nil {
-			decision = *n.ReviewDecision
-		}
-		var reviewStates []string
-		for _, r := range n.LatestOpinionatedReviews.Nodes {
-			if r != nil {
-				reviewStates = append(reviewStates, r.State)
-			}
-		}
-		var rollup *string
-		if n.StatusCheckRollup != nil {
-			rollup = &n.StatusCheckRollup.State
-		}
-		state := domain.ParseState(n.State)
-		snap.PRs = append(snap.PRs, domain.PR{
-			ID:      n.ID,
-			Ref:     domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
-			Title:   domain.Clean(n.Title),
-			URL:     n.URL,
-			Author:  author,
-			IsDraft: n.IsDraft,
-			State:   state,
-			Review:  domain.DeriveReview(decision, reviewStates),
-			CI:      domain.ClassifyRollup(rollup),
-			Merge:   domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
-			// List rows never read latestReviews (RESEARCH F8): the third
-			// argument is for the detail view.
-			Reviewers: domain.MergeReviewers(reviewInputs(n.LatestOpinionatedReviews.Nodes), requestInputs(n.ReviewRequests.Nodes), nil),
-			CreatedAt: n.CreatedAt,
-			UpdatedAt: n.UpdatedAt,
-			ClosedAt:  n.ClosedAt,
-		})
+		snap.PRs = append(snap.PRs, mapNode(n))
 	}
 	return snap
+}
+
+// mapNode maps one PullRequest node into a domain.PR. Every remote string is
+// cleaned here, at the seam.
+func mapNode(n *wireNode) domain.PR {
+	author := "ghost"
+	if n.Author != nil {
+		author = domain.Clean(n.Author.Login)
+	}
+	decision := ""
+	if n.ReviewDecision != nil {
+		decision = *n.ReviewDecision
+	}
+	var reviewStates []string
+	for _, r := range n.LatestOpinionatedReviews.Nodes {
+		if r != nil {
+			reviewStates = append(reviewStates, r.State)
+		}
+	}
+	var rollup *string
+	if n.StatusCheckRollup != nil {
+		rollup = &n.StatusCheckRollup.State
+	}
+	state := domain.ParseState(n.State)
+	return domain.PR{
+		ID:      n.ID,
+		Ref:     domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
+		Title:   domain.Clean(n.Title),
+		URL:     n.URL,
+		Author:  author,
+		IsDraft: n.IsDraft,
+		State:   state,
+		Review:  domain.DeriveReview(decision, reviewStates),
+		CI:      domain.ClassifyRollup(rollup),
+		Merge:   domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
+		// List rows never read latestReviews (RESEARCH F8): the third
+		// argument is for the detail view.
+		Reviewers: domain.MergeReviewers(reviewInputs(n.LatestOpinionatedReviews.Nodes), requestInputs(n.ReviewRequests.Nodes), nil),
+		CreatedAt: n.CreatedAt,
+		UpdatedAt: n.UpdatedAt,
+		ClosedAt:  n.ClosedAt,
+	}
 }

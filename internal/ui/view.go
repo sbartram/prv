@@ -118,6 +118,9 @@ func (m Model) warning() string {
 // number prompt while it is open, otherwise the footer. The prompt replaces
 // the footer, so it never costs a list row (chromeLines stays 3).
 func (m Model) bottom() string {
+	if m.add.open {
+		return m.addLine()
+	}
 	if !m.prompting {
 		return m.footer()
 	}
@@ -368,6 +371,24 @@ func (m Model) renderList() string {
 	}
 	sz.natural[colMarker] = 1
 	minCI := lipgloss.Width(headers[colCI])
+	// markW is the width of the "+ " marker of a saved PR (D-05): 2 when any row
+	// is saved, else 0, so a list with no saved PR is drawn as before.
+	markW := 0
+	for _, pr := range m.rows {
+		if pr.Manual {
+			markW = 2
+			break
+		}
+	}
+	prefix := func(pr domain.PR) string {
+		switch {
+		case pr.Manual:
+			return "+ "
+		case markW > 0:
+			return "  "
+		}
+		return ""
+	}
 	sz.collapsed[colReviewers] = lipgloss.Width("REVS")
 	for i, pr := range m.rows {
 		marker := " "
@@ -383,7 +404,7 @@ func (m Model) renderList() string {
 			author = "me"
 		}
 		row := [colCount]string{
-			colMarker: marker, colPR: pr.Ref.String(), colTitle: title, colAuthor: author, colState: pr.State.String(),
+			colMarker: marker, colPR: prefix(pr) + pr.Ref.String(), colTitle: title, colAuthor: author, colState: pr.State.String(),
 			colReview: pr.Review.Badge(), colReviewers: reviewersCell(pr.Reviewers, m.snap.Viewer, 0),
 			colMerge: pr.Merge.Badge(), colCI: ciCell(pr, maxCIColW),
 		}
@@ -427,7 +448,7 @@ func (m Model) renderList() string {
 			text := cells[r][c]
 			switch c {
 			case colPR:
-				text = trimLeft(text, lay.width[c])
+				text = prefix(pr) + trimLeft(pr.Ref.String(), max(lay.width[c]-markW, 1))
 			case colReviewers:
 				if lay.collapsed[c] {
 					text = reviewersCount(pr.Reviewers)

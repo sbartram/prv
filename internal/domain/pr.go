@@ -2,8 +2,11 @@
 package domain
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // DefaultClosedDays is the default closed/merged window, in days.
@@ -83,11 +86,11 @@ func (r Ref) String() string {
 
 // Key returns the ref in the form used to compare refs: owner and repository
 // in lower case (GitHub names are case-insensitive), number unchanged. It is the
-// key for duplicates, saved entries and removal (D-03). RED stub.
-func (r Ref) Key() Ref { return r }
+// key for duplicates, saved entries and removal (D-03).
+func (r Ref) Key() Ref { return Ref{Repo: strings.ToLower(r.Repo), Number: r.Number} }
 
-// URL returns the browser URL of the pull request. RED stub.
-func (r Ref) URL() string { return "" }
+// URL returns the browser URL of the pull request.
+func (r Ref) URL() string { return "https://github.com/" + r.Repo + "/pull/" + strconv.Itoa(r.Number) }
 
 // MaxPRNumber is the largest GraphQL Int, the largest PR number prv accepts.
 const MaxPRNumber = 2147483647
@@ -105,11 +108,68 @@ const (
 	ReasonNotRef    = "not a PR reference"
 )
 
-// ParseRef reads a pasted PR reference. RED stub.
-func ParseRef(s string) (Ref, error) { return Ref{}, &RefError{Reason: ReasonNotRef} }
+// GitHub names: an owner has at most 39 characters and no leading or trailing
+// hyphen; a repository name is up to 100 characters of letters, digits and . _ -.
+// Every pattern is anchored, one per accepted form (D-04); RE2 runs in linear
+// time, so a long paste cannot stall the UI.
+const (
+	ownerPat = `[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?`
+	repoPat  = `[A-Za-z0-9._-]{1,100}`
+	// ghPrefix is an optional scheme, an optional www. and the host github.com.
+	ghPrefix = `^(?i:https?://)?(?i:www\.)?(?i:github\.com)/`
+)
 
-// ValidRef reports whether r could name a pull request. RED stub.
-func ValidRef(r Ref) bool { return false }
+var (
+	prURLRe = regexp.MustCompile(ghPrefix + `(` + ownerPat + `)/(` + repoPat + `)/pull/([0-9]{1,10})` +
+		`(?:/(?:files|checks|commits(?:/[0-9a-fA-F]{4,40})?))?/?(?:[?#].*)?$`)
+	shortRe     = regexp.MustCompile(`^(` + ownerPat + `)/(` + repoPat + `)#([0-9]{1,10})$`)
+	issueRe     = regexp.MustCompile(ghPrefix + ownerPat + `/` + repoPat + `/issues/[0-9]+(?:[/?#].*)?$`)
+	otherHostRe = regexp.MustCompile(`^(?:[A-Za-z][A-Za-z0-9+.-]*://)?([^/\s]+)/[^/\s]+/[^/\s]+/pull/[0-9]+`)
+	ownerRe     = regexp.MustCompile(`^` + ownerPat + `$`)
+	repoRe      = regexp.MustCompile(`^` + repoPat + `$`)
+)
+
+// ParseRef reads one pasted PR reference: a github.com PR URL (scheme and www.
+// optional; /files, /checks, /commits or /commits/SHA, a query or a fragment may
+// follow the number) or OWNER/REPO#N. Only the owner, repository and number are
+// kept; the owner and repository keep the letter case that was typed. Every
+// failure is a *RefError whose Reason says why (D-04).
+func ParseRef(s string) (Ref, error) {
+	s = strings.TrimSpace(s)
+	for _, r := range s {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return Ref{}, &RefError{Reason: ReasonNotRef}
+		}
+	}
+	if issueRe.MatchString(s) {
+		return Ref{}, &RefError{Reason: ReasonIssue}
+	}
+	m := prURLRe.FindStringSubmatch(s)
+	if m == nil {
+		m = shortRe.FindStringSubmatch(s)
+	}
+	if m == nil {
+		if h := otherHostRe.FindStringSubmatch(s); h != nil &&
+			!strings.EqualFold(h[1], "github.com") && !strings.EqualFold(h[1], "www.github.com") {
+			return Ref{}, &RefError{Reason: ReasonOtherHost}
+		}
+		return Ref{}, &RefError{Reason: ReasonNotRef}
+	}
+	n, err := strconv.Atoi(m[3])
+	if err != nil || n < 1 || n > MaxPRNumber || m[2] == "." || m[2] == ".." {
+		return Ref{}, &RefError{Reason: ReasonNotRef}
+	}
+	return Ref{Repo: m[1] + "/" + m[2], Number: n}, nil
+}
+
+// ValidRef reports whether r could name a pull request: OWNER/REPO with GitHub's
+// character rules and a number from 1 to MaxPRNumber. It re-checks refs that
+// come from a file a person may have edited.
+func ValidRef(r Ref) bool {
+	owner, repo, ok := strings.Cut(r.Repo, "/")
+	return ok && ownerRe.MatchString(owner) && repoRe.MatchString(repo) && repo != "." && repo != ".." &&
+		r.Number >= 1 && r.Number <= MaxPRNumber
+}
 
 // UnavailKind says why a saved PR could not be loaded.
 type UnavailKind int
