@@ -12,7 +12,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **WATCH-01**: PRs the user authored appear on the list automatically
 - [x] **WATCH-02**: PRs assigned to the user appear on the list automatically
 - [x] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
-- [ ] **WATCH-04**: User can add a PR by pasting a github.com PR URL or `owner/repo#123`; invalid or inaccessible PRs show an error and are not saved
+- [x] **WATCH-04**: User can add a PR by pasting a github.com PR URL or `owner/repo#123`; invalid or inaccessible PRs show an error and are not saved
 - [ ] **WATCH-05**: Manually added PRs are saved locally and reappear after restart
 - [ ] **WATCH-06**: User can remove a manually added PR
 - [ ] **WATCH-07**: Manually added PRs stay listed after they close, until the user removes them (the closed window does not apply to them)
@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LIST-07**: For failing PRs, the row shows the name of a failing check
   - v1 limit, accepted by the user on 2026-10-12 (Phase 3 CONTEXT D-02, revised): when a failing PR's checks fill more than one page of 100 contexts, the row shows the plain `✗ failing` badge with no name. prv never guesses a name, so a failed check-name query also leaves the plain badge (Phase 3 CONTEXT, Claude's Discretion).
 - [x] **LIST-08**: List is sorted by need for attention (failing CI / changes requested first) in a stable order that does not shuffle between refreshes
-- [ ] **LIST-09**: A PR that can't be fetched shows as an "unavailable" row with a reason, and the other PRs still display
+- [x] **LIST-09**: A PR that can't be fetched shows as an "unavailable" row with a reason, and the other PRs still display
 
 ### Filtering
 
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WATCH-01 | Phase 1 | Complete |
 | WATCH-02 | Phase 1 | Complete |
 | WATCH-03 | Phase 1 | Complete |
-| WATCH-04 | Phase 4 | Pending |
+| WATCH-04 | Phase 4 | Complete |
 | WATCH-05 | Phase 4 | Pending |
 | WATCH-06 | Phase 4 | Pending |
 | WATCH-07 | Phase 4 | Pending |
@@ -138,7 +138,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-06 | Phase 3 | Complete |
 | LIST-07 | Phase 3 | Complete |
 | LIST-08 | Phase 2 | Complete |
-| LIST-09 | Phase 4 | Pending |
+| LIST-09 | Phase 4 | Complete |
 | FILT-01 | Phase 2 | Complete |
 | FILT-02 | Phase 2 | Complete |
 | FILT-03 | Phase 2 | Complete |

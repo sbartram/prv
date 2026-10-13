@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-10-13T23:19:02.542Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-10-13T23:24:34.607Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: c3df12c47c111ee14535d9471e11ede68f2938ae
+state_head: 231a4e4217b6d4d2e7e71fdafc4f24418d0d67dc
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 26
+  completed_plans: 27
   percent: 75
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Last activity: 2026-10-13 — Phase 04 execution started
 
@@ -84,6 +84,7 @@ Progress: [████████░░] 75%
 | Phase 03 P10 | 4 min | 2 tasks | 18 files |
 | Phase 03 P11 | 5 min | 2 tasks | 11 files |
 | Phase 04 P01 | 40 min | 2 tasks | 14 files |
+| Phase 04 P02 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,8 @@ Recent decisions affecting current work:
 - [Phase 03]: [03-11] Detail.Truncated means only 'check runs not read'; new Detail.Partial means 'a GraphQL error was kept'; the faint notice 'some details could not be loaded' goes in detailNotes under the title (supersedes 03-09 reuse of Truncated)
 - [Phase 04]: Provenance is a row property (PR.Auto, PR.Manual); the saved ref (PR.Watched) is kept apart from the canonical display ref (PR.Ref) so a repo rename cannot split one PR into two rows or make removal miss its entry
 - [Phase 04]: A Lookup that fails as a whole fails the whole refresh (previous rows stay); an unreadable watchlist.json reuses the last list read and warns, never treated as empty
+- [Phase 04]: [04-02] Clean and cut (40 runes) the GitHub error type before it becomes the short reason, so a hostile type cannot carry terminal escapes
+- [Phase 04]: [04-02] Reason priority per alias: SSO (FORBIDDEN with saml_failure true or SAML in message), then NOT_FOUND, then the first error's type
 
 ### Pending Todos
 
@@ -170,6 +173,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:19:02.487Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-10-13T23:24:34.551Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
