@@ -2,13 +2,16 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
 )
@@ -56,7 +59,7 @@ func (w *memWatch) Remove(ref domain.Ref) (bool, error) {
 
 // addModelWith builds a 120x40 model with the fakes, loaded with snap. after
 // replaces the timer function, so no test waits on a real timer.
-func addModelWith(t *testing.T, f *addFetcher, w *memWatch, snap domain.Snapshot, after func(time.Duration, tea.Msg) tea.Cmd) tea.Model {
+func addModelWith(t *testing.T, f Fetcher, w *memWatch, snap domain.Snapshot, after func(time.Duration, tea.Msg) tea.Cmd) tea.Model {
 	t.Helper()
 	m := New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Watchlist: w})
 	m.after = after
@@ -402,4 +405,350 @@ func TestFetchWithoutEpochApplies(t *testing.T) {
 	if m.(Model).state != stateList || len(m.(Model).snap.PRs) != 4 {
 		t.Errorf("state=%v PRs=%d, want the list with 4 PRs", m.(Model).state, len(m.(Model).snap.PRs))
 	}
+}
+
+// ---- the input: where a works, typing, errors, esc, pause, widths (task 2) ----
+
+// addDetailFetcher is an addFetcher that can also load details, so the detail
+// view can be opened.
+type addDetailFetcher struct{ addFetcher }
+
+func (f *addDetailFetcher) FetchDetail(context.Context, string) (domain.Detail, error) {
+	return domain.Detail{}, nil
+}
+
+// limitErr is a rate-limited request error, like *github.Error with a Retry-After.
+type limitErr struct{}
+
+func (limitErr) Error() string                             { return "secondary limit, token ghp_SECRET" }
+func (limitErr) Short() string                             { return "rate limited" }
+func (limitErr) Backoff() (time.Duration, time.Time, bool) { return time.Minute, time.Time{}, true }
+
+func addOpen(m tea.Model) bool { return m.(Model).add.open }
+
+func TestAddOnlyOnListScreens(t *testing.T) {
+	f, w := &addFetcher{}, &memWatch{added: true}
+	sized := func(m tea.Model) tea.Model { m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40}); return m }
+	fresh := func() Model { return New(t.Context(), f, Options{ClosedDays: 14, Now: fixedNow, Watchlist: w}) }
+
+	opens := map[string]tea.Model{
+		"list":           addModel(t, f, w, addSnap()),
+		"empty":          addModel(t, f, w, domain.Snapshot{Viewer: "octo"}),
+		"filtered-empty": press(addModel(t, f, w, domain.Snapshot{Viewer: "octo", PRs: addSnap().PRs[:1]}), "1"),
+	}
+	if fe := opens["filtered-empty"].(Model); fe.state != stateList || len(fe.rows) != 0 {
+		t.Fatalf("setup: state=%v rows=%d, want the filtered-empty screen", fe.state, len(fe.rows))
+	}
+	for name, m := range opens {
+		t.Run("opens on "+name, func(t *testing.T) {
+			m = press(m, "a")
+			if !addOpen(m) {
+				t.Fatal("the prompt did not open")
+			}
+			if got := lastLine(m); !strings.Contains(got, "add PR: █") {
+				t.Errorf("last line = %q, want the prompt", got)
+			}
+		})
+	}
+
+	t.Run("loading", func(t *testing.T) {
+		if m := press(sized(fresh()), "a"); addOpen(m) {
+			t.Error("the prompt opened on the loading screen")
+		}
+	})
+	t.Run("error panel", func(t *testing.T) {
+		var m tea.Model = sized(fresh())
+		m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
+		if m = press(m, "a"); addOpen(m) {
+			t.Error("the prompt opened on the error screen")
+		}
+	})
+	t.Run("detail view", func(t *testing.T) {
+		df := &addDetailFetcher{}
+		m := addModelWith(t, df, w, addSnap(), func(time.Duration, tea.Msg) tea.Cmd { return nil })
+		m = press(m, "j") // an ordinary row
+		m, _ = m.Update(special(tea.KeyEnter))
+		if !m.(Model).detail.open {
+			t.Fatal("setup: the detail view did not open")
+		}
+		m = press(m, "a")
+		if addOpen(m) || !m.(Model).detail.open {
+			t.Errorf("add open=%v detail open=%v; a does nothing in the detail view", addOpen(m), m.(Model).detail.open)
+		}
+	})
+	t.Run("number prompt", func(t *testing.T) {
+		m := press(addModel(t, f, w, addSnap()), "/", "a")
+		if addOpen(m) || !m.(Model).prompting || m.(Model).numFilter != "" {
+			t.Errorf("add open=%v prompting=%v numFilter=%q; a is ignored in the number prompt", addOpen(m), m.(Model).prompting, m.(Model).numFilter)
+		}
+	})
+	t.Run("help overlay", func(t *testing.T) {
+		m := press(addModel(t, f, w, addSnap()), "?")
+		if !m.(Model).showHelp {
+			t.Fatal("setup: help did not open")
+		}
+		m = press(m, "a")
+		if addOpen(m) || m.(Model).showHelp {
+			t.Errorf("add open=%v help open=%v; a only closes the overlay", addOpen(m), m.(Model).showHelp)
+		}
+	})
+}
+
+func TestAddNotAvailable(t *testing.T) {
+	t.Run("no Looker", func(t *testing.T) {
+		m := modelIn(t, "list")
+		m = press(m, "a")
+		if addOpen(m) || flashOf(m) != "adding PRs is not available" {
+			t.Errorf("add open=%v flash=%q", addOpen(m), flashOf(m))
+		}
+	})
+	t.Run("no Watchlist", func(t *testing.T) {
+		var m tea.Model = New(t.Context(), &addFetcher{}, Options{ClosedDays: 14, Now: fixedNow})
+		m, _ = m.Update(fetchedMsg{snap: onePR()})
+		m = press(m, "a")
+		if addOpen(m) || flashOf(m) != "adding PRs is not available" {
+			t.Errorf("add open=%v flash=%q", addOpen(m), flashOf(m))
+		}
+	})
+}
+
+func TestAddTyping(t *testing.T) {
+	f, w := &addFetcher{}, &memWatch{}
+	m := press(addModel(t, f, w, addSnap()), "a", "q", "a", "d", "1", "/", ":")
+	if got := m.(Model).add.text; got != "qad1/:" {
+		t.Errorf("text = %q, want %q", got, "qad1/:")
+	}
+	if !addOpen(m) {
+		t.Error("a typed q closed the prompt or quit")
+	}
+	if m.(Model).show != domain.AllStates || m.(Model).numFilter != "" {
+		t.Error("a typed 1 or / acted on the list filters")
+	}
+	m, _ = m.Update(special(tea.KeyBackspace))
+	if got := m.(Model).add.text; got != "qad1/" {
+		t.Errorf("after backspace text = %q, want %q", got, "qad1/")
+	}
+	if _, cmd := m.Update(key("ctrl+c")); cmd == nil {
+		t.Error("ctrl+c returned no command")
+	} else if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Error("ctrl+c did not quit")
+	}
+	if _, cmd := m.Update(key("q")); cmd != nil {
+		t.Error("q returned a command (a quit) while typing")
+	}
+
+	t.Run("300 runes keep 256", func(t *testing.T) {
+		m := press(addModel(t, f, w, addSnap()), "a")
+		for range 300 {
+			m, _ = m.Update(key("x"))
+		}
+		if n := len([]rune(m.(Model).add.text)); n != 256 {
+			t.Errorf("text has %d runes, want 256", n)
+		}
+	})
+}
+
+func TestAddPasteSanitised(t *testing.T) {
+	f, w := &addFetcher{}, &memWatch{}
+	m := addModel(t, f, w, addSnap())
+	m, _ = m.Update(key("a"))
+	m, _ = m.Update(tea.PasteMsg{Content: "\x1b[31macme/api#1\x1b[0m\u202e"})
+	if got := m.(Model).add.text; got != "acme/api#1" {
+		t.Errorf("text = %q, want %q", got, "acme/api#1")
+	}
+
+	t.Run("two lines are refused as one reference", func(t *testing.T) {
+		m, cmd := submit(addModel(t, f, w, addSnap()), "acme/api#1\r\nacme/web#2")
+		m = drainUI(m, cmd)
+		if got := lastLine(m); !strings.Contains(got, "✗ not a PR reference · esc cancel") {
+			t.Errorf("last line = %q, want the not-a-reference error", got)
+		}
+		if len(f.looked) != 0 {
+			t.Errorf("looked %v, want no Lookup", f.looked)
+		}
+	})
+	t.Run("a long paste is cut", func(t *testing.T) {
+		m := addModel(t, f, w, addSnap())
+		m, _ = m.Update(key("a"))
+		m, _ = m.Update(tea.PasteMsg{Content: strings.Repeat("x", 1000)})
+		if n := len([]rune(m.(Model).add.text)); n != 256 {
+			t.Errorf("text has %d runes, want 256", n)
+		}
+	})
+}
+
+func TestAddParseErrorKeepsText(t *testing.T) {
+	f, w := &addFetcher{}, &memWatch{}
+	m, cmd := submit(addModel(t, f, w, addSnap()), "github.com/o/r/issues/3")
+	m = drainUI(m, cmd)
+	if got := lastLine(m); !strings.Contains(got, "✗ that is an issue, not a PR · esc cancel") || !strings.Contains(got, "github.com/o/r/issues/3") {
+		t.Errorf("last line = %q, want the issue error and the kept text", got)
+	}
+	if len(f.looked) != 0 || len(w.adds) != 0 {
+		t.Errorf("looked %v saved %v, want neither", f.looked, w.adds)
+	}
+	m, _ = m.Update(key("x"))
+	got := lastLine(m)
+	if strings.Contains(got, "✗") || !strings.Contains(got, "(URL or owner/repo#n") {
+		t.Errorf("last line after typing = %q, want the input hint and no error", got)
+	}
+}
+
+func TestAddLookupErrors(t *testing.T) {
+	sso := domain.Unavail{Kind: domain.UnavailSSO, Reason: "SSO: authorize your token for acme", Help: "run gh auth refresh"}
+	for _, tc := range []struct {
+		name    string
+		pr      domain.PR
+		lookErr error
+		want    []string
+	}{
+		{"not found", domain.PR{Unavail: domain.NotFound()}, nil, []string{"✗ not found (deleted, renamed, or no access)"}},
+		{"sso", domain.PR{Unavail: sso}, nil, []string{"✗ SSO: authorize your token for acme", "run gh auth refresh"}},
+		{"request failed", domain.PR{}, &shortErr{short: "network"}, []string{"✗ could not check (network)"}},
+		{"rate limited", domain.PR{}, limitErr{}, []string{"✗ could not check (rate limited)"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, w := &addFetcher{pr: tc.pr, lookErr: tc.lookErr}, &memWatch{added: true}
+			m, cmd := submit(addModel(t, f, w, addSnap()), "acme/new#7")
+			m = drainUI(m, cmd)
+			got := lastLine(m)
+			for _, want := range tc.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("last line = %q, want it to contain %q", got, want)
+				}
+			}
+			if !strings.Contains(got, "acme/new#7") || !addOpen(m) {
+				t.Errorf("the text did not stay: open=%v line=%q", addOpen(m), got)
+			}
+			if len(w.adds) != 0 {
+				t.Errorf("saved %v, want nothing", w.adds)
+			}
+			if tc.name == "rate limited" && !m.(Model).pausedUntil.After(fixedNow()) {
+				t.Errorf("pausedUntil = %v, want a pause after a rate-limited Lookup", m.(Model).pausedUntil)
+			}
+		})
+	}
+}
+
+func TestAddDuringPause(t *testing.T) {
+	f, w := &addFetcher{}, &memWatch{added: true}
+	m := addModel(t, f, w, addSnap())
+	mm := m.(Model)
+	mm.pausedUntil = fixedNow().Add(10 * time.Minute)
+	m = mm
+	m, cmd := submit(m, "acme/new#7")
+	m = drainUI(m, cmd)
+	if got := lastLine(m); !strings.Contains(got, "✗ rate limited — resumes 14:42 · esc cancel") {
+		t.Errorf("last line = %q, want the pause error", got)
+	}
+	if len(f.looked) != 0 || len(w.adds) != 0 {
+		t.Errorf("looked %v saved %v, want neither during a pause", f.looked, w.adds)
+	}
+}
+
+func TestAddEscDropsLateResult(t *testing.T) {
+	f, w := &addFetcher{pr: toolsPR(domain.StateOpen)}, &memWatch{added: true}
+	m := addModel(t, f, w, addSnap())
+	m, first := submit(m, "octo/tools#42")
+	seq := m.(Model).addSeq
+	if !m.(Model).add.checking {
+		t.Fatal("setup: the prompt is not checking")
+	}
+	m, _ = m.Update(special(tea.KeyEscape))
+	if addOpen(m) {
+		t.Fatal("esc did not close the prompt while checking")
+	}
+
+	// The Lookup finishes after esc: dropped.
+	m = drainUI(m, first)
+	if len(w.adds) != 0 || countRef(m, domain.Ref{Repo: "octo/tools", Number: 42}) != 0 {
+		t.Errorf("a late Lookup result changed things: saved %v", w.adds)
+	}
+	// So is a late save result.
+	m, _ = m.Update(addSavedMsg{seq: seq, pr: toolsPR(domain.StateOpen), added: true})
+	if countRef(m, domain.Ref{Repo: "octo/tools", Number: 42}) != 0 {
+		t.Error("a late save result listed the PR")
+	}
+
+	// A new add afterwards works, and a result of the old attempt still does not count.
+	f.pr = domain.PR{ID: "PR_77", Ref: domain.Ref{Repo: "octo/other", Number: 77}, Title: "Other", UpdatedAt: addUpdated}
+	m, second := submit(m, "octo/other#77")
+	m, _ = m.Update(addCheckedMsg{seq: seq, ref: domain.Ref{Repo: "octo/tools", Number: 42}, pr: toolsPR(domain.StateOpen)})
+	if len(w.adds) != 0 {
+		t.Errorf("an old Lookup result started a save: %v", w.adds)
+	}
+	m = drainUI(m, second)
+	if want := (domain.Ref{Repo: "octo/other", Number: 77}); len(w.adds) != 1 || w.adds[0] != want {
+		t.Errorf("saved %v, want [%v]", w.adds, want)
+	}
+}
+
+func TestAddSaveError(t *testing.T) {
+	f, w := &addFetcher{pr: toolsPR(domain.StateOpen)}, &memWatch{addErr: errors.New("disk full")}
+	m, cmd := submit(addModel(t, f, w, addSnap()), "octo/tools#42")
+	m = drainUI(m, cmd)
+	if got := lastLine(m); !strings.Contains(got, "✗ could not save the watch list") || !strings.Contains(got, "octo/tools#42") {
+		t.Errorf("last line = %q, want the save error and the kept text", got)
+	}
+	if !addOpen(m) {
+		t.Error("the prompt closed after a failed save")
+	}
+	if n := countRef(m, domain.Ref{Repo: "octo/tools", Number: 42}); n != 0 {
+		t.Errorf("%d rows for the PR after a failed save, want 0", n)
+	}
+}
+
+func TestAddPromptWidths(t *testing.T) {
+	url := "https://github.com/acme/" + strings.Repeat("a", 96)
+	if len([]rune(url)) != 120 {
+		t.Fatalf("setup: url has %d runes", len([]rune(url)))
+	}
+	for _, w := range []int{120, 60, 40, 20} {
+		for _, errState := range []bool{false, true} {
+			name := "typing"
+			if errState {
+				name = "error"
+			}
+			t.Run(name+"/"+strconv.Itoa(w), func(t *testing.T) {
+				f, wl := &addFetcher{}, &memWatch{}
+				m := addModel(t, f, wl, addSnap())
+				m, _ = m.Update(tea.WindowSizeMsg{Width: w, Height: 24})
+				m, _ = m.Update(key("a"))
+				m, _ = m.Update(tea.PasteMsg{Content: url})
+				if errState {
+					m, _ = m.Update(special(tea.KeyEnter))
+				}
+				got := lastLine(m)
+				if lipgloss.Width(got) > w {
+					t.Errorf("last line is %d cells wide in a %d-cell pane: %q", lipgloss.Width(got), w, got)
+				}
+				if !strings.Contains(got, "█") {
+					t.Errorf("last line has no cursor: %q", got)
+				}
+				if errState {
+					if !strings.Contains(got, "✗ not") {
+						t.Errorf("last line has no start of the error: %q", got)
+					}
+					if w >= 60 && !strings.Contains(got, "✗ not a PR reference · esc cancel") {
+						t.Errorf("last line lost the error text: %q", got)
+					}
+				} else if strings.Contains(got, "(URL or") {
+					t.Errorf("last line kept the hint although the text is long: %q", got)
+				}
+				if w == 120 && !strings.Contains(got, "…") {
+					t.Errorf("last line does not show that the text is cut: %q", got)
+				}
+			})
+		}
+	}
+
+	t.Run("not sized", func(t *testing.T) {
+		var m tea.Model = New(t.Context(), &addFetcher{}, Options{ClosedDays: 14, Now: fixedNow, Watchlist: &memWatch{}})
+		m, _ = m.Update(fetchedMsg{snap: addSnap()})
+		m, _ = m.Update(key("a"))
+		m, _ = m.Update(tea.PasteMsg{Content: url})
+		if got := lastLine(m); !strings.Contains(got, url+"█") {
+			t.Errorf("last line = %q, want the full text and the cursor", got)
+		}
+	})
 }
