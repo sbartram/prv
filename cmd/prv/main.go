@@ -19,6 +19,7 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 	"github.com/sbartram/prv/internal/github"
 	"github.com/sbartram/prv/internal/ui"
+	"github.com/sbartram/prv/internal/watchlist"
 )
 
 // version is overridable: -ldflags "-X main.version=1.2.3".
@@ -30,6 +31,9 @@ var tokenForHost = auth.TokenForHost
 // configPath is a variable so tests can replace it.
 var configPath = config.Path
 
+// watchlistPath is a variable so tests can replace it.
+var watchlistPath = watchlist.Path
+
 const noTokenMessage = "prv needs a GitHub token. Run `gh auth login`, or set GH_TOKEN / GITHUB_TOKEN."
 
 // browserOpener opens URLs through go-gh's browser, which honours GH_BROWSER,
@@ -39,8 +43,17 @@ type browserOpener struct{ b *browser.Browser }
 
 var _ ui.Opener = browserOpener{}
 
-// The github client supplies the detail view's data.
-var _ ui.DetailFetcher = (*github.Client)(nil)
+// The github client supplies the detail view's data and the add prompt's check.
+var (
+	_ ui.DetailFetcher = (*github.Client)(nil)
+	_ ui.Looker        = (*github.Client)(nil)
+)
+
+// The watch list store is what the client reads and the add prompt writes.
+var (
+	_ ui.Watchlist       = (*watchlist.Store)(nil)
+	_ github.WatchSource = (*watchlist.Store)(nil)
+)
 
 func (o browserOpener) Open(url string) error { return o.b.Browse(url) }
 
@@ -104,25 +117,31 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, noTokenMessage)
 		return 1
 	}
-	client, err := github.NewClient(github.Options{Token: token, ClosedDays: days})
-	if err != nil {
-		fmt.Fprintln(stderr, "prv: "+err.Error())
-		return 1
-	}
-
-	// io.Discard keeps a launcher from writing over the TUI.
-	opener := browserOpener{b: browser.New("", io.Discard, io.Discard)}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	p := tea.NewProgram(ui.New(ctx, client, ui.Options{
-		Opener:     opener,
+	ghOpts := github.Options{Token: token, ClosedDays: days}
+	uiOpts := ui.Options{
+		Opener:     browserOpener{b: browser.New("", io.Discard, io.Discard)}, // io.Discard keeps a launcher from writing over the TUI
 		ClosedDays: days,
 		Interval:   cfg.Interval,
 		Show:       cfg.Show,
 		Warnings:   cfg.Warnings,
 		ConfigPath: displayPath(shownPath, home),
-	}), tea.WithContext(ctx))
+	}
+	// The store is a nil interface when the path cannot be found: never assign a
+	// nil *watchlist.Store to either field.
+	if path, err := watchlistPath(); err == nil {
+		s := watchlist.New(path)
+		ghOpts.Watch = s
+		uiOpts.Watchlist = s
+	}
+	client, err := github.NewClient(ghOpts)
+	if err != nil {
+		fmt.Fprintln(stderr, "prv: "+err.Error())
+		return 1
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p := tea.NewProgram(ui.New(ctx, client, uiOpts), tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, "prv: "+err.Error())
 		return 1

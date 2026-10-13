@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -17,7 +18,8 @@ import (
 )
 
 // WatchSource supplies the saved watch list. *watchlist.Store implements it.
-// RED stub.
+// Load runs inside Fetch, which runs in a tea.Cmd, so every refresh reads the
+// file (D-16).
 type WatchSource interface {
 	Load() ([]domain.Ref, []string, error)
 }
@@ -37,6 +39,12 @@ type Client struct {
 	capture    *captureTransport
 	closedDays int
 	now        func() time.Time
+	watch      WatchSource
+
+	// lastRefs is the last list that Load returned, used when the file cannot be
+	// read: an unreadable file is never treated as an empty list.
+	mu       sync.Mutex
+	lastRefs []domain.Ref
 }
 
 // NewClient builds a Client. The token is passed explicitly and never logged:
@@ -58,7 +66,7 @@ func NewClient(opts Options) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating GitHub client: %w", err)
 	}
-	c := &Client{gql: gql, capture: capture, closedDays: opts.ClosedDays, now: opts.Now}
+	c := &Client{gql: gql, capture: capture, closedDays: opts.ClosedDays, now: opts.Now, watch: opts.Watch}
 	if c.closedDays <= 0 {
 		c.closedDays = domain.DefaultClosedDays
 	}
@@ -218,8 +226,30 @@ func requestInputs(nodes []*wireRequest) []domain.RequestInput {
 // complete.
 const maxPages = 5
 
-// Fetch runs the discovery query page by page, de-duplicates by node id, keeps
-// the PRs inside the closed window and orders them for display. It then names
+// savedRefs returns the saved refs for this refresh. The file is read on every
+// call. When it cannot be read, the snapshot gets a warning and the last list
+// that was read is used. Load's own warnings are not snapshot warnings: they are
+// shown once at startup.
+func (c *Client) savedRefs(snap *domain.Snapshot) []domain.Ref {
+	if c.watch == nil {
+		return nil
+	}
+	refs, _, err := c.watch.Load()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err != nil {
+		snap.Warnings = addWarning(snap.Warnings, "Watch list could not be read")
+		return slices.Clone(c.lastRefs)
+	}
+	c.lastRefs = slices.Clone(refs)
+	return refs
+}
+
+// Fetch runs the discovery query page by page, de-duplicates by node id, merges
+// in the saved watch list (the saved PRs that discovery did not return are looked
+// up, in chunks), keeps the PRs inside the closed window and orders them for
+// display. A Lookup that fails as a whole fails the refresh, so the rows on
+// screen stay. It then names
 // the failing check of every failing PR with a second query (D-01), inside the
 // same call, so the whole refresh stays one single-flight fetch.
 func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
@@ -288,6 +318,17 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 		}
 		vars["after"] = resp.Search.PageInfo.EndCursor
 	}
+
+	for i := range snap.PRs {
+		snap.PRs[i].Auto = true
+	}
+	saved := c.savedRefs(&snap)
+	rest := domain.MarkWatched(snap.PRs, saved)
+	looked, err := c.lookupRefs(ctx, rest, &snap)
+	if err != nil {
+		return domain.Snapshot{}, err
+	}
+	snap.PRs = domain.Combine(snap.PRs, looked)
 
 	snap.PRs = slices.DeleteFunc(snap.PRs, func(pr domain.PR) bool {
 		return !domain.InWindow(pr, now, c.closedDays)
