@@ -155,7 +155,7 @@ Plans:
   4. When a saved PR later can't be fetched (deleted, access revoked, SSO not authorized), it shows as an "unavailable" row with the reason. The other PRs still display, and the saved entry is never deleted automatically.
 
 **Pitfalls first addressed here**: Batched aliased lookups use GraphQL variables, never string interpolation, in chunks of 25-50 aliases. Parse the response envelope yourself and attribute `errors[].path[0]` to its alias, using the Phase 1 spike findings (Q3, Q6) for the NOT_FOUND and SAML FORBIDDEN shapes. Validate a PR by fetching it before you persist it. Support bracketed paste. The store holds PR refs only, as versioned JSON at `$XDG_DATA_HOME/prv/watchlist.json` with an atomic write, a tolerant load, and a backup of a corrupt file. Never remove manual entries automatically. Show an SSO hint when a PR is inaccessible.
-**Plans**: 2/7 plans executed
+**Plans**: 3/7 plans executed
 
 Plans:
 **Wave 1**
@@ -163,7 +163,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 04-02-PLAN.md — Every reference form parsed or refused with one of three reasons; per-alias errors attributed by path[0] to not found, SSO (with hint) or "could not load"; whole-request failures fail the refresh (D-04, D-10, D-12)
-- [ ] 04-03-PLAN.md — Forgiving add prompt: duplicates jump to the row (key and node ID, hidden by filters), errors inline with the text kept, esc drops late results, paste cleaning, rate-limit pause, fits any width, stale-refresh epoch rule (D-02, D-03, D-08)
+- [x] 04-03-PLAN.md — Forgiving add prompt: duplicates jump to the row (key and node ID, hidden by filters), errors inline with the text kept, esc drops late results, paste cleaning, rate-limit pause, fits any width, stale-refresh epoch rule (D-02, D-03, D-08)
 - [ ] 04-04-PLAN.md — Store survives anything: hash-named backup of a corrupt file, bad entries kept, 500 cap, 0700/0600, no temp leftovers, two panes; each refresh re-reads the file; startup warnings shown once (D-16)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -187,4 +187,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
 | 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
-| 4. Curated Watch List | 2/7 | In Progress | - |
+| 4. Curated Watch List | 3/7 | In Progress | - |

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-10-13T23:24:34.607Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-10-13T23:34:27.192Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: 231a4e4217b6d4d2e7e71fdafc4f24418d0d67dc
+state_head: b4bdae1641929c41544368f4dad8b628cf83d676
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 27
+  completed_plans: 28
   percent: 75
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 ## Current Position
 
 Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-10-13 — Phase 04 execution started
 
@@ -85,6 +85,7 @@ Progress: [████████░░] 75%
 | Phase 03 P11 | 5 min | 2 tasks | 11 files |
 | Phase 04 P01 | 40 min | 2 tasks | 14 files |
 | Phase 04 P02 | 25min | 2 tasks | 6 files |
+| Phase 04 P03 | 25 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,8 @@ Recent decisions affecting current work:
 - [Phase 04]: A Lookup that fails as a whole fails the whole refresh (previous rows stay); an unreadable watchlist.json reuses the last list read and warns, never treated as empty
 - [Phase 04]: [04-02] Clean and cut (40 runes) the GitHub error type before it becomes the short reason, so a hostile type cannot carry terminal escapes
 - [Phase 04]: [04-02] Reason priority per alias: SSO (FORBIDDEN with saml_failure true or SAML in message), then NOT_FOUND, then the first error's type
+- [Phase 04]: [04-03] Fetch results are discarded by epoch (fetchEpoch/mutEpoch), not by generation: a refresh that began before a local watch-list change is re-run, or the tick waits out a rate-limit pause
+- [Phase 04]: [04-03] A save that finds the PR already listed marks that row Manual with the saved ref; a visible new row gets no flash, hidden and already-watching outcomes do
 
 ### Pending Todos
 
@@ -173,6 +176,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:24:34.551Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-10-13T23:34:27.139Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
