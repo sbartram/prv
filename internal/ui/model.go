@@ -374,6 +374,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.failedAt = time.Time{}
+		// D-12: a saved PR that fails for another reason than not-found or SSO
+		// keeps its last data on the first failed refresh. An error, a discarded
+		// refresh and a fetch that was never applied do not reach this line, so
+		// none of them counts as a strike.
+		msg.snap.PRs, m.strikes = domain.Reconcile(m.snap.PRs, msg.snap.PRs, m.strikes)
 		m.snap = msg.snap
 		m.lastOK = m.now()
 		m.rebuild()

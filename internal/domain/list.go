@@ -9,10 +9,15 @@ import (
 )
 
 // InWindow reports whether a PR belongs in the list. Open and unknown-state PRs
-// are always kept. A merged or closed PR is kept only when it closed at or
-// after now minus closedDays days (the boundary is inclusive); one with no
+// are always kept, and so is every saved (Manual) PR whatever its state or
+// close date: the window only decides which discovery PRs are kept (WATCH-07,
+// D-13). A merged or closed PR that is not saved is kept only when it closed at
+// or after now minus closedDays days (the boundary is inclusive); one with no
 // close time cannot be placed in the window and is dropped.
 func InWindow(pr PR, now time.Time, closedDays int) bool {
+	if pr.Manual {
+		return true
+	}
 	switch pr.State {
 	case StateMerged, StateClosed:
 		if pr.ClosedAt.IsZero() {

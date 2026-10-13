@@ -211,11 +211,19 @@ func TestReconcile(t *testing.T) {
 			t.Errorf("kind = %v, want unavailable", out[0].Unavail.Kind)
 		}
 	})
-	t.Run("the result is sorted", func(t *testing.T) {
+	t.Run("a row replaced by its last data is sorted into place", func(t *testing.T) {
 		fail := PR{ID: "F", Ref: Ref{"acme/x", 1}, State: StateOpen, CI: CIFailing, Auto: true}
-		out, _ := Reconcile(nil, []PR{fail, notFound()}, nil)
-		if len(out) != 2 || out[0].Unavail.Kind != UnavailNotFound {
-			t.Errorf("order = %v, want the unavailable row first", out)
+		out, _ := Reconcile([]PR{loaded()}, []PR{failed(), fail}, nil)
+		if len(out) != 2 || out[0].ID != "F" || out[1].ID != "PR_42" {
+			t.Errorf("order = %v, want the failing PR first (bucket 1), the kept PR second (bucket 5)", out)
+		}
+	})
+	t.Run("rows that were not replaced keep their order", func(t *testing.T) {
+		a := PR{ID: "A", Ref: Ref{"acme/a", 1}, State: StateClosed}
+		b := PR{ID: "B", Ref: Ref{"acme/b", 1}, State: StateOpen, CI: CIFailing}
+		out, _ := Reconcile(nil, []PR{a, b}, nil)
+		if out[0].ID != "A" || out[1].ID != "B" {
+			t.Errorf("order = %v, want next's order", out)
 		}
 	})
 }
