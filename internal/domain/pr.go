@@ -197,8 +197,15 @@ func NotFound() Unavail {
 }
 
 // SSORequired is the Unavail of a PR in an organization that requires SSO
-// authorization for the token (D-10).
-func SSORequired(org string) Unavail { return Unavail{} }
+// authorization for the token (D-10). org must be the owner of a ref that passed
+// ValidRef (letters, digits and hyphens), never text taken from a message.
+func SSORequired(org string) Unavail {
+	return Unavail{
+		Kind:   UnavailSSO,
+		Reason: "SSO: authorize your token for " + org,
+		Help:   "open https://github.com/orgs/" + org + "/sso to authorize this token, or run gh auth refresh",
+	}
+}
 
 // LoadFailed is the Unavail of a PR that failed to load for another reason.
 func LoadFailed(short, help string) Unavail {
