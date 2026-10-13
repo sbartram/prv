@@ -276,27 +276,31 @@ func errDetailGone() error {
 // detailPage sends one Detail request and returns its pull request node. Partial
 // GraphQL data is kept when the node is a pull request; a rate limit, a
 // cancelled context and any other error are returned. A missing node, or one
-// that is not a pull request, is errDetailGone.
-func (c *Client) detailPage(ctx context.Context, vars map[string]any) (*wireDetailNode, error) {
+// that is not a pull request, is errDetailGone. The bool is true only when the
+// node is returned together with a kept GraphQL error: nodes of that page may
+// be missing, so the caller must treat the read as partial.
+func (c *Client) detailPage(ctx context.Context, vars map[string]any) (*wireDetailNode, bool, error) {
 	var resp wireDetailResp
+	partial := false
 	err := c.gql.DoWithContext(ctx, detailQuery, vars, &resp)
 	if err != nil {
 		err = classify(err, c.capture.latest())
 		if errors.Is(err, context.Canceled) {
-			return nil, err
+			return nil, false, err
 		}
 		var ce *Error
 		var ge *api.GraphQLError
 		keep := errors.As(err, &ce) && ce.Kind == KindGraphQL && errors.As(err, &ge) &&
 			resp.Node != nil && resp.Node.Typename == "PullRequest"
 		if !keep {
-			return nil, err
+			return nil, false, err
 		}
+		partial = true
 	}
 	if resp.Node == nil || resp.Node.Typename != "PullRequest" {
-		return nil, errDetailGone()
+		return nil, false, errDetailGone()
 	}
-	return resp.Node, nil
+	return resp.Node, partial, nil
 }
 
 // FetchDetail returns the full detail of one pull request: its de-duplicated,
@@ -305,17 +309,17 @@ func (c *Client) detailPage(ctx context.Context, vars map[string]any) (*wireDeta
 // Contexts are read 100 at a time for at most maxPages pages. Counts always
 // come from the de-duplicated checks of the pages read (D-03), so a run
 // superseded on another page is not counted. When the pull request has more
-// check runs than were read, a later page fails, or fewer runs were read than
-// GitHub reports (for example nodes that GraphQL returned as null), Truncated
-// is set and Read and Total say how many runs were read of how many exist. A
-// failure on page 1
+// check runs than were read, a later page fails, fewer runs were read than
+// GitHub reports (for example nodes that GraphQL returned as null), or any page
+// came back with a GraphQL error whose data was kept, Truncated is set. Read
+// and Total say how many runs were read of how many exist. A failure on page 1
 // is returned; so are a rate limit and a cancelled context on any page.
 func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, error) {
 	vars := map[string]any{"id": id}
 	var d domain.Detail
 	var checks []domain.Check
 	for page := 1; page <= maxPages; page++ {
-		n, err := c.detailPage(ctx, vars)
+		n, partial, err := c.detailPage(ctx, vars)
 		if err != nil {
 			var ce *Error
 			if page == 1 || errors.Is(err, context.Canceled) || (errors.As(err, &ce) && ce.Kind == KindRateLimited) {
@@ -323,6 +327,11 @@ func (c *Client) FetchDetail(ctx context.Context, id string) (domain.Detail, err
 			}
 			d.Truncated = true // a later page failed: keep the pages read so far
 			break
+		}
+		if partial {
+			// GitHub reported an error next to this page's data, so nodes (a
+			// check, a reviewer or a review request) may be missing (G-03-6-WR02).
+			d.Truncated = true
 		}
 		if page == 1 {
 			d.Reviewers = detailReviewers(n)
