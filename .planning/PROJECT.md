@@ -20,14 +20,14 @@ At a glance, without opening a browser, the user can see which of their watched 
 - ✓ Auto-found merged/closed PRs only appear if closed within a configurable recent window (default 14 days) — Phase 2 (manual-PR exemption lands with WATCH-07 in a later phase)
 - ✓ Data refreshes automatically on a configurable interval, with failure marker and rate-limit backoff — Phase 2 (real-terminal UAT deferred)
 - ✓ User can open the selected PR in the browser with a key — Phase 2 (real-browser UAT deferred)
+- ✓ List shows the overall review decision plus which reviewers approved, requested changes or are pending, merge-readiness, and the failing check name — Phase 3 (team-reviewer and merge-variety UAT deferred until add-by-URL)
+- ✓ Selecting a PR shows a detail view with each check/job and its status, failing first, and every reviewer — Phase 3 (large-CI-matrix UAT deferred until add-by-URL)
 
 ### Active
 
 - [ ] User can add any PR by pasting a github.com PR URL or `owner/repo#123`
 - [ ] Manually added PRs persist across restarts in a local file until the user removes them
 - [ ] User can remove a manually added PR from the watch list
-- [ ] List shows the overall review decision (approved / changes requested / review required) plus which reviewers approved or requested changes
-- [ ] Selecting a PR shows a detail view with each check/job and its status
 
 ### Out of Scope
 
@@ -66,6 +66,8 @@ At a glance, without opening a browser, the user can see which of their watched 
 | Clean remote strings once at the mapper seam | One audit point; go-gh already defangs C0 controls, Clean adds bidi/other controls | ✓ Good (Phase 1) |
 | ANSI-16 colours + glyph/word badges, reverse-video selection | Readable on light and dark themes without background detection; not colour-only | ✓ Good (Phase 1) |
 | Bubble Tea v2 (charm.land/*/v2) + go-gh v2 | v2 is stable; go-gh gives GraphQL, auth, browser | ✓ Good (Phase 1) |
+| Failing check names in a second batched query; full check list fetched lazily for the open detail only (C3) | Keeps the list query at rollup cost; one Detail query per refresh only while the view is open | ✓ Good (Phase 3) |
+| Partial data is never shown as complete: Truncated (runs not read) and Partial (GraphQL error kept) are separate, each with its own notice | The detail screen is where the user decides why a PR is blocked | ✓ Good (Phase 3) |
 
 ## Evolution
 
@@ -85,4 +87,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-12 after Phase 2*
+*Last updated: 2026-10-12 after Phase 3*

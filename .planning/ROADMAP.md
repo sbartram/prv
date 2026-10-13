@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Status at a Glance** - Live spike, then auth + one GraphQL fetch of authored/assigned PRs rendered as a list with state, review, and CI badges (completed 2026-10-11)
 - [x] **Phase 2: Live Monitoring** - Single-flight auto-refresh, rate-limit backoff, stable attention sort, state/number filters, config file, open-in-browser, help (completed 2026-10-12)
-- [ ] **Phase 3: Blocker Detail** - Reviewer names, merge-readiness, failing check name in rows, and a detail view of every check and reviewer
+- [x] **Phase 3: Blocker Detail** - Reviewer names, merge-readiness, failing check name in rows, and a detail view of every check and reviewer (completed 2026-10-12)
 - [ ] **Phase 4: Curated Watch List** - Add any PR by URL or `owner/repo#n`, remove it, persist across restarts, and degrade to per-PR unavailable rows
 
 ## Phase Details
@@ -112,7 +112,7 @@ Plans:
 
 **Gate**: Before planning, decide C3 (check contexts fetched eagerly for every PR, or lazily for the selected PR). Use the Phase 1 spike measurements (Q2, Q7, Q9, Q10). The decision must also cover LIST-07, which needs a failing check name for every failing row and not only for the selected PR.
 **Pitfalls first addressed here**: Review-state edge cases: DISMISSED, a COMMENTED review that hides an approval, team and bot reviewers through union fragments with nil guards, and re-requests. The list badge always comes from the rollup state and counts, never from a truncated contexts page. Large matrices show "+N more". Re-run jobs are not double-counted. The detail view handles a PR that leaves the list during a refresh. Use display-width helpers. Add golden tests at 60x15, 80x24, 120x40, and 0x0.
-**Plans**: 11/11 plans executed
+**Plans**: 11/11 plans complete
 
 Plans:
 **Wave 1**
@@ -167,5 +167,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
-| 3. Blocker Detail | 11/11 | In Progress | - |
+| 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
 | 4. Curated Watch List | 0/TBD | Not started | - |
