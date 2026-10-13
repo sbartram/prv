@@ -33,7 +33,7 @@
 | check-suite-ordering | INTEGRATE | |
 | workflow-run-name-and-file | INTEGRATE | |
 | status-context-fields | INTEGRATE | |
-| check-run-counts-by-state | OPT-OUT | not needed: the counts include superseded re-runs (RESEARCH F1) and D-03 requires de-duplicated counts at every size; the detail summary counts the de-duplicated contexts it read and discloses a partial read (03-06, 03-07) |
+| check-run-counts-by-state | OPT-OUT | not needed: counts include superseded re-runs (RESEARCH F1); D-03 needs de-duplicated counts, so the detail counts the contexts it read (03-06, 03-07) |
 | status-context-counts-by-state | OPT-OUT | not needed: same reason as check-run-counts-by-state |
 | contexts-pagination | INTEGRATE | |
 | node-batch-lookup | INTEGRATE | |
