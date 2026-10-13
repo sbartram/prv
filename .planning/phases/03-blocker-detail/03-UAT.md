@@ -24,12 +24,12 @@ result: pass
 ### 3. Run against a PR that has a visible team review request (an org account).
 expected: The row shows '...@org/slug' and the detail shows '@org/slug  pending'; a hidden team shows as '...team'.
 result: skipped
-reason: "I don't have an org PR with team reviewers"
+reason: "Deferred follow-up: I don't have an org PR with team reviewers. Revisit after Phase 4 add-by-URL with a public org PR that has a team review request."
 
 ### 4. Compare the MERGE column with the github.com merge box for several real PRs (mergeable, blocked, behind, conflicts, draft).
 expected: Each row agrees with GitHub's own merge state.
 result: skipped
-reason: "only one PR and it has no merge variety"
+reason: "Deferred follow-up: only one PR and it has no merge variety. Revisit after Phase 4 add-by-URL with several public PRs in different merge states."
 
 ### 5. Check the glyph widths of the check, merge, reviewer and compact-row glyphs (including the new unknown-check glyph) in the user's font.
 expected: Every glyph is one cell wide; no column shifts.
@@ -80,4 +80,10 @@ blocked: 0
 
 - test: 1
   idea: "Verify the large-CI-matrix detail view once Phase 4 add-by-URL exists (or with a fixture PR): failing on top, unknown listed, passing/skipped folded, e expands, j/k scroll, esc keeps selection."
+  deferred_at: 2026-10-12
+- test: 3
+  idea: "Verify team review requests ('...@org/slug' in the row, '@org/slug  pending' in detail, hidden team as '...team') once Phase 4 add-by-URL can watch a public org PR."
+  deferred_at: 2026-10-12
+- test: 4
+  idea: "Compare the MERGE column with github.com's merge box for several PRs (mergeable, blocked, behind, conflicts, draft) once Phase 4 add-by-URL exists."
   deferred_at: 2026-10-12
