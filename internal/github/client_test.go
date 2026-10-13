@@ -46,6 +46,7 @@ func opName(body []byte) string {
 // in order (only they count in calls and bodies); "FailingChecks" requests are
 // served from failing in order, then with failingNoneBody; "Detail" requests
 // are served from detail in order, and a request past the list fails the test.
+// "Lookup" requests are served from lookup in the same way.
 type fixtureTransport struct {
 	t            *testing.T
 	files        []string
@@ -55,6 +56,8 @@ type fixtureTransport struct {
 	failBodies   [][]byte
 	detail       []string
 	detailBodies [][]byte
+	lookup       []string
+	lookupBodies [][]byte
 }
 
 func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -91,6 +94,17 @@ func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 		}
 		var err error
 		data, err = os.ReadFile(filepath.Join("testdata", f.detail[n]))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+	case "Lookup":
+		n := len(f.lookupBodies)
+		f.lookupBodies = append(f.lookupBodies, raw)
+		if n >= len(f.lookup) {
+			f.t.Fatalf("unexpected Lookup request %d; only %d fixtures", n+1, len(f.lookup))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.lookup[n]))
 		if err != nil {
 			f.t.Fatal(err)
 		}
