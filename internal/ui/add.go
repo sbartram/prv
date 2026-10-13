@@ -8,6 +8,7 @@ import (
 
 	bkey "charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
 )
@@ -156,6 +157,11 @@ func (m *Model) addPaste(s string) {
 // submitAdd is enter: parse the text, then check the PR before anything is saved
 // (D-02). A text that is not a PR reference shows its reason and sends nothing.
 func (m *Model) submitAdd() tea.Cmd {
+	if now := m.now(); now.Before(m.pausedUntil) {
+		// Phase 2 D-08: no request during a rate-limit pause.
+		m.add.errText = "rate limited — resumes " + m.clock(m.pausedUntil, "15:04")
+		return nil
+	}
 	ref, err := domain.ParseRef(m.add.text)
 	if err != nil {
 		var re *domain.RefError
@@ -186,9 +192,15 @@ func (m *Model) applyAddChecked(msg addCheckedMsg) tea.Cmd {
 	switch {
 	case msg.err != nil:
 		m.add.errText = "could not check (" + errReason(msg.err) + ")"
+		m.pauseForRateLimit(msg.err) // the same pause a detail fetch sets
 		return nil
 	case msg.pr.Unavail.Kind != domain.UnavailNone:
 		m.add.errText = msg.pr.Unavail.Reason
+		if msg.pr.Unavail.Kind == domain.UnavailSSO && msg.pr.Unavail.Help != "" {
+			// The prompt is the only place the user sees this ref before it is
+			// saved, so it carries the SSO help.
+			m.add.errText += " · " + msg.pr.Unavail.Help
+		}
 		return nil
 	}
 	// D-03: GitHub may return a PR that is already a row under another name (a
@@ -285,15 +297,38 @@ func (m *Model) jumpTo(pr domain.PR, text string) tea.Cmd {
 }
 
 // addLine is the prompt line. It replaces the footer, so it costs no list row.
+// On a narrow pane (RESEARCH Pitfall 6) the input hint goes first, then the typed
+// text shows its tail behind a "…" and, if even that has no room, goes: the
+// cursor, the checking text and the error outrank the text.
 func (m Model) addLine() string {
-	line := "add PR: " + m.add.text + "█"
+	const prefix = "add PR: "
+	var suffix string
+	hint := false
 	switch {
 	case m.add.errText != "":
-		line += "   " + warnStyle.Render("✗ "+m.add.errText) + " · esc cancel"
+		suffix = "   " + warnStyle.Render("✗ "+m.add.errText) + " · esc cancel"
 	case m.add.checking:
-		line += "   checking " + m.add.ref.String() + " " + m.spin.View()
+		suffix = "   checking " + m.add.ref.String() + " " + m.spin.View()
 	default:
-		line += faintStyle.Render("   (URL or owner/repo#n · enter add · esc cancel)")
+		suffix = faintStyle.Render("   (URL or owner/repo#n · enter add · esc cancel)")
+		hint = true
 	}
-	return m.cut(line)
+	text := m.add.text
+	if m.w > 0 {
+		fixed := lipgloss.Width(prefix) + 1 // the prefix and the cursor
+		if hint && fixed+lipgloss.Width(text)+lipgloss.Width(suffix) > m.w {
+			suffix = ""
+		}
+		if room := m.w - fixed - lipgloss.Width(suffix); lipgloss.Width(text) > room {
+			switch {
+			case room > 1:
+				text = trimLeft(text, room)
+			case room == 1:
+				text = "…"
+			default:
+				text = ""
+			}
+		}
+	}
+	return m.cut(prefix + text + "█" + suffix)
 }
