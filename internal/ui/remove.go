@@ -81,11 +81,17 @@ func (m *Model) applyRemoved(msg removedMsg) tea.Cmd {
 	}
 	m.markMutation()
 	k := msg.ref.Key()
-	label := msg.ref.String()
+	label := "removed " + msg.ref.String()
 	prs := make([]domain.PR, 0, len(m.snap.PRs))
 	for _, pr := range m.snap.PRs {
-		if pr.Manual && pr.Watched.Key() == k {
-			label = pr.Ref.String()
+		switch {
+		case !pr.Manual || pr.Watched.Key() != k:
+		case pr.Auto:
+			// D-07: discovery lists it too, so it stays, no longer saved.
+			pr.Manual, pr.Watched = false, domain.Ref{}
+			label = "unpinned — still listed (authored/assigned)"
+		default:
+			label = "removed " + pr.Ref.String()
 			continue
 		}
 		prs = append(prs, pr)
@@ -95,7 +101,7 @@ func (m *Model) applyRemoved(msg removedMsg) tea.Cmd {
 	if len(prs) == 0 {
 		m.state = stateEmpty
 	}
-	return m.setFlash("removed "+label, flashFor)
+	return m.setFlash(label, flashFor)
 }
 
 // confirmLine is the confirm line. It replaces the footer, so it costs no list
