@@ -196,6 +196,10 @@ func NotFound() Unavail {
 	return Unavail{Kind: UnavailNotFound, Reason: "not found (deleted, renamed, or no access)"}
 }
 
+// SSORequired is the Unavail of a PR in an organization that requires SSO
+// authorization for the token (D-10).
+func SSORequired(org string) Unavail { return Unavail{} }
+
 // LoadFailed is the Unavail of a PR that failed to load for another reason.
 func LoadFailed(short, help string) Unavail {
 	return Unavail{Kind: UnavailOther, Reason: "could not load (" + short + ")", Help: help}

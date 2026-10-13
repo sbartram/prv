@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,14 @@ func TestParseRef(t *testing.T) {
 		{"short form", "octo/tools#42", Ref{"octo/tools", 42}},
 		{"short form with space around", "  octo/tools#42\n", Ref{"octo/tools", 42}},
 		{"largest number", "o/r#2147483647", Ref{"o/r", 2147483647}},
+		{"files with diff fragment", "https://github.com/o/r/pull/12/files#diff-abc", Ref{"o/r", 12}},
+		{"plain http", "http://github.com/o/r/pull/12", Ref{"o/r", 12}},
+		{"www with https", "https://www.github.com/o/r/pull/12", Ref{"o/r", 12}},
+		{"mixed-case host", "https://GitHub.com/o/r/pull/12", Ref{"o/r", 12}},
+		{"short form keeps letter case", "Cli/CLI#5", Ref{"Cli/CLI", 5}},
+		{"repo with dot underscore hyphen", "o/my.repo_x-y#3", Ref{"o/my.repo_x-y", 3}},
+		{"39 character owner", strings.Repeat("a", 39) + "/r#1", Ref{strings.Repeat("a", 39) + "/r", 1}},
+		{"query and fragment are dropped", "https://github.com/o/r/pull/12?token=abc#frag", Ref{"o/r", 12}},
 	}
 	for _, c := range ok {
 		t.Run(c.name, func(t *testing.T) {
@@ -58,6 +67,12 @@ func TestParseRef(t *testing.T) {
 		{"escape", "o/r#1\x1b[31m", ReasonNotRef},
 		{"repo url", "https://github.com/o/r", ReasonNotRef},
 		{"unknown suffix", "https://github.com/o/r/pull/1/foo", ReasonNotRef},
+		{"lookalike host", "https://github.com.evil.com/o/r/pull/1", ReasonOtherHost},
+		{"inner newline", "o/r#12\no/r#13", ReasonNotRef},
+		{"owner with leading hyphen", "-o/r#1", ReasonNotRef},
+		{"40 character owner", strings.Repeat("a", 40) + "/r#1", ReasonNotRef},
+		{"non-numeric pull number", "https://github.com/o/r/pull/abc", ReasonNotRef},
+		{"extra path after files", "https://github.com/o/r/pull/12/files/extra", ReasonNotRef},
 	}
 	for _, c := range bad {
 		t.Run(c.name, func(t *testing.T) {
@@ -97,10 +112,35 @@ func TestValidRef(t *testing.T) {
 		{Ref{"o/..", 1}, false},
 		{Ref{"o/r r", 1}, false},
 		{Ref{"", 1}, false},
+		{Ref{"Cli/CLI", 5}, true},
+		{Ref{"o", 1}, false},
+		{Ref{"o/r/x", 1}, false},
+		{Ref{"a b/c", 1}, false},
 	}
 	for _, c := range cases {
 		if got := ValidRef(c.ref); got != c.want {
 			t.Errorf("ValidRef(%v) = %v, want %v", c.ref, got, c.want)
 		}
+	}
+}
+
+func TestUnavailWording(t *testing.T) {
+	sso := SSORequired("acme")
+	if sso.Kind != UnavailSSO || sso.Reason != "SSO: authorize your token for acme" {
+		t.Errorf("SSORequired(acme) = %+v, want kind SSO and reason %q", sso, "SSO: authorize your token for acme")
+	}
+	for _, want := range []string{"https://github.com/orgs/acme/sso", "gh auth refresh"} {
+		if !strings.Contains(sso.Help, want) {
+			t.Errorf("SSORequired help %q does not name %q", sso.Help, want)
+		}
+	}
+	if i, j := strings.Index(sso.Help, "orgs/acme/sso"), strings.Index(sso.Help, "gh auth refresh"); i < 0 || j < 0 || i > j {
+		t.Errorf("SSORequired help %q must name the org SSO page before gh auth refresh", sso.Help)
+	}
+	if got, want := NotFound().Reason, "not found (deleted, renamed, or no access)"; got != want {
+		t.Errorf("NotFound reason = %q, want %q", got, want)
+	}
+	if got, want := LoadFailed("forbidden", "Resource not accessible"), (Unavail{Kind: UnavailOther, Reason: "could not load (forbidden)", Help: "Resource not accessible"}); got != want {
+		t.Errorf("LoadFailed = %+v, want %+v", got, want)
 	}
 }
