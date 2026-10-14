@@ -17,11 +17,12 @@ type confirmState struct {
 	pr   domain.PR
 }
 
-// removedMsg is the result of one Watchlist.Remove. ref is the saved ref that
+// removedMsg is the result of one Watchlist.RemoveRef. ref is the saved ref that
 // was removed. removed is false when the entry was already gone from the file.
 type removedMsg struct {
 	ref     domain.Ref
 	removed bool
+	note    string // the backup's base name when the write replaced a broken file
 	err     error
 }
 
@@ -36,7 +37,7 @@ func removeCmd(w Watchlist, ref domain.Ref) tea.Cmd {
 			}
 		}()
 		r, err := w.RemoveRef(ref)
-		return removedMsg{ref: ref, removed: r.Changed, err: err}
+		return removedMsg{ref: ref, removed: r.Changed, note: r.StartedOver, err: err}
 	}
 }
 
@@ -101,7 +102,8 @@ func (m *Model) applyRemoved(msg removedMsg) tea.Cmd {
 	if len(prs) == 0 {
 		m.state = stateEmpty
 	}
-	return m.setFlash(label, flashFor)
+	notice, d := startedOverNotice(msg.note)
+	return m.setFlash(joinNotice(notice, label), d)
 }
 
 // confirmLine is the confirm line. It replaces the footer, so it costs no list

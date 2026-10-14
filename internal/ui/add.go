@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	bkey "charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -54,6 +55,7 @@ type addSavedMsg struct {
 	seq   int
 	pr    domain.PR
 	added bool
+	note  string // the backup's base name when the save replaced a broken file
 	err   error
 }
 
@@ -80,7 +82,7 @@ func saveCmd(w Watchlist, pr domain.PR, seq int) tea.Cmd {
 			}
 		}()
 		r, err := w.AddRef(pr.Watched)
-		return addSavedMsg{seq: seq, pr: pr, added: r.Changed, err: err}
+		return addSavedMsg{seq: seq, pr: pr, added: r.Changed, note: r.StartedOver, err: err}
 	}
 }
 
@@ -248,16 +250,39 @@ func (m *Model) applyAddSaved(msg addSavedMsg) tea.Cmd {
 	m.markMutation()
 	m.state = stateList
 	m.rebuild()
+	notice, d := startedOverNotice(msg.note)
 	switch {
 	case !msg.added:
 		// Another pane saved it first; it is listed all the same.
-		return m.jumpTo(target, "already watching "+target.Ref.String())
+		return m.jumpTo(target, joinNotice(notice, "already watching "+target.Ref.String()), d)
 	case indexOf(m.rows, target.Ref) >= 0:
 		m.selected = target.Ref
 		m.rebuild()
+		if notice != "" {
+			return m.setFlash(notice, d)
+		}
 		return nil
 	}
-	return m.setFlash("added "+target.Ref.String()+" · hidden by filters", flashFor)
+	return m.setFlash(joinNotice(notice, "added "+target.Ref.String()+" · hidden by filters"), d)
+}
+
+// startedOverNotice is the footer text for a save that replaced a broken
+// watchlist.json (D-04), and how long it stays. note is the backup's base name;
+// with none, the text is empty and the duration is the usual flashFor.
+func startedOverNotice(note string) (string, time.Duration) {
+	if note == "" {
+		return "", flashFor
+	}
+	return "previous list saved to " + note, warnFor
+}
+
+// joinNotice puts the notice ahead of text. A narrow pane cuts the end of the
+// footer, so the notice, which matters more, comes first.
+func joinNotice(notice, text string) string {
+	if notice == "" {
+		return text
+	}
+	return notice + " · " + text
 }
 
 // listedIndex returns the index in m.snap.PRs of the first PR that is ref or id:
@@ -283,18 +308,18 @@ func (m *Model) findListed(ref domain.Ref, id string) (domain.PR, bool) {
 func (m *Model) closeAsDuplicate(hit domain.PR) tea.Cmd {
 	m.add = addState{}
 	m.addSeq++
-	return m.jumpTo(hit, "already watching "+hit.Ref.String())
+	return m.jumpTo(hit, "already watching "+hit.Ref.String(), flashFor)
 }
 
-// jumpTo selects pr and shows text in the footer. When the filters hide the row
-// the selection stays and the text says so.
-func (m *Model) jumpTo(pr domain.PR, text string) tea.Cmd {
+// jumpTo selects pr and shows text in the footer for d. When the filters hide the
+// row the selection stays and the text says so.
+func (m *Model) jumpTo(pr domain.PR, text string, d time.Duration) tea.Cmd {
 	if indexOf(m.rows, pr.Ref) >= 0 {
 		m.selected = pr.Ref
 		m.rebuild()
-		return m.setFlash(text, flashFor)
+		return m.setFlash(text, d)
 	}
-	return m.setFlash(text+" · hidden by filters", flashFor)
+	return m.setFlash(text+" · hidden by filters", d)
 }
 
 // addLine is the prompt line. It replaces the footer, so it costs no list row.
