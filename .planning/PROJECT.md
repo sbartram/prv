@@ -16,11 +16,11 @@ At a glance, without opening a browser, the user can see which of their watched 
 - ✓ List shows each PR's state: Open / Merged / Closed — Phase 1
 - ✓ List shows one rollup workflow badge per PR (passing / failing / running) — Phase 1
 - ✓ Authenticates with the same token `gh` would use: `GH_TOKEN`, then `GITHUB_TOKEN`, then the `gh` CLI login — Phase 1
-- ✓ User can filter the list by any combination of Open / Merged / Closed — Phase 2 (real-terminal UAT deferred)
+- ✓ User can filter the list by any combination of Open / Merged / Closed — Phase 2 (real-terminal UAT passed in Phase 5)
 - ✓ Auto-found merged/closed PRs only appear if closed within a configurable recent window (default 14 days) — Phase 2 (manual-PR exemption lands with WATCH-07 in a later phase)
-- ✓ Data refreshes automatically on a configurable interval, with failure marker and rate-limit backoff — Phase 2 (real-terminal UAT deferred)
-- ✓ User can open the selected PR in the browser with a key — Phase 2 (real-browser UAT deferred)
-- ✓ List shows the overall review decision plus which reviewers approved, requested changes or are pending, merge-readiness, and the failing check name — Phase 3 (team-reviewer and merge-variety UAT deferred until add-by-URL)
+- ✓ Data refreshes automatically on a configurable interval, with failure marker and rate-limit backoff — Phase 2 (failure marker UAT passed in Phase 5; live rate-limit pause still deferred, D-17)
+- ✓ User can open the selected PR in the browser with a key — Phase 2 (real-browser UAT passed in Phase 5)
+- ✓ List shows the overall review decision plus which reviewers approved, requested changes or are pending, merge-readiness, and the failing check name — Phase 3 (badges and MERGE vs github.com passed in Phase 5 UAT; team-reviewer UAT still deferred, D-17)
 - ✓ Selecting a PR shows a detail view with each check/job and its status, failing first, and every reviewer — Phase 3 (large-CI-matrix UAT deferred until add-by-URL)
 
 - ✓ User can add any PR by pasting a github.com PR URL or `owner/repo#123` — Phase 4 (real-SSO-org UAT deferred)
@@ -73,6 +73,8 @@ At a glance, without opening a browser, the user can see which of their watched 
 | Watch list store keeps no state: every call re-reads watchlist.json, writes via temp file + rename, and never overwrites a file it cannot parse (backs it up once instead) | Two prv panes share one file; a hand-edit mistake must never lose saved PRs | ✓ Good (Phase 4) |
 | Saved PRs GitHub cannot return stay on the list as unavailable rows with a reason, never silently dropped | A saved PR must disappear only when the user removes it | ✓ Good (Phase 4) |
 | Epoch rule: a refresh begun before a local add/remove is discarded and re-run | The screen never shows a list older than the user's own change | ✓ Good (Phase 4) |
+| Watch-list writers take an exclusive flock on watchlist.json.lock (3 s wait, then "busy"); reads stay lock-free; a file of another version is refused, never overwritten | Two prv panes writing at once must not lose a change; a newer prv's file must survive an older prv | ✓ Good (Phase 5) |
+| Opt-in live smoke (PRV_LIVE=1) against pinned public PRs; default `go test ./...` stays offline | Checks the GitHub mapping against reality without making CI depend on the network | ✓ Good (Phase 5) |
 
 ## Evolution
 
@@ -92,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 after Phase 4*
+*Last updated: 2026-10-14 after Phase 5*

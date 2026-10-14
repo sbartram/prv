@@ -1,43 +1,42 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 05
-current_phase_name: "Address tech debt: watch-list locking + live smoke"
-status: verifying
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-10-14T03:49:32.516Z"
-last_activity: 2026-10-13
-last_activity_desc: Phase 05 execution started
-state_head: 73d8b4d8ffcd6a335e3ba81b8a6008b2b8123015
+current_phase: 5
+status: completed
+stopped_at: Phase 5 complete — all phases complete
+last_updated: "2026-10-14T15:37:26.765Z"
+last_activity: 2026-10-14
+last_activity_desc: Phase 5 complete
+state_head: f5c6a5cd64ff31406ac3608d35acfa03417e9580
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 35
   completed_plans: 35
-  percent: 80
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-13)
+See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Phase 05 — Address tech debt: watch-list locking + live smoke
+**Current focus:** Milestone v1 complete — ready for milestone audit / close
 
 ## Current Position
 
-Phase: 05 (Address tech debt: watch-list locking + live smoke) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-10-13 — Phase 05 execution started
+Phase: 5
+Plan: Not started
+Status: All phases complete
+Last activity: 2026-10-14 — Phase 5 complete
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 32
+- Total plans completed: 35
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -49,6 +48,7 @@ Progress: [████████░░] 80%
 | 02 | 10 | - | - |
 | 03 | 11 | - | - |
 | 04 | 7 | - | - |
+| 5 | 3 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -181,11 +181,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 3]: 3 UAT checks deferred (03-UAT.md Deferred Follow-Ups): large-CI-matrix detail view, team review requests, MERGE column vs github.com merge box. Add-by-URL now exists (Phase 4), so they can be re-tested (e.g. prometheus/prometheus#19994). VERIFICATION.md was set to passed on the deferral.
+- [Phase 3]: MERGE column vs github.com passed in 05-UAT #8. Still deferred (D-17): large-CI-matrix detail view, team review requests.
 - [Phase 4]: 1 UAT check deferred (04-UAT.md Deferred Follow-Ups): SAML SSO reason text on a real SSO-enforcing org.
 - [Phase 1]: Open code-review warnings (01-REVIEW-DISPOSITION.md): WR-01 unbounded hidden --closed-days, WR-02 empty state hides partial-fetch warnings, WR-03 footer integrity notes truncated first. Triage WR-02/WR-03 with Phase 2 footer/refresh work.
-- [Phase 1]: 4 UAT checks deferred (01-UAT.md Deferred Follow-Ups): live assignee:@me, badge fidelity vs github.com, real 401 flow, ambiguous-width glyphs.
-- [Phase 2]: 7 UAT checks deferred (02-UAT.md Deferred Follow-Ups): failure marker at 80/40 cols, api footer/rate warning legibility, live rate-limit pause, filter keys and paste, `o` in a real browser, `?` overlay, live config edits. VERIFICATION.md was set to passed on the deferral, not on observed behaviour.
+- [Phase 1]: Badge fidelity vs github.com passed in 05-UAT #7. Still deferred (D-17): live assignee:@me, real 401 flow, ambiguous-width glyphs.
+- [Phase 2]: Of the 7 deferred UAT checks, 4 passed live in 05-UAT (failure marker, filter keys/paste, `o` in a browser, `?` overlay). Still deferred: live rate-limit pause (D-17), api footer/rate warning legibility (ROADMAP 999.1), live config edits (ROADMAP 999.2, deferred twice, never run live).
 - [Phase 1]: Throwaway test PR sbartram/prv#1 (branch uat/test-pr-scratch) is open; close with `gh pr close 1 --delete-branch`.
 
 ### Roadmap Evolution
@@ -202,6 +202,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-14T03:49:32.453Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-10-14
+Stopped at: Phase 5 complete (UAT 7 passed, 2 deferred to backlog 999.1/999.2), ready for milestone audit
 Resume file: None

@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Live Monitoring** - Single-flight auto-refresh, rate-limit backoff, stable attention sort, state/number filters, config file, open-in-browser, help (completed 2026-10-12)
 - [x] **Phase 3: Blocker Detail** - Reviewer names, merge-readiness, failing check name in rows, and a detail view of every check and reviewer (completed 2026-10-12)
 - [x] **Phase 4: Curated Watch List** - Add any PR by URL or `owner/repo#n`, remove it, persist across restarts, and degrade to per-PR unavailable rows (completed 2026-10-13)
+- [x] **Phase 5: Address tech debt: watch-list locking + live smoke** - Multi-process-safe watch-list writes, no silent loss of a broken or newer watchlist.json, honest save prompt, opt-in live smoke test (completed 2026-10-14)
 
 ## Phase Details
 
@@ -180,7 +181,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -188,6 +189,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
 | 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
 | 4. Curated Watch List | 7/7 | Complete    | 2026-10-13 |
+| 5. Address tech debt: watch-list locking + live smoke | 3/3 | Complete    | 2026-10-14 |
 
 ### Phase 5: Address tech debt: watch-list locking + live smoke
 
@@ -202,7 +204,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
   4. A failed add or remove says why (list full, another prv writing, another version, permission denied, disk full) and never shows a file path or raw OS text.
   5. `PRV_LIVE=1 go test ./internal/github -run TestLive -count=1 -v` checks state, review, CI and MERGE for pinned public PRs on github.com, while plain `go test ./...` stays offline and green. 05-UAT.md holds the manual checks (the Phase 2 UI set, and badges and MERGE by eye) for /gsd-verify-work.
 
-**Plans:** 3/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
