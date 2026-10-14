@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 5
+current_phase: 05
 current_phase_name: "Address tech debt: watch-list locking + live smoke"
-status: completed
-stopped_at: Phase 5 context gathered
-last_updated: "2026-10-14T03:13:44.148Z"
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-10-14T03:36:30.630Z"
 last_activity: 2026-10-13
-last_activity_desc: Phase 04 complete
-state_head: ecdb58c5348c1a15f806ddc824c448ba6e59cccf
+last_activity_desc: Phase 05 execution started
+state_head: 605272af12777cb07facbad2155d75b366830c5b
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 33
   percent: 80
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Milestone v1 complete — ready to close milestone
+**Current focus:** Phase 05 — Address tech debt: watch-list locking + live smoke
 
 ## Current Position
 
-Phase: 5 (Address tech debt: watch-list locking + live smoke) — READY TO EXECUTE
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-13 — Phase 04 complete
+Phase: 05 (Address tech debt: watch-list locking + live smoke) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-10-13 — Phase 05 execution started
 
 Progress: [████████░░] 80%
 
@@ -91,6 +91,7 @@ Progress: [████████░░] 80%
 | Phase 04 P05 | 35 min | 2 tasks | 9 files |
 | Phase 04 P06 | 10 min | 2 tasks | 6 files |
 | Phase 04 P07 | 20 min | 2 tasks | 49 files |
+| Phase 05 P01 | 4 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,7 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-06: d remove hint left out of the footer and help; plan 04-07 adds it with the goldens
 - [Phase 04]: 04-07: the unavailable detail wraps the reason and Help text to the pane instead of cutting them, so the SSO hint stays whole at 60 columns
 - [Phase 04]: 04-07: the d remove footer hint shows only when the selected row is saved (Manual), the same test askRemove uses
+- [Phase 05]: 05-01: x/sys/unix flock (3 s wait, 10 ms poll, reads lock-free); version classified before entries decoded, version != 1 (0 and absent included) refused; backup via temp+sync+no-clobber link named by hash of bytes copied
 
 ### Pending Todos
 
@@ -195,6 +197,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-14T01:29:24.837Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-address-tech-debt-watch-list-locking-live-smoke/05-CONTEXT.md
+Last session: 2026-10-14T03:36:30.567Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None
