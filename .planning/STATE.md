@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Curated Watch List
-status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-10-13T23:54:10.332Z"
+status: verifying
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-10-14T00:01:12.656Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 04 execution started
-state_head: 2646c1ad03578136e2d9b4317e3e7f6d1823c587
+state_head: 715c306689beae853f1e3a218bf2553654a40d64
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 32
-  completed_plans: 31
+  completed_plans: 32
   percent: 75
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-12)
 
 Phase: 04 (Curated Watch List) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-13 — Phase 04 execution started
 
 Progress: [████████░░] 75%
@@ -89,6 +89,7 @@ Progress: [████████░░] 75%
 | Phase 04 P04 | 25 min | 2 tasks | 5 files |
 | Phase 04 P05 | 35 min | 2 tasks | 9 files |
 | Phase 04 P06 | 10 min | 2 tasks | 6 files |
+| Phase 04 P07 | 20 min | 2 tasks | 49 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,8 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-05: unavailable rows are drawn by unavailLine after the table renders, with blank table cells so the reason never widens a column
 - [Phase 04]: 04-06: confirmKey closes the remove confirm before it reads the key, so only y removes, only ctrl+c quits and every other key (q included) cancels
 - [Phase 04]: 04-06: d remove hint left out of the footer and help; plan 04-07 adds it with the goldens
+- [Phase 04]: 04-07: the unavailable detail wraps the reason and Help text to the pane instead of cutting them, so the SSO hint stays whole at 60 columns
+- [Phase 04]: 04-07: the d remove footer hint shows only when the selected row is saved (Manual), the same test askRemove uses
 
 ### Pending Todos
 
@@ -186,6 +189,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-13T23:54:10.279Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-10-14T00:01:12.600Z
+Stopped at: Completed 04-07-PLAN.md
 Resume file: None

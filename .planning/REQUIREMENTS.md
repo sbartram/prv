@@ -14,8 +14,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **WATCH-03**: A PR that is both authored and assigned (or also added manually) appears only once
 - [x] **WATCH-04**: User can add a PR by pasting a github.com PR URL or `owner/repo#123`; invalid or inaccessible PRs show an error and are not saved
 - [x] **WATCH-05**: Manually added PRs are saved locally and reappear after restart
-- [ ] **WATCH-06**: User can remove a manually added PR
-- [ ] **WATCH-07**: Manually added PRs stay listed after they close, until the user removes them (the closed window does not apply to them)
+- [x] **WATCH-06**: User can remove a manually added PR
+- [x] **WATCH-07**: Manually added PRs stay listed after they close, until the user removes them (the closed window does not apply to them)
 
 ### List display
 
@@ -128,8 +128,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WATCH-03 | Phase 1 | Complete |
 | WATCH-04 | Phase 4 | Complete |
 | WATCH-05 | Phase 4 | Complete |
-| WATCH-06 | Phase 4 | Pending |
-| WATCH-07 | Phase 4 | Pending |
+| WATCH-06 | Phase 4 | Complete |
+| WATCH-07 | Phase 4 | Complete |
 | LIST-01 | Phase 1 | Complete |
 | LIST-02 | Phase 1 | Complete |
 | LIST-03 | Phase 1 | Complete |
