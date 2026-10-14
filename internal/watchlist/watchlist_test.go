@@ -67,8 +67,12 @@ func TestAddCreatesFile(t *testing.T) {
 		}
 	}
 	entries, _ := os.ReadDir(filepath.Dir(path))
-	if len(entries) != 1 {
-		t.Errorf("directory holds %d files, want only watchlist.json (no temp file left)", len(entries))
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if len(names) != 2 || names[0] != "watchlist.json" || names[1] != "watchlist.json.lock" {
+		t.Errorf("directory holds %v, want only watchlist.json and watchlist.json.lock (no temp file left)", names)
 	}
 
 	refs, warns, err := s.Load()
@@ -496,6 +500,9 @@ func TestPermissions(t *testing.T) {
 	}
 	if di, _ := os.Stat(filepath.Dir(path)); di.Mode().Perm() != 0o700 {
 		t.Errorf("directory mode = %v, want 0700", di.Mode().Perm())
+	}
+	if fi, err := os.Stat(path + ".lock"); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf("lock file = %v, %v, want mode 0600", fi, err)
 	}
 }
 

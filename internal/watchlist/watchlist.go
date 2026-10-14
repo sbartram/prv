@@ -83,10 +83,18 @@ type Store struct {
 	path   string
 	now    func() time.Time
 	rename func(oldpath, newpath string) error
+	// lockWait is how long a writer waits for the lock; tests shorten it.
+	lockWait time.Duration
+	// afterRead is a test hook. When non-nil, Add calls it inside the lock right
+	// after readForWrite returns, so a test can hold the critical section open.
+	// New leaves it nil.
+	afterRead func()
 }
 
 // New returns a Store for path. It touches no file.
-func New(path string) *Store { return &Store{path: path, now: time.Now, rename: os.Rename} }
+func New(path string) *Store {
+	return &Store{path: path, now: time.Now, rename: os.Rename, lockWait: defaultLockWait}
+}
 
 // Path returns the file path of the store.
 func (s *Store) Path() string { return s.path }
@@ -224,9 +232,17 @@ func (s *Store) Add(ref domain.Ref) (bool, error) {
 	if !domain.ValidRef(ref) {
 		return false, errors.New("not a PR reference")
 	}
+	unlock, err := s.lock()
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
 	shape, err := s.readForWrite()
 	if err != nil {
 		return false, err
+	}
+	if s.afterRead != nil {
+		s.afterRead()
 	}
 	for _, e := range shape.PRs {
 		if e.ref().Key() == ref.Key() {
@@ -246,6 +262,11 @@ func (s *Store) Add(ref domain.Ref) (bool, error) {
 // Remove drops every entry with the same Key as ref. It reports false, and
 // writes nothing, when there was none (for example another pane removed it).
 func (s *Store) Remove(ref domain.Ref) (bool, error) {
+	unlock, err := s.lock()
+	if err != nil {
+		return false, err
+	}
+	defer unlock()
 	shape, err := s.readForWrite()
 	if err != nil {
 		return false, err
