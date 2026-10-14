@@ -1,43 +1,42 @@
 ---
 gsd_state_version: "1.0"
 current_phase: 04
-current_phase_name: Curated Watch List
-status: verifying
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-10-14T00:01:12.656Z"
+status: completed
+stopped_at: Phase 04 complete — all phases complete
+last_updated: "2026-10-14T00:46:38.062Z"
 last_activity: 2026-10-13
-last_activity_desc: Phase 04 execution started
-state_head: 715c306689beae853f1e3a218bf2553654a40d64
+last_activity_desc: Phase 04 complete
+state_head: 86b557086b5e7878943725481b64122751ef0797
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 32
   completed_plans: 32
-  percent: 75
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-12)
+See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Phase 04 — Curated Watch List
+**Current focus:** Milestone v1 complete — ready to close milestone
 
 ## Current Position
 
-Phase: 04 (Curated Watch List) — EXECUTING
-Plan: 7 of 7
-Status: Phase complete — ready for verification
-Last activity: 2026-10-13 — Phase 04 execution started
+Phase: 04
+Plan: Not started
+Status: All phases complete
+Last activity: 2026-10-13 — Phase 04 complete
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25
+- Total plans completed: 32
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -48,6 +47,7 @@ Progress: [████████░░] 75%
 | 01 | 4 | - | - |
 | 02 | 10 | - | - |
 | 03 | 11 | - | - |
+| 04 | 7 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -173,7 +173,8 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 3]: 3 UAT checks deferred (03-UAT.md Deferred Follow-Ups): large-CI-matrix detail view, team review requests, MERGE column vs github.com merge box. All need PRs the user does not own; re-test once Phase 4 add-by-URL exists. VERIFICATION.md was set to passed on the deferral.
+- [Phase 3]: 3 UAT checks deferred (03-UAT.md Deferred Follow-Ups): large-CI-matrix detail view, team review requests, MERGE column vs github.com merge box. Add-by-URL now exists (Phase 4), so they can be re-tested (e.g. prometheus/prometheus#19994). VERIFICATION.md was set to passed on the deferral.
+- [Phase 4]: 1 UAT check deferred (04-UAT.md Deferred Follow-Ups): SAML SSO reason text on a real SSO-enforcing org.
 - [Phase 1]: Open code-review warnings (01-REVIEW-DISPOSITION.md): WR-01 unbounded hidden --closed-days, WR-02 empty state hides partial-fetch warnings, WR-03 footer integrity notes truncated first. Triage WR-02/WR-03 with Phase 2 footer/refresh work.
 - [Phase 1]: 4 UAT checks deferred (01-UAT.md Deferred Follow-Ups): live assignee:@me, badge fidelity vs github.com, real 401 flow, ambiguous-width glyphs.
 - [Phase 2]: 7 UAT checks deferred (02-UAT.md Deferred Follow-Ups): failure marker at 80/40 cols, api footer/rate warning legibility, live rate-limit pause, filter keys and paste, `o` in a real browser, `?` overlay, live config edits. VERIFICATION.md was set to passed on the deferral, not on observed behaviour.
@@ -189,6 +190,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-14T00:01:12.600Z
-Stopped at: Completed 04-07-PLAN.md
+Last session: 2026-10-13
+Stopped at: Phase 04 complete (UAT 2 passed, 1 deferred; security verified) — milestone ready to close
 Resume file: None

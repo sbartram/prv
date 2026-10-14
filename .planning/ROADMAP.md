@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Status at a Glance** - Live spike, then auth + one GraphQL fetch of authored/assigned PRs rendered as a list with state, review, and CI badges (completed 2026-10-11)
 - [x] **Phase 2: Live Monitoring** - Single-flight auto-refresh, rate-limit backoff, stable attention sort, state/number filters, config file, open-in-browser, help (completed 2026-10-12)
 - [x] **Phase 3: Blocker Detail** - Reviewer names, merge-readiness, failing check name in rows, and a detail view of every check and reviewer (completed 2026-10-12)
-- [ ] **Phase 4: Curated Watch List** - Add any PR by URL or `owner/repo#n`, remove it, persist across restarts, and degrade to per-PR unavailable rows
+- [x] **Phase 4: Curated Watch List** - Add any PR by URL or `owner/repo#n`, remove it, persist across restarts, and degrade to per-PR unavailable rows (completed 2026-10-13)
 
 ## Phase Details
 
@@ -155,7 +155,7 @@ Plans:
   4. When a saved PR later can't be fetched (deleted, access revoked, SSO not authorized), it shows as an "unavailable" row with the reason. The other PRs still display, and the saved entry is never deleted automatically.
 
 **Pitfalls first addressed here**: Batched aliased lookups use GraphQL variables, never string interpolation, in chunks of 25-50 aliases. Parse the response envelope yourself and attribute `errors[].path[0]` to its alias, using the Phase 1 spike findings (Q3, Q6) for the NOT_FOUND and SAML FORBIDDEN shapes. Validate a PR by fetching it before you persist it. Support bracketed paste. The store holds PR refs only, as versioned JSON at `$XDG_DATA_HOME/prv/watchlist.json` with an atomic write, a tolerant load, and a backup of a corrupt file. Never remove manual entries automatically. Show an SSO hint when a PR is inaccessible.
-**Plans**: 7/7 plans executed
+**Plans**: 7/7 plans complete
 
 Plans:
 **Wave 1**
@@ -187,4 +187,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Status at a Glance | 4/4 | Complete    | 2026-10-11 |
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
 | 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
-| 4. Curated Watch List | 7/7 | In Progress | - |
+| 4. Curated Watch List | 7/7 | Complete    | 2026-10-13 |
