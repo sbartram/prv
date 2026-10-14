@@ -92,6 +92,26 @@ A draft PR shows `[draft]` before its title. Its row is dimmed.
 | `– no checks` | The PR has no checks                   |
 | `? unknown`   | prv cannot tell the CI status          |
 
+## Development
+
+`go test ./...` runs offline and needs no token.
+
+The live smoke test checks prv against real github.com:
+
+```sh
+PRV_LIVE=1 go test ./internal/github -run TestLive -count=1 -v
+```
+
+It uses the same token as prv (`GH_TOKEN`, `GITHUB_TOKEN` or `gh auth login`).
+It only reads data and costs about 4 API points.
+A skipped subtest means a pinned PR changed on GitHub.
+Re-pin it (see `internal/github/live_test.go`).
+
+### Platforms
+
+prv builds and runs on macOS and Linux.
+Windows is not supported, because the watch-list lock uses `flock`.
+
 ## License
 
 See [LICENSE](LICENSE).
