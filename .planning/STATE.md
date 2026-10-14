@@ -1,7 +1,7 @@
 ---
 gsd_state_version: "1.0"
 status: Awaiting next milestone
-stopped_at: Phase 5 complete — all phases complete
+stopped_at: Milestone v1.0 archived
 last_updated: "2026-10-14T16:00:18.510Z"
 last_activity: 2026-10-14
 last_activity_desc: Milestone v1.0 completed and archived
@@ -22,7 +22,7 @@ current_phase: 5
 See: .planning/PROJECT.md (updated 2026-10-14)
 
 **Core value:** At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
-**Current focus:** Milestone v1 complete — ready for milestone audit / close
+**Current focus:** Planning next milestone
 
 ## Current Position
 
@@ -97,81 +97,7 @@ Last activity: 2026-10-14 — Milestone v1.0 completed and archived
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- [Roadmap]: Vertical MVP in 4 phases. Phase 1 is a thin live slice (auth + GraphQL fetch + list with state/review/CI badges).
-- [Roadmap]: The live-verification spike moves from research's "Phase 2" to the start of Phase 1, as a gate before the query is frozen.
-- [Research C1]: Resolved. Token order is GH_TOKEN → GITHUB_TOKEN → gh login (go-gh TokenForHost), per PROJECT.md. Spike Q5 confirms it on the installed gh.
-- [Research C5]: Resolved. Manually added PRs are exempt from the closed window (WATCH-07).
-- [Research C2/C4]: Defaults recorded in REQUIREMENTS.md (single ISSUE_ADVANCED search; latestOpinionatedReviews fallback). The Phase 1 spike confirms or overturns them.
-- [Phase 01]: go-gh defangs C0 control characters in API responses (ESC becomes visible ^[), so domain.Clean at the mapper seam is a second layer, tested through the client and directly
-- [Phase 01]: State zero value is StateOpen per the plan interface order; unknown remote states map to StateUnknown via ParseState and are never shown as open
-- [Phase 01]: 01-02: a GraphQL error on page 2 or later discards that page; earlier pages stay and the list is marked truncated
-- [Phase 01]: 01-02: API error messages are not token-scrubbed; built from status, fixed strings and domain.Clean(API message)
-- [Phase 01]: 01-03: TITLE width is max(10, min(widest title, space left)); narrow panes cut at the right edge until NAV-05
-- [Phase 01]: 01-03: list view has no blank lines (header, column row, rows, footer) so visible rows = height - 3
-- [Phase 01]: 01-04: GSD runtime files .planning/state.json and .planning/milestone.lock are gitignored; .planning stays tracked
-- [Phase 02]: 02-01: refresh interval floor (15 s) lives in config.Load, not the model; generation numbering starts at 0 in New()
-- [Phase 02]: 02-01: unresolved config path keeps defaults; a broken config.toml exits 2 before the token lookup, and --version ignores it
-- [Phase 02]: 02-02: bubbles/key is imported as bkey in internal/ui because the test helper key() owns that package-level name
-- [Phase 02]: 02-02: selected domain.Ref is the source of truth; rebuild() derives rows and cursor; nearest neighbour looks below first, then above
-- [Phase 02]: A merged or closed draft PR sorts as merged (7) or closed (8); only an open draft is bucket 6 (D-04 as clarified 2026-10-12)
-- [Phase 02]: Approved PR with no checks or unknown CI sorts in bucket 5, never ready to merge; updatedAt is not a sort key (D-02)
-- [Phase 02]: 02-04: header segments carry priorities (prv 1, @login 2, N PRs 4, updated 5, failure marker 7); prio 3 and 6 are reserved for the filter segment (02-08) and rate warning (02-05)
-- [Phase 02]: 02-04: footer shows integrity notes before key hints; notes are cut with an ellipsis, never dropped; hints need at least 8 cells and come from keyMap.ShortHelp()
-- [Phase 02]: D-06 'always shows' read as 'from the first successful response on': api segment absent while Limit is 0, last value kept through failed refreshes
-- [Phase 02]: Rate warning boundary is Remaining*5 < Limit (999/5000 warns, 1000/5000 does not); header prio 6, footer drops hints before notes or api
-- [Phase 02]: 02-06: a current-generation tick that fires before pausedUntil re-arms instead of fetching; r during a pause keeps the generation and only shows the 4 s flash
-- [Phase 02]: 02-06: NextDelay is pure in domain (clock passed in); ui reads Backoff() through its own backoffer interface, so 02-07 adds the method to *github.Error without ui importing it
-- [Phase 02]: 02-07: a rate limit on any discovery page returns an empty snapshot and the error (previous data stays, model pauses); other later-page errors still truncate
-- [Phase 02]: 02-07: rate limit decided from captured headers first, RATE_LIMITED error type second, never message text; Retry-After saturates at 2^31 s
-- [Phase 02]: 02-08: unknown-state PRs are never hidden by 1/2/3; the number prompt opens only on the list screen and its keys are handled before the list keys
-- [Phase 02]: 02-08: rows = domain.Visible(snap.PRs, show, numFilter) in rebuild(); bottom() is the prompt while open, else the footer, so the prompt costs no list row
-- [Phase 02]: 02-09: config values are clamped to 1..365 while the --closed-days flag is rejected outside the same range; flag beats config beats default 14
-- [Phase 02]: 02-09: config warnings start their 8 s clock at the first fetch result and sit in their own footer segment, below the flash and notes and above key hints
-- [Phase 02]: 02-10: help overlay keeps 'press any key to return' as the last line when cut to pane height; safeURL refuses whitespace/control runes before parsing
-- [Phase 03]: 03-01: '+N' counts only other failing checks when a failing check is named, and other cancelled checks when the named check is cancelled — Row agrees with the detail summary, which shows failing and cancelled separately (D-10)
-- [Phase 03]: 03-01: truncated contexts page, missing node, null rollup or failed query keeps the plain failing badge; a check name is never guessed — LIST-07 v1 limit accepted in D-02
-- [Phase 03]: 03-02: Step-2 failing-name behavior already held; tests pinned and proven by mutation, no production change — 03-01 implementation covered re-runs, truncation, partial errors, chunking, rate limit and cancel
-- [Phase 03]: 03-02: ciCell cuts only the check name with ansi.Truncate and keeps (cancelled) and +N; under 2 name cells it shows the cut plain badge — Display-width safe for CJK and ZWJ emoji; suffix carries cancelled/more information
-- [Phase 03]: 03-03: compact 'widen for columns' hint sits on the column-header line, not the header line — Keeps the header segments asserted by filter_test.go at 36 cells unchanged
-- [Phase 03]: 03-03: a compact row with no room for a ref draws only the marker and the REVIEW and CI glyphs — Approved/blocked/failing state stays visible down to 4 cells
-- [Phase 03]: 03-04: review logins lose [bot] like request names, so a re-requested bot shows once as pending
-- [Phase 03]: 03-04: PR holds a Reviewers slice, so PR values are no longer comparable with ==; tests compare with reflect.DeepEqual
-- [Phase 03]: 03-05: reviewers legend in the ? overlay is two lines, because the one-line text is 82 cells and wrapped mid-token at 80
-- [Phase 03]: 03-05: renderList cell and header tables are [colCount]string arrays indexed by column constant, so inserting a column cannot shift another column's data
-- [Phase 03]: Detail counts are the de-duplicated counts at every size (D-03 reading of D-08); paging to 5 pages keeps them exact to 500 runs, past that Read/Total disclose the partial read
-- [Phase 03]: A later Detail page that fails (not rate limit or cancel) keeps the earlier pages and sets Truncated; a rate limit or cancel on any page is returned
-- [Phase 03]: 03-07: openDetail takes the PR from Update so detail.go never reads the list row at the cursor
-- [Phase 03]: 03-07: r in the detail also refetches the detail when it failed with no data; footer drops whole hints from the end when help would overflow
-- [Phase 03]: D-12 'the list' is the rows on screen after the filters, so the no-longer-in-list note and the esc landing spot agree
-- [Phase 03]: A rate-limited detail error extends pausedUntil directly and arms no tick; the pending tick re-arms to the end of the pause
-- [Phase 03]: schedule() keeps a still-running pause, so a list result cannot end a pause a detail error set
-- [Phase 03]: A gone PR is not refetched; o still opens the detail PR's own URL
-- [Phase 03]: [03-09] Reuse Detail.Truncated for both partial-read causes (Read < Total and kept GraphQL error) so the UI renders 'read N of M runs' unchanged
-- [Phase 03]: 03-10: ServerWait goes straight to RateLimitFloor without timing (no snapshot reset fallback); Retry-After wins over reset on the detail path; detail pause ends at reset+1s
-- [Phase 03]: 03-10: fold line reads '+N more passing or skipped' (user UAT decision supersedes D-10 text); unknown checks always listed and counted in CheckCounts.Other
-- [Phase 03]: [03-11] Detail.Truncated means only 'check runs not read'; new Detail.Partial means 'a GraphQL error was kept'; the faint notice 'some details could not be loaded' goes in detailNotes under the title (supersedes 03-09 reuse of Truncated)
-- [Phase 04]: Provenance is a row property (PR.Auto, PR.Manual); the saved ref (PR.Watched) is kept apart from the canonical display ref (PR.Ref) so a repo rename cannot split one PR into two rows or make removal miss its entry
-- [Phase 04]: A Lookup that fails as a whole fails the whole refresh (previous rows stay); an unreadable watchlist.json reuses the last list read and warns, never treated as empty
-- [Phase 04]: [04-02] Clean and cut (40 runes) the GitHub error type before it becomes the short reason, so a hostile type cannot carry terminal escapes
-- [Phase 04]: [04-02] Reason priority per alias: SSO (FORBIDDEN with saml_failure true or SAML in message), then NOT_FOUND, then the first error's type
-- [Phase 04]: [04-03] Fetch results are discarded by epoch (fetchEpoch/mutEpoch), not by generation: a refresh that began before a local watch-list change is re-run, or the tick waits out a rate-limit pause
-- [Phase 04]: [04-03] A save that finds the PR already listed marks that row Manual with the saved ref; a visible new row gets no flash, hidden and already-watching outcomes do
-- [Phase 04]: Corrupt, unknown-version or oversized watchlist.json is copied once to watchlist.json.corrupt-HASH8 (O_EXCL, SHA-256 name); reads never write and Add over a backed-up file starts fresh
-- [Phase 04]: Watch list capped at 500 PRs: Load keeps the first 500 with a warning, Add refuses a 501st
-- [Phase 04]: Startup watch-list problems join config warnings in ui.Options.Warnings via watchWarnings; prv never exits for them
-- [Phase 04]: 04-05: Reconcile re-sorts only when it replaced a row with its last data (an always-sort reordered existing unsorted test fixtures; Fetch already sorts)
-- [Phase 04]: 04-05: unavailable rows are drawn by unavailLine after the table renders, with blank table cells so the reason never widens a column
-- [Phase 04]: 04-06: confirmKey closes the remove confirm before it reads the key, so only y removes, only ctrl+c quits and every other key (q included) cancels
-- [Phase 04]: 04-06: d remove hint left out of the footer and help; plan 04-07 adds it with the goldens
-- [Phase 04]: 04-07: the unavailable detail wraps the reason and Help text to the pane instead of cutting them, so the SSO hint stays whole at 60 columns
-- [Phase 04]: 04-07: the d remove footer hint shows only when the selected row is saved (Manual), the same test askRemove uses
-- [Phase 05]: 05-01: x/sys/unix flock (3 s wait, 10 ms poll, reads lock-free); version classified before entries decoded, version != 1 (0 and absent included) refused; backup via temp+sync+no-clobber link named by hash of bytes copied
-- [Phase 05]: 05-02: ui imports the leaf package internal/watchlist for Result and the sentinel errors (still never internal/github)
-- [Phase 05]: 05-02: started-over notice leads the footer text and uses warnFor (8 s); jumpTo takes the flash duration
-- [Phase 05]: 05-02: failed saves and removals show fixed phrases from saveReason, never err.Error()
+Full decision log for v1.0 is in PROJECT.md Key Decisions and the archived phase summaries (.planning/milestones/v1.0-phases/). Cleared at the v1.0 close.
 
 ### Pending Todos
 
@@ -179,9 +105,10 @@ None yet.
 
 ### Blockers/Concerns
 
+Carried into the next milestone (v1.0 closed as an override; see MILESTONES.md):
+
 - [Phase 3]: MERGE column vs github.com passed in 05-UAT #8. Still deferred (D-17): large-CI-matrix detail view, team review requests.
 - [Phase 4]: 1 UAT check deferred (04-UAT.md Deferred Follow-Ups): SAML SSO reason text on a real SSO-enforcing org.
-- [Phase 1]: Open code-review warnings (01-REVIEW-DISPOSITION.md): WR-01 unbounded hidden --closed-days, WR-02 empty state hides partial-fetch warnings, WR-03 footer integrity notes truncated first. Triage WR-02/WR-03 with Phase 2 footer/refresh work.
 - [Phase 1]: Badge fidelity vs github.com passed in 05-UAT #7. Still deferred (D-17): live assignee:@me, real 401 flow, ambiguous-width glyphs.
 - [Phase 2]: Of the 7 deferred UAT checks, 4 passed live in 05-UAT (failure marker, filter keys/paste, `o` in a browser, `?` overlay). Still deferred: live rate-limit pause (D-17), api footer/rate warning legibility (ROADMAP 999.1), live config edits (ROADMAP 999.2, deferred twice, never run live).
 - [Phase 1]: Throwaway test PR sbartram/prv#1 (branch uat/test-pr-scratch) is open; close with `gh pr close 1 --delete-branch`.
@@ -189,6 +116,7 @@ None yet.
 ### Roadmap Evolution
 
 - Phase 5 added: Address tech debt: watch-list locking + live smoke
+- v1.0 MVP archived 2026-10-14 (phases 1-5 → .planning/milestones/v1.0-phases/)
 
 ## Deferred Items
 
@@ -201,7 +129,7 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-10-14
-Stopped at: Phase 5 complete (UAT 7 passed, 2 deferred to backlog 999.1/999.2), ready for milestone audit
+Stopped at: Milestone v1.0 archived and tagged; next is /gsd-new-milestone
 Resume file: None
 
 ## Operator Next Steps
