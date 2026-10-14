@@ -82,3 +82,33 @@ func (c CI) Badge() string {
 	}
 	return "– no checks"
 }
+
+// Glyph returns the one-cell glyph at the start of the review badge. Compact
+// rows show it alone; TestGlyphPrefix keeps it equal to the badge's first
+// glyph.
+func (r Review) Glyph() string {
+	switch r {
+	case ReviewApproved:
+		return "✓"
+	case ReviewChangesRequested:
+		return "✗"
+	case ReviewRequired:
+		return "○"
+	}
+	return "–"
+}
+
+// Glyph returns the one-cell glyph at the start of the CI badge.
+func (c CI) Glyph() string {
+	switch c {
+	case CIPassing:
+		return "✓"
+	case CIFailing:
+		return "✗"
+	case CIRunning:
+		return "●"
+	case CIUnknown:
+		return "?"
+	}
+	return "–"
+}

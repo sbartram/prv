@@ -123,26 +123,60 @@ func TestQuitInEveryState(t *testing.T) {
 	}
 }
 
-func TestRetryOnlyInError(t *testing.T) {
-	for _, state := range []string{"loading", "list", "empty"} {
-		t.Run(state, func(t *testing.T) {
-			m := modelIn(t, state)
-			before := plain(m)
-			m2, cmd := m.Update(key("r"))
-			if cmd != nil {
-				t.Errorf("r in %s state returned a command", state)
+func TestRefreshKey(t *testing.T) {
+	// build returns a sized model in the named state and the fetcher behind it.
+	build := func(state string) (tea.Model, *fakeFetcher) {
+		f := &fakeFetcher{snap: onePR()}
+		var m tea.Model = New(context.Background(), f, Options{ClosedDays: 14})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		switch state {
+		case "list":
+			m, _ = m.Update(fetchedMsg{snap: onePR()})
+		case "empty":
+			m, _ = m.Update(fetchedMsg{snap: domain.Snapshot{Viewer: "octo"}})
+		case "error":
+			m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
+		}
+		return m, f
+	}
+
+	t.Run("loading: the first fetch is running, r does nothing", func(t *testing.T) {
+		m, f := build("loading")
+		m2, cmd := m.Update(key("r"))
+		if cmd != nil {
+			t.Error("r while the first fetch runs returned a command")
+		}
+		if f.calls != 0 {
+			t.Errorf("fetch calls = %d, want 0", f.calls)
+		}
+		if got := m2.(Model).gen; got != 0 {
+			t.Errorf("generation = %d, want 0", got)
+		}
+	})
+	for _, state := range []string{"list", "empty"} {
+		t.Run(state+": one fetch, merged while it runs", func(t *testing.T) {
+			m, f := build(state)
+			m, cmd := m.Update(key("r"))
+			if cmd == nil {
+				t.Fatalf("r in the %s state returned no command", state)
 			}
-			if after := plain(m2); after != before {
-				t.Errorf("r in %s state changed the screen", state)
+			if got := m.(Model).gen; got != 1 {
+				t.Errorf("generation after r = %d, want 1", got)
+			}
+			if _, again := m.Update(key("r")); again != nil {
+				t.Error("r while a refresh runs returned a command")
+			}
+			m = runCmd(m, cmd)
+			if f.calls != 1 {
+				t.Errorf("fetch calls = %d, want exactly 1", f.calls)
+			}
+			if v := plain(m); !strings.Contains(v, "acme/api#1") {
+				t.Errorf("after the refresh the screen is %q, want the list", v)
 			}
 		})
 	}
 	t.Run("error retries once", func(t *testing.T) {
-		f := &fakeFetcher{snap: onePR()}
-		var m tea.Model = New(context.Background(), f, Options{ClosedDays: 14})
-		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-		m, _ = m.Update(fetchedMsg{err: errors.New("boom")})
-
+		m, f := build("error")
 		m, cmd := m.Update(key("r"))
 		if cmd == nil {
 			t.Fatal("r in the error state returned no command")
@@ -170,6 +204,41 @@ func TestRetryOnlyInError(t *testing.T) {
 		m = runCmd(m, cmd)
 		if v := plain(m); !strings.Contains(v, "Could not load your PRs") || !strings.Contains(v, "still broken") {
 			t.Errorf("screen = %q", v)
+		}
+	})
+	t.Run("j and k still move", func(t *testing.T) {
+		snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{
+			{ID: "1", Ref: domain.Ref{Repo: "a/b", Number: 1}, Title: "one"},
+			{ID: "2", Ref: domain.Ref{Repo: "a/b", Number: 2}, Title: "two"},
+		}}
+		var m tea.Model = New(context.Background(), &fakeFetcher{}, Options{ClosedDays: 14})
+		m, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		m, _ = m.Update(fetchedMsg{snap: snap})
+		marked := func() string {
+			for _, l := range strings.Split(plain(m), "\n") {
+				if strings.HasPrefix(l, ">") {
+					return l
+				}
+			}
+			return ""
+		}
+		for _, k := range []string{"j", "down"} {
+			m, _ = m.Update(key("k"))
+			m, _ = m.Update(key(k))
+			if !strings.Contains(marked(), "a/b#2") {
+				t.Errorf("after %s the marker is on %q, want a/b#2", k, marked())
+			}
+		}
+		for _, k := range []string{"k", "up"} {
+			m, _ = m.Update(key("j"))
+			if k == "up" {
+				m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+			} else {
+				m, _ = m.Update(key(k))
+			}
+			if !strings.Contains(marked(), "a/b#1") {
+				t.Errorf("after %s the marker is on %q, want a/b#1", k, marked())
+			}
 		}
 	})
 }
@@ -216,9 +285,12 @@ func TestErrorPanelShowsHint(t *testing.T) {
 		if strings.Contains(v, "gh auth") {
 			t.Errorf("an error without Hint() must show no hint line:\n%s", v)
 		}
-		// Exactly: title, blank, message, blank, footer.
-		if got := strings.Count(strings.TrimRight(v, "\n"), "\n"); got != 4 {
-			t.Errorf("panel has %d line breaks, want 4:\n%s", got, v)
+		if !strings.Contains(v, "retrying at ") {
+			t.Errorf("panel does not say when it retries:\n%s", v)
+		}
+		// Exactly: title, blank, message, blank, retry line, blank, footer.
+		if got := strings.Count(strings.TrimRight(v, "\n"), "\n"); got != 6 {
+			t.Errorf("panel has %d line breaks, want 6:\n%s", got, v)
 		}
 	})
 }
@@ -251,8 +323,11 @@ func TestFooterNotes(t *testing.T) {
 	if strings.Contains(v, "list truncated") || strings.Contains(v, "some data could not be loaded") {
 		t.Errorf("a complete list must carry no notes:\n%s", v)
 	}
-	if !strings.Contains(v, "j/k move · q quit") {
-		t.Errorf("list footer missing:\n%s", v)
+	// The hint pieces are asserted apart: later plans insert bindings between them.
+	for _, want := range []string{"j/k move · r refresh", "q quit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list footer missing %q:\n%s", want, v)
+		}
 	}
 	if v := list(false, []string{"Some data could not be loaded: x"}); !strings.Contains(v, "some data could not be loaded") {
 		t.Errorf("warnings produce no note:\n%s", v)
@@ -273,5 +348,152 @@ func TestCanceledFetchIgnored(t *testing.T) {
 		if strings.Contains(v, "Could not load your PRs") || !strings.Contains(v, "Fetching your PRs…") {
 			t.Errorf("a canceled fetch must leave the screen alone, got:\n%s", v)
 		}
+	}
+}
+
+// testClock is a mutable clock for the config-warning tests.
+type testClock struct{ t time.Time }
+
+func (c *testClock) now() time.Time { return c.t }
+func (c *testClock) set(hh, mm, ss int) {
+	c.t = time.Date(2026, 10, 11, hh, mm, ss, 0, time.UTC)
+}
+
+// warnModel builds a sized model with config warnings, a test clock at
+// 12:00:00 and recorded timers.
+func warnModel(w, h int, warnings []string) (Model, *testClock, *afterRec) {
+	clk := &testClock{}
+	clk.set(12, 0, 0)
+	m := New(context.Background(), &fakeFetcher{}, Options{ClosedDays: 14, Now: clk.now, Warnings: warnings})
+	rec := &afterRec{}
+	m.after = rec.after
+	tm, _ := m.Update(tea.WindowSizeMsg{Width: w, Height: h})
+	return tm.(Model), clk, rec
+}
+
+func redraws(rec *afterRec) []time.Duration {
+	var out []time.Duration
+	for _, c := range rec.calls {
+		if _, ok := c.msg.(redrawMsg); ok {
+			out = append(out, c.d)
+		}
+	}
+	return out
+}
+
+const unknownKeyWarning = `config: unknown key "x"`
+
+func TestConfigWarningLifetime(t *testing.T) {
+	m, clk, rec := warnModel(120, 40, []string{unknownKeyWarning})
+
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the loading screen shows the warning:\n%s", v)
+	}
+	m.Init()
+	if len(rec.calls) != 0 {
+		t.Errorf("Init armed %d timers, want 0", len(rec.calls))
+	}
+
+	clk.set(12, 0, 2)
+	tm, _ := m.Update(fetchedMsg{snap: onePR()})
+	m = tm.(Model)
+	if v := plain(m); !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the footer after the first result lacks the warning:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 || got[0] != 8*time.Second {
+		t.Errorf("redraw timers = %v, want one 8s timer", got)
+	}
+
+	clk.set(12, 0, 9)
+	if v := plain(m); !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is gone at 12:00:09:\n%s", v)
+	}
+
+	clk.set(12, 0, 10)
+	tm, _ = m.Update(redrawMsg{})
+	m = tm.(Model)
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is still shown at 12:00:10:\n%s", v)
+	}
+
+	// A later result neither shows nor arms the warning again.
+	clk.set(12, 1, 0)
+	tm, _ = m.Update(fetchedMsg{snap: onePR()})
+	m = tm.(Model)
+	if v := plain(m); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("a second result shows the warning again:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 {
+		t.Errorf("redraw timers after a second result = %v, want still one", got)
+	}
+}
+
+func TestConfigWarningKeepsFlash(t *testing.T) {
+	const flash = "rate limited — resumes 12:30"
+
+	t.Run("wide pane shows both", func(t *testing.T) {
+		m, clk, _ := warnModel(120, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		tm, _ := m.Update(fetchedMsg{snap: onePR()})
+		m = tm.(Model)
+		m.setFlash(flash, 4*time.Second)
+		v := plain(m)
+		if !strings.Contains(v, flash) || !strings.Contains(v, unknownKeyWarning) {
+			t.Errorf("footer lacks the flash or the warning:\n%s", v)
+		}
+	})
+
+	t.Run("narrow pane keeps the flash and the note", func(t *testing.T) {
+		m, clk, _ := warnModel(50, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		snap := onePR()
+		snap.Truncated = true
+		tm, _ := m.Update(fetchedMsg{snap: snap})
+		m = tm.(Model)
+		m.setFlash(flash, 4*time.Second)
+		lines := strings.Split(plain(m), "\n")
+		footer := lines[len(lines)-1]
+		if !strings.Contains(footer, flash) || !strings.Contains(footer, "list truncated") {
+			t.Errorf("footer lost the flash or the note:\n%q", footer)
+		}
+		if strings.Contains(footer, unknownKeyWarning) {
+			t.Errorf("the whole warning fits where it should not:\n%q", footer)
+		}
+	})
+
+	t.Run("a cut warning ends with an ellipsis", func(t *testing.T) {
+		m, clk, _ := warnModel(60, 40, []string{unknownKeyWarning})
+		clk.set(12, 0, 2)
+		snap := onePR()
+		snap.Truncated = true
+		tm, _ := m.Update(fetchedMsg{snap: snap})
+		m = tm.(Model)
+		lines := strings.Split(plain(m), "\n")
+		footer := lines[len(lines)-1]
+		if !strings.Contains(footer, "list truncated") || !strings.Contains(footer, "config: ") || !strings.Contains(footer, "…") {
+			t.Errorf("want the note and a cut warning with …:\n%q", footer)
+		}
+	})
+}
+
+func TestConfigWarningOnErrorPanel(t *testing.T) {
+	m, clk, rec := warnModel(120, 40, []string{unknownKeyWarning})
+	clk.set(12, 0, 2)
+	tm, _ := m.Update(fetchedMsg{err: errors.New("boom")})
+	m = tm.(Model)
+	v := plain(m)
+	if !strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the error panel lacks the warning:\n%s", v)
+	}
+	if strings.Index(v, unknownKeyWarning) > strings.Index(v, "r retry · q quit") {
+		t.Errorf("the warning should sit above the key line:\n%s", v)
+	}
+	if got := redraws(rec); len(got) != 1 || got[0] != 8*time.Second {
+		t.Errorf("redraw timers = %v, want one 8s timer", got)
+	}
+	clk.set(12, 0, 10)
+	tm, _ = m.Update(redrawMsg{})
+	if v := plain(tm); strings.Contains(v, unknownKeyWarning) {
+		t.Errorf("the warning is still on the error panel at 12:00:10:\n%s", v)
 	}
 }

@@ -1,24 +1,24 @@
-prv · @octo · 30 PRs
-  PR          TITLE                           AUTHOR STATE  REVIEW     CI       
-> acme/api#1  Change number B                 alice  open   ✓ approved ✓ passing
-  acme/api#2  Change number C                 alice  open   ✓ approved ✓ passing
-  acme/api#3  Change number D                 alice  open   ✓ approved ✓ passing
-  acme/api#4  Change number E                 alice  open   ✓ approved ✓ passing
-  acme/api#5  long title long title long tit… alice  open   ✓ approved ✓ passing
-  acme/api#6  Change number G                 alice  open   ✓ approved ✓ passing
-  acme/api#7  数据迁移工具修复问题测试        alice  open   ✓ approved ✓ passing
-  acme/api#8  Change number I                 alice  open   ✓ approved ✓ passing
-  acme/api#9  Family 👨‍👩‍👧‍👦 sync and a long tail… alice  open   ✓ approved ✓ passing
-  acme/api#10 Change number K                 alice  open   ✓ approved ✓ passing
-  acme/api#11 [draft] Change number L         alice  open   ✓ approved ✓ passing
-  acme/api#12 Change number M                 alice  merged ✓ approved ✓ passing
-  acme/api#13 Change number N                 alice  open   ✓ approved ✓ passing
-  acme/api#14 Change number O                 alice  open   ✓ approved ✓ passing
-  acme/api#15 Change number P                 alice  open   ✓ approved ✓ passing
-  acme/api#16 Change number Q                 alice  open   ✓ approved ✓ passing
-  acme/api#17 Change number R                 alice  open   ✓ approved ✓ passing
-  acme/api#18 Change number S                 alice  open   ✓ approved ✓ passing
-  acme/api#19 Change number T                 alice  open   ✓ approved ✓ passing
-  acme/api#20 Change number U                 alice  open   ✓ approved ✓ passing
-  acme/api#21 Change number V                 alice  open   ✓ approved ✓ passing
-j/k move · q quit
+prv · @octo · [open merged closed] · 30 PRs · updated 14:32:05
+  PR          TITLE      REVIEW     REVIEWERS              MERGE       CI       
+> acme/api#1  Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#2  Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#3  Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#4  Change nu… ✓ approved ✗erin …frank           ✗ conflicts ✓ passing
+  acme/api#5  long titl… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#6  Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#7  数据迁移…  ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#8  Change nu… ✓ approved ✓bob                   ↓ behind    ✓ passing
+  acme/api#9  Family 👨‍👩‍👧‍👦… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#10 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#11 [draft] C… ✓ approved ✓bob                   –           ✓ passing
+  acme/api#12 Change nu… ✓ approved ✓bob                               ✓ passing
+  acme/api#13 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#14 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#15 Change nu… ✓ approved ✗erin …frank …gina +3  ✓ mergeable ✓ passing
+  acme/api#16 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#17 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#18 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#19 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#20 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+  acme/api#21 Change nu… ✓ approved ✓bob                   ✓ mergeable ✓ passing
+j/k move · r refresh · enter details · o open · a add · / PR # …        api 4812

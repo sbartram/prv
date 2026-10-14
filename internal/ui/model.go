@@ -6,7 +6,10 @@ package ui
 import (
 	"context"
 	"errors"
+	"time"
 
+	"charm.land/bubbles/v2/help"
+	bkey "charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
@@ -18,9 +21,36 @@ type Fetcher interface {
 	Fetch(ctx context.Context) (domain.Snapshot, error)
 }
 
+// DetailFetcher loads the detail of one pull request: every check and every
+// reviewer. It is optional: the model type-asserts its Fetcher, and a Fetcher
+// without the method shows "details not available" in the detail view.
+// *github.Client implements it.
+type DetailFetcher interface {
+	FetchDetail(ctx context.Context, id string) (domain.Detail, error)
+}
+
+// defaultInterval is the refresh interval when Options.Interval is zero. The
+// 15 s floor is the config package's job, so tests can use short intervals.
+const defaultInterval = 60 * time.Second
+
+// maxFilterDigits is how many digits the number prompt keeps. A PR number has
+// at most 7 digits in practice; a longer prefix matches nothing anyway.
+const maxFilterDigits = 7
+
+// warnFor is how long the config warnings stay on screen, counted from the
+// first fetch result: the loading screen has no footer to show them in.
+const warnFor = 8 * time.Second
+
 // Options configures the model.
 type Options struct {
 	ClosedDays int
+	Show       domain.StateSet  // states visible at launch; zero means domain.AllStates (D-12)
+	ConfigPath string           // display form of the config path, for the help overlay
+	Warnings   []string         // config warnings, shown for warnFor from the first fetch result (D-15)
+	Opener     Opener           // opens a PR URL in the browser; nil means "no browser available"
+	Interval   time.Duration    // zero means defaultInterval
+	Now        func() time.Time // nil means time.Now
+	Watchlist  Watchlist        // saves and removes manually added PRs; nil means adding is not available
 }
 
 type viewState int
@@ -37,108 +67,494 @@ type Model struct {
 	ctx     context.Context
 	fetcher Fetcher
 	opts    Options
+	keys    keyMap
+	help    help.Model // footer key hints, rendered from keys (D-17)
+	opener  Opener     // opens the selected PR in the browser (NAV-02)
 
-	state   viewState
-	loading bool
-	spin    spinner.Model
-	snap    domain.Snapshot
-	err     error
-	cursor  int
-	offset  int // index of the first visible row
-	w, h    int
+	state viewState
+	spin  spinner.Model
+	snap  domain.Snapshot
+	err   error
+	w, h  int
+
+	// show is which lifecycle states are visible (D-10). It lasts for the
+	// session only: nothing is written to disk (D-12).
+	show domain.StateSet
+
+	// numFilter is the digit prefix typed after "/" (D-11). The prompt is a
+	// hand-rolled buffer: it takes digits only, so nothing else from a key
+	// press or a paste is stored or drawn. prompting is true while the prompt
+	// line is open.
+	numFilter string
+	prompting bool
+	pkeys     promptKeys
+
+	// The add prompt (WATCH-04) takes free text and pastes. addSeq is bumped for
+	// every attempt and every close, so a result that arrives late is dropped.
+	watchlist Watchlist
+	add       addState
+	addSeq    int
+
+	// confirm is the remove confirm line (D-06): open from d until the next key.
+	confirm confirmState
+
+	// showHelp is true while the full-screen help overlay is open (D-17).
+	// Refreshes carry on behind it.
+	showHelp bool
+
+	// Selection is tracked by PR ref (D-03). selected is the source of truth;
+	// rebuild derives cursor from it after every snapshot. rows is what is on
+	// screen: snap.PRs after the filters.
+	selected domain.Ref
+	rows     []domain.PR
+	cursor   int // index of selected in rows; 0 when there are no rows
+	offset   int // index of the first visible row
+
+	// Refresh state. gen is bumped when a manual retry orphans the pending
+	// tick. Exactly one tick is pending: it is armed only from a fetch result
+	// of the current generation.
+	gen      int
+	inFlight bool
+	interval time.Duration
+	now      func() time.Time
+	after    func(time.Duration, tea.Msg) tea.Cmd
+	lastOK   time.Time // time of the last successful fetch
+	nextAt   time.Time // when the pending tick is due
+	failedAt time.Time // time of the last failed refresh while data is shown
+
+	// fetchEpoch is the epoch of the latest fetch started (Init's is 0). A
+	// result with an epoch below mutEpoch started before the last local
+	// watch-list change and is discarded (RESEARCH Pitfall 1).
+	fetchEpoch, mutEpoch int
+
+	// strikes counts, per saved ref (Key), the refreshes in a row that failed
+	// for that PR with an error other than not-found or SSO (D-12).
+	strikes map[domain.Ref]int
+
+	// Backoff state. failures counts consecutive failed fetches. While now is
+	// before pausedUntil no request goes out, not even on r. flash is a short
+	// message in the footer that expires at flashUntil.
+	failures    int
+	pausedUntil time.Time
+	flash       string
+	flashUntil  time.Time
+
+	// The detail view (DETL-01) replaces the list while detail.open. Its data
+	// comes from its own sequenced fetch: detailSeq is bumped for every start
+	// and every close, so a result that arrives late is dropped.
+	detail         detailState
+	detailSeq      int
+	detailInFlight bool
+
+	// Config warnings (D-15) have their own fields and footer segment, so a
+	// flash never overwrites them and they never hide a flash. warnUntil is
+	// zero until the first fetch result starts the clock.
+	configPath string
+	warnings   []string
+	warnUntil  time.Time
 }
 
-// New builds a Model that starts in the loading state.
+// backoffer is implemented by errors that know when to retry. ui declares it
+// so that it never imports internal/github. It returns the Retry-After delay,
+// the time the limit resets (zero when unknown), and whether the error is a
+// rate limit.
+type backoffer interface {
+	Backoff() (time.Duration, time.Time, bool)
+}
+
+// New builds a Model that starts in the loading state. Init starts the first
+// fetch, so the model starts with a fetch in flight.
 func New(ctx context.Context, f Fetcher, opts Options) Model {
 	if opts.ClosedDays <= 0 {
 		opts.ClosedDays = domain.DefaultClosedDays
 	}
+	interval := opts.Interval
+	if interval <= 0 {
+		interval = defaultInterval
+	}
+	now := opts.Now
+	if now == nil {
+		now = time.Now
+	}
+	h := help.New()
+	h.ShortSeparator = " · "
+	h.Styles = helpStyles()
+	show := opts.Show
+	if show == 0 {
+		show = domain.AllStates
+	}
 	return Model{
-		ctx:     ctx,
-		fetcher: f,
-		opts:    opts,
-		state:   stateLoading,
-		loading: true,
-		spin:    spinner.New(spinner.WithSpinner(spinner.Dot)),
+		show:       show,
+		warnings:   opts.Warnings,
+		ctx:        ctx,
+		fetcher:    f,
+		opts:       opts,
+		keys:       defaultKeys(),
+		pkeys:      defaultPromptKeys(),
+		watchlist:  opts.Watchlist,
+		help:       h,
+		opener:     opts.Opener,
+		state:      stateLoading,
+		inFlight:   true,
+		spin:       spinner.New(spinner.WithSpinner(spinner.Dot)),
+		interval:   interval,
+		configPath: opts.ConfigPath,
+		now:        now,
+		after:      afterTick,
 	}
 }
 
-type fetchedMsg struct {
-	snap domain.Snapshot
-	err  error
-}
-
-// fetchCmd runs one fetch. A panic inside the fetcher becomes an error with a
-// fixed message: the panic value is never shown, and the terminal is not left
-// in the alt screen.
-func (m Model) fetchCmd() tea.Cmd {
-	return func() (msg tea.Msg) {
-		defer func() {
-			if recover() != nil {
-				msg = fetchedMsg{err: errors.New("unexpected internal error while loading PRs")}
-			}
-		}()
-		snap, err := m.fetcher.Fetch(m.ctx)
-		return fetchedMsg{snap: snap, err: err}
-	}
-}
-
-// Init starts the spinner and the first fetch.
+// Init starts the spinner and the first fetch. It arms no tick: the first
+// result arms it.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.spin.Tick, m.fetchCmd())
+	return tea.Batch(m.spin.Tick, fetch(m.ctx, m.fetcher, m.gen, m.fetchEpoch))
 }
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "r":
-			if m.state == stateError && !m.loading {
-				m.state = stateLoading
-				m.loading = true
-				return m, tea.Batch(m.spin.Tick, m.fetchCmd())
+	case tea.PasteMsg:
+		if m.add.open {
+			m.addPaste(msg.Content)
+		} else if m.prompting {
+			for _, r := range msg.Content {
+				if r >= '0' && r <= '9' && len(m.numFilter) < maxFilterDigits {
+					m.numFilter += string(r)
+				}
 			}
-		case "j", "down":
-			if m.state == stateList && m.cursor < len(m.snap.PRs)-1 {
+			m.rebuild()
+		}
+	case tea.KeyPressMsg:
+		if m.showHelp {
+			// D-17: any key returns to the list and is consumed; q closes the
+			// overlay rather than quitting. Only ctrl+c still quits.
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m.showHelp = false
+			return m, nil
+		}
+		if m.add.open {
+			cmd := m.addKey(msg)
+			return m, cmd
+		}
+		if m.confirm.open {
+			cmd := m.confirmKey(msg)
+			return m, cmd
+		}
+		if m.prompting {
+			m.promptKey(msg)
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+		if m.detail.open {
+			return m.detailKey(msg)
+		}
+		switch {
+		case bkey.Matches(msg, m.keys.Quit):
+			return m, tea.Quit
+		case bkey.Matches(msg, m.keys.Help):
+			m.showHelp = true
+		case bkey.Matches(msg, m.keys.Open):
+			if len(m.rows) == 0 {
+				return m, nil
+			}
+			cmd := m.openURL(m.rows[m.cursor].URL)
+			return m, cmd
+		case bkey.Matches(msg, m.keys.Refresh):
+			cmd := m.manualRefresh()
+			return m, cmd
+		case bkey.Matches(msg, m.keys.Add):
+			if m.state == stateList || m.state == stateEmpty { // the prompt line exists on these screens only
+				cmd := m.openAdd()
+				return m, cmd
+			}
+		case bkey.Matches(msg, m.keys.Remove):
+			if m.state == stateList && len(m.rows) > 0 {
+				cmd := m.askRemove()
+				return m, cmd
+			}
+		case bkey.Matches(msg, m.keys.Filter):
+			if m.state == stateList { // the prompt line only exists on the list screens
+				m.prompting = true
+			}
+		case m.numFilter != "" && bkey.Matches(msg, m.keys.Clear):
+			m.numFilter = ""
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.ToggleOpen):
+			m.show = m.show.Toggle(domain.StateOpen)
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.ToggleMerged):
+			m.show = m.show.Toggle(domain.StateMerged)
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.ToggleClosed):
+			m.show = m.show.Toggle(domain.StateClosed)
+			m.rebuild()
+		case bkey.Matches(msg, m.keys.Enter):
+			if m.state == stateList && len(m.rows) > 0 {
+				cmd := m.openDetail(m.rows[m.cursor])
+				return m, cmd
+			}
+		case bkey.Matches(msg, m.keys.Down):
+			if m.state == stateList && m.cursor < len(m.rows)-1 {
 				m.cursor++
+				m.selected = m.rows[m.cursor].Ref
 				m.clampOffset()
 			}
-		case "k", "up":
+		case bkey.Matches(msg, m.keys.Up):
 			if m.state == stateList && m.cursor > 0 {
 				m.cursor--
+				m.selected = m.rows[m.cursor].Ref
 				m.clampOffset()
 			}
 		}
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.clampOffset()
+		if m.detail.open {
+			m.syncDetail()
+		}
 	case spinner.TickMsg:
-		if m.state == stateLoading {
+		if m.inFlight || m.state == stateLoading || m.add.checking || m.add.saving {
 			var cmd tea.Cmd
 			m.spin, cmd = m.spin.Update(msg)
 			return m, cmd
 		}
+	case tickMsg:
+		if msg.gen != m.gen || m.inFlight {
+			return m, nil
+		}
+		if now := m.now(); now.Before(m.pausedUntil) {
+			// The timer fired early: no request during a pause.
+			cmd := m.arm(m.pausedUntil.Sub(now))
+			return m, cmd
+		}
+		cmd := m.beginFetch()
+		return m, cmd
+	case openedMsg:
+		if msg.err != nil && !errors.Is(msg.err, context.Canceled) {
+			cmd := m.setFlash("could not open the browser", flashFor)
+			return m, cmd
+		}
+	case addCheckedMsg:
+		cmd := m.applyAddChecked(msg)
+		return m, cmd
+	case addSavedMsg:
+		cmd := m.applyAddSaved(msg)
+		return m, cmd
+	case removedMsg:
+		cmd := m.applyRemoved(msg)
+		return m, cmd
+	case detailMsg:
+		m.applyDetail(msg)
+	case redrawMsg:
+		// Nothing to change: Bubble Tea redraws after every Update, which
+		// lets an expired flash leave the footer.
+		return m, nil
 	case fetchedMsg:
 		if errors.Is(msg.err, context.Canceled) {
 			return m, nil // the program is quitting
 		}
-		m.loading = false
-		m.cursor, m.offset = 0, 0
-		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+		if msg.gen != m.gen {
 			return m, nil
+		}
+		m.inFlight = false
+		if msg.err == nil && msg.epoch < m.mutEpoch {
+			// The fetch started before a local watch-list change, so its list
+			// may lack the change: discard it and read again (RESEARCH Pitfall
+			// 1). During a rate-limit pause the one pending tick is armed to
+			// the end of the pause instead of a request going out.
+			if now := m.now(); now.Before(m.pausedUntil) {
+				cmd := m.arm(m.pausedUntil.Sub(now))
+				return m, cmd
+			}
+			cmd := m.beginFetch()
+			return m, cmd
+		}
+		if msg.err != nil {
+			m.err = msg.err
+			if !m.lastOK.IsZero() {
+				// Data has been shown: keep the rows and the state, undimmed.
+				m.failedAt = m.now()
+				cmd := tea.Batch(m.schedule(msg.err), m.startWarning())
+				return m, cmd
+			}
+			// No data yet: the error panel, and the tick retries on its own.
+			m.cursor, m.offset = 0, 0
+			m.state = stateError
+			cmd := tea.Batch(m.schedule(msg.err), m.startWarning())
+			return m, cmd
 		}
 		m.err = nil
+		m.failedAt = time.Time{}
+		// D-12: a saved PR that fails for another reason than not-found or SSO
+		// keeps its last data on the first failed refresh. An error, a discarded
+		// refresh and a fetch that was never applied do not reach this line, so
+		// none of them counts as a strike.
+		msg.snap.PRs, m.strikes = domain.Reconcile(m.snap.PRs, msg.snap.PRs, m.strikes)
 		m.snap = msg.snap
+		m.lastOK = m.now()
+		m.rebuild()
 		if len(msg.snap.PRs) == 0 {
 			m.state = stateEmpty
-			return m, nil
+		} else {
+			m.state = stateList
 		}
-		m.state = stateList
+		cmds := []tea.Cmd{m.schedule(nil), m.startWarning()}
+		if m.detail.open {
+			// D-11: the open detail follows the list, as its own Cmd.
+			cmds = append(cmds, m.refreshDetail())
+		}
+		return m, tea.Batch(cmds...)
 	}
 	return m, nil
+}
+
+// markMutation records a local watch-list change (an add or a removal): a fetch
+// that is running now started before it, so its result is discarded when it
+// arrives.
+func (m *Model) markMutation() { m.mutEpoch = m.fetchEpoch + 1 }
+
+// openURL opens raw in the browser, after safeURL has checked it. The launch
+// happens in the returned Cmd, never in Update.
+func (m *Model) openURL(raw string) tea.Cmd {
+	u, ok := safeURL(raw)
+	switch {
+	case !ok:
+		return m.setFlash("not a github.com link — not opened", flashFor)
+	case m.opener == nil:
+		return m.setFlash("no browser available", flashFor)
+	}
+	return openCmd(m.opener, u)
+}
+
+// manualRefresh is the r key: it merges with a running refresh, shows the
+// pause while a rate limit holds requests back, and otherwise orphans the
+// pending tick and starts a fetch.
+func (m *Model) manualRefresh() tea.Cmd {
+	if m.inFlight {
+		return nil // merges with the running refresh
+	}
+	if m.now().Before(m.pausedUntil) {
+		// D-08: no request during a pause; say when refreshing resumes.
+		return m.setFlash("rate limited — resumes "+m.clock(m.pausedUntil, "15:04"), flashFor)
+	}
+	m.gen++ // orphans the pending tick
+	if m.state == stateError {
+		m.state = stateLoading
+	}
+	return m.beginFetch()
+}
+
+// startWarning starts the config-warning clock on the first fetch result and
+// returns the Cmd that redraws the screen when the warning expires. Later
+// results return nil, so the warnings show once (D-15).
+func (m *Model) startWarning() tea.Cmd {
+	if len(m.warnings) == 0 || !m.warnUntil.IsZero() {
+		return nil
+	}
+	m.warnUntil = m.now().Add(warnFor)
+	return m.after(warnFor, redrawMsg{})
+}
+
+// promptKey handles one key press while the number prompt is open (D-11).
+// Digits are typed (1, 2 and 3 do not toggle), enter keeps the filter, esc
+// clears it, backspace deletes. Every other key is ignored; q does not quit.
+// The caller handles ctrl+c.
+func (m *Model) promptKey(msg tea.KeyPressMsg) {
+	switch {
+	case bkey.Matches(msg, m.pkeys.Accept):
+		m.prompting = false
+	case bkey.Matches(msg, m.pkeys.Cancel):
+		m.numFilter, m.prompting = "", false
+		m.rebuild()
+	case bkey.Matches(msg, m.pkeys.Delete):
+		if m.numFilter != "" {
+			m.numFilter = m.numFilter[:len(m.numFilter)-1]
+			m.rebuild()
+		}
+	default:
+		if r := []rune(msg.Text); len(r) == 1 && r[0] >= '0' && r[0] <= '9' && len(m.numFilter) < maxFilterDigits {
+			m.numFilter += string(r)
+			m.rebuild()
+		}
+	}
+}
+
+// schedule applies the backoff policy to the result of the current-generation
+// fetch (err is nil on success) and arms the one tick for the next refresh. It
+// also sets or clears the rate-limit pause.
+func (m *Model) schedule(err error) tea.Cmd {
+	out := domain.Outcome{Failed: err != nil}
+	if err == nil {
+		m.failures = 0
+	} else {
+		m.failures++
+		var b backoffer
+		if errors.As(err, &b) {
+			out.RetryAfter, out.ResetAt, out.RateLimited = b.Backoff()
+		}
+	}
+	d := domain.NextDelay(m.now(), m.interval, m.failures, m.snap.RateLimit, out)
+	prev := m.pausedUntil
+	m.pausedUntil = d.PausedUntil
+	if m.now().Before(prev) && prev.After(m.pausedUntil) {
+		m.pausedUntil = prev // a pause that a detail rate limit extended is still running
+	}
+	return m.arm(d.Wait)
+}
+
+// rebuild derives the rows on screen and the cursor from the snapshot, the
+// filters and the selected ref. A refresh that moves the selected PR moves the cursor with it;
+// when the PR left the list the cursor lands on its nearest surviving
+// neighbour in the old order (D-03).
+func (m *Model) rebuild() {
+	oldRows, oldCur := m.rows, m.cursor
+	m.rows = domain.Visible(m.snap.PRs, m.show, m.numFilter)
+	switch {
+	case len(m.rows) == 0:
+		// Keep m.selected: the PR may come back.
+		m.cursor, m.offset = 0, 0
+		return
+	case m.selected == (domain.Ref{}):
+		m.cursor = 0
+		m.selected = m.rows[0].Ref
+	default:
+		if i := indexOf(m.rows, m.selected); i >= 0 {
+			m.cursor = i
+		} else {
+			m.cursor = nearest(oldRows, oldCur, m.rows)
+			m.selected = m.rows[m.cursor].Ref
+		}
+	}
+	m.clampOffset()
+}
+
+// nearest returns the index in rows of the PR closest to oldRows[oldCur] that
+// is still present. At each distance it looks below first, then above. When no
+// old neighbour survived it keeps the old row index, clamped to the new list.
+// rows must not be empty.
+func nearest(oldRows []domain.PR, oldCur int, rows []domain.PR) int {
+	for d := 1; oldCur+d < len(oldRows) || oldCur-d >= 0; d++ {
+		for _, i := range []int{oldCur + d, oldCur - d} {
+			if i >= 0 && i < len(oldRows) {
+				if j := indexOf(rows, oldRows[i].Ref); j >= 0 {
+					return j
+				}
+			}
+		}
+	}
+	return min(oldCur, len(rows)-1)
+}
+
+// indexOf returns the index of ref in rows, or -1.
+func indexOf(rows []domain.PR, ref domain.Ref) int {
+	for i, pr := range rows {
+		if pr.Ref == ref {
+			return i
+		}
+	}
+	return -1
 }

@@ -1,0 +1,174 @@
+{
+ "data": {
+  "rateLimit": {
+   "limit": 5000,
+   "cost": 1,
+   "remaining": 4980,
+   "resetAt": "2026-10-11T13:00:00Z"
+  },
+  "r0": {
+   "pullRequest": {
+    "id": "PR_M1",
+    "number": 1,
+    "title": "PR_M1 title",
+    "url": "https://github.com/acme/api/pull/1",
+    "isDraft": false,
+    "state": "OPEN",
+    "createdAt": "2026-10-05T00:00:00Z",
+    "closedAt": null,
+    "mergedAt": null,
+    "updatedAt": "2026-10-11T11:00:00Z",
+    "repository": {
+     "nameWithOwner": "acme/api"
+    },
+    "author": {
+     "login": "hubot"
+    },
+    "reviewDecision": "APPROVED",
+    "mergeStateStatus": "CLEAN",
+    "mergeable": "MERGEABLE",
+    "latestOpinionatedReviews": {
+     "nodes": [
+      {
+       "state": "APPROVED",
+       "author": {
+        "login": "octo"
+       }
+      }
+     ]
+    },
+    "reviewRequests": {
+     "nodes": [
+      {
+       "requestedReviewer": {
+        "__typename": "User",
+        "login": "reviewer1"
+       }
+      }
+     ]
+    },
+    "statusCheckRollup": {
+     "state": "SUCCESS"
+    }
+   }
+  },
+  "r1": null,
+  "r2": {
+   "pullRequest": null
+  },
+  "r3": null,
+  "r4": {
+   "pullRequest": null
+  },
+  "r5": null,
+  "r6": null,
+  "r7": {
+   "pullRequest": {
+    "id": "PR_M7",
+    "number": 7,
+    "title": "PR_M7 title",
+    "url": "https://github.com/acme/api/pull/7",
+    "isDraft": false,
+    "state": "OPEN",
+    "createdAt": "2026-10-05T00:00:00Z",
+    "closedAt": null,
+    "mergedAt": null,
+    "updatedAt": "2026-10-11T11:00:00Z",
+    "repository": {
+     "nameWithOwner": "acme/api"
+    },
+    "author": {
+     "login": "hubot"
+    },
+    "reviewDecision": "APPROVED",
+    "mergeStateStatus": "CLEAN",
+    "mergeable": "MERGEABLE",
+    "latestOpinionatedReviews": {
+     "nodes": [
+      {
+       "state": "APPROVED",
+       "author": {
+        "login": "octo"
+       }
+      }
+     ]
+    },
+    "reviewRequests": {
+     "nodes": [
+      {
+       "requestedReviewer": {
+        "__typename": "User",
+        "login": "reviewer1"
+       }
+      }
+     ]
+    },
+    "statusCheckRollup": {
+     "state": "SUCCESS"
+    }
+   }
+  },
+  "r8": null
+ },
+ "errors": [
+  {
+   "type": "NOT_FOUND",
+   "path": [
+    "r1"
+   ],
+   "message": "Could not resolve to a Repository with the name 'ghost-org/nope'."
+  },
+  {
+   "type": "NOT_FOUND",
+   "path": [
+    "r2",
+    "pullRequest"
+   ],
+   "message": "Could not resolve to a PullRequest with the number of 99999999."
+  },
+  {
+   "type": "FORBIDDEN",
+   "path": [
+    "r3"
+   ],
+   "extensions": {
+    "saml_failure": true
+   },
+   "message": "Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization."
+  },
+  {
+   "type": "FORBIDDEN",
+   "path": [
+    "r4",
+    "pullRequest"
+   ],
+   "message": "Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization."
+  },
+  {
+   "type": "FORBIDDEN",
+   "path": [
+    "r5"
+   ],
+   "extensions": {
+    "saml_failure": false
+   },
+   "message": "Resource not accessible by personal access token"
+  },
+  {
+   "type": "SERVICE_UNAVAILABLE",
+   "path": [
+    "r6"
+   ],
+   "message": "Something went wrong"
+  },
+  {
+   "type": "FORBIDDEN",
+   "path": [
+    "r7",
+    "pullRequest",
+    "statusCheckRollup"
+   ],
+   "message": "Resource not accessible by integration"
+  }
+ ]
+}

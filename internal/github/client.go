@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -16,36 +17,56 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 )
 
+// WatchSource supplies the saved watch list. *watchlist.Store implements it.
+// Load runs inside Fetch, which runs in a tea.Cmd, so every refresh reads the
+// file (D-16).
+type WatchSource interface {
+	Load() ([]domain.Ref, []string, error)
+}
+
 // Options configures a Client.
 type Options struct {
 	Token      string
 	ClosedDays int
 	Now        func() time.Time
 	Transport  http.RoundTripper // nil means the default transport; tests inject a fake
+	Watch      WatchSource       // nil means no saved list
 }
 
 // Client fetches pull requests. It implements ui.Fetcher.
 type Client struct {
 	gql        *api.GraphQLClient
+	capture    *captureTransport
 	closedDays int
 	now        func() time.Time
+	watch      WatchSource
+
+	// lastRefs is the last list that Load returned, used when the file cannot be
+	// read: an unreadable file is never treated as an empty list.
+	mu       sync.Mutex
+	lastRefs []domain.Ref
 }
 
 // NewClient builds a Client. The token is passed explicitly and never logged:
 // LogIgnoreEnv stops GH_DEBUG from writing HTTP traffic over the screen, and
 // the response cache stays off so polling never shows stale data.
 func NewClient(opts Options) (*Client, error) {
+	base := opts.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	capture := &captureTransport{base: base}
 	gql, err := api.NewGraphQLClient(api.ClientOptions{
 		Host:         "github.com",
 		AuthToken:    opts.Token,
 		Timeout:      20 * time.Second,
 		LogIgnoreEnv: true,
-		Transport:    opts.Transport,
+		Transport:    capture,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating GitHub client: %w", err)
 	}
-	c := &Client{gql: gql, closedDays: opts.ClosedDays, now: opts.Now}
+	c := &Client{gql: gql, capture: capture, closedDays: opts.ClosedDays, now: opts.Now, watch: opts.Watch}
 	if c.closedDays <= 0 {
 		c.closedDays = domain.DefaultClosedDays
 	}
@@ -55,23 +76,31 @@ func NewClient(opts Options) (*Client, error) {
 	return c, nil
 }
 
+// prFields is the PullRequest field selection shared by the discovery query
+// and the Lookup query, so a looked-up PR maps exactly like a discovered one.
+const prFields = `id number title url isDraft state createdAt closedAt mergedAt updatedAt
+        repository { nameWithOwner }
+        author { login }
+        reviewDecision
+        mergeStateStatus mergeable
+        latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
+        reviewRequests(first: 20) { nodes { requestedReviewer { __typename
+          ... on User { login } ... on Bot { login } ... on Mannequin { login }
+          ... on Team { combinedSlug } ... on EnterpriseTeam { combinedSlug } } } }
+        statusCheckRollup { state }`
+
 // discoveryQuery is the query proven live in 01-SPIKE.md. The search string is
 // always passed as the variable $q, never concatenated into this document.
 const discoveryQuery = `query Watch($q: String!, $after: String) {
   viewer { login }
-  rateLimit { cost remaining resetAt }
+  rateLimit { limit cost remaining resetAt }
   search(query: $q, type: ISSUE_ADVANCED, first: 100, after: $after) {
     issueCount
     pageInfo { hasNextPage endCursor }
     nodes {
       __typename
       ... on PullRequest {
-        id number title url isDraft state closedAt mergedAt updatedAt
-        repository { nameWithOwner }
-        author { login }
-        reviewDecision
-        latestOpinionatedReviews(first: 20) { nodes { state author { login } } }
-        statusCheckRollup { state }
+        ` + prFields + `
       }
     }
   }
@@ -93,6 +122,7 @@ func BuildSearch(now time.Time, closedDays int) string {
 type wireResp struct {
 	Viewer    struct{ Login string }
 	RateLimit struct {
+		Limit     int
 		Cost      int
 		Remaining int
 		ResetAt   time.Time
@@ -115,19 +145,80 @@ type wireNode struct {
 	URL            string
 	IsDraft        bool
 	State          string
+	CreatedAt      time.Time
 	ClosedAt       time.Time
 	MergedAt       time.Time
 	UpdatedAt      time.Time
 	Repository     struct{ NameWithOwner string }
 	Author         *struct{ Login string }
 	ReviewDecision *string
+	// MergeStateStatus is "UNKNOWN" while GitHub computes it; DeriveMerge
+	// decides state and draft first (RESEARCH F4).
+	MergeStateStatus string
+	Mergeable        string
 	// Only the opinionated-review connection is requested on purpose: in the
 	// non-opinionated one a later COMMENTED review hides an earlier approval
 	// (01-SPIKE.md Q1).
-	LatestOpinionatedReviews struct {
-		Nodes []*struct{ State string }
+	LatestOpinionatedReviews struct{ Nodes []*wireReview }
+	ReviewRequests           struct{ Nodes []*wireRequest }
+	StatusCheckRollup        *struct{ State string }
+}
+
+// wireReview is one review. Author is null when the account was deleted.
+type wireReview struct {
+	State  string
+	Author *struct{ Login string }
+}
+
+// wireRequest is one review request. RequestedReviewer is a union: it is null
+// for a team the viewer cannot see (RESEARCH F6), a User, Bot or Mannequin has a
+// login, and a Team or EnterpriseTeam has a combinedSlug.
+type wireRequest struct {
+	RequestedReviewer *struct {
+		Typename     string `json:"__typename"`
+		Login        string
+		CombinedSlug string
 	}
-	StatusCheckRollup *struct{ State string }
+}
+
+// reviewInputs maps reviews for domain.MergeReviewers. A nil review is skipped
+// and a null author gives an empty login. Logins are cleaned here, once.
+func reviewInputs(nodes []*wireReview) []domain.ReviewInput {
+	var out []domain.ReviewInput
+	for _, r := range nodes {
+		if r == nil {
+			continue
+		}
+		in := domain.ReviewInput{State: r.State}
+		if r.Author != nil {
+			in.Login = domain.Clean(r.Author.Login)
+		}
+		out = append(out, in)
+	}
+	return out
+}
+
+// requestInputs maps review requests for domain.MergeReviewers. A nil
+// RequestedReviewer maps to the zero RequestInput, a hidden pending reviewer;
+// it is never dropped.
+func requestInputs(nodes []*wireRequest) []domain.RequestInput {
+	var out []domain.RequestInput
+	for _, r := range nodes {
+		if r == nil {
+			continue
+		}
+		q := r.RequestedReviewer
+		if q == nil {
+			out = append(out, domain.RequestInput{})
+			continue
+		}
+		name := q.Login
+		if q.Typename == "Team" || q.Typename == "EnterpriseTeam" {
+			name = q.CombinedSlug
+		}
+		out = append(out, domain.RequestInput{Typename: q.Typename, Name: domain.Clean(name)})
+	}
+	return out
 }
 
 // maxPages caps discovery at 5 pages of 100 results (cost 1 each). When more
@@ -135,8 +226,32 @@ type wireNode struct {
 // complete.
 const maxPages = 5
 
-// Fetch runs the discovery query page by page, de-duplicates by node id, keeps
-// the PRs inside the closed window and orders them for display.
+// savedRefs returns the saved refs for this refresh. The file is read on every
+// call. When it cannot be read, the snapshot gets a warning and the last list
+// that was read is used. Load's own warnings are not snapshot warnings: they are
+// shown once at startup.
+func (c *Client) savedRefs(snap *domain.Snapshot) []domain.Ref {
+	if c.watch == nil {
+		return nil
+	}
+	refs, _, err := c.watch.Load()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err != nil {
+		snap.Warnings = addWarning(snap.Warnings, "Watch list could not be read")
+		return slices.Clone(c.lastRefs)
+	}
+	c.lastRefs = slices.Clone(refs)
+	return refs
+}
+
+// Fetch runs the discovery query page by page, de-duplicates by node id, merges
+// in the saved watch list (the saved PRs that discovery did not return are looked
+// up, in chunks), keeps the PRs inside the closed window and orders them for
+// display. A Lookup that fails as a whole fails the refresh, so the rows on
+// screen stay. It then names
+// the failing check of every failing PR with a second query (D-01), inside the
+// same call, so the whole refresh stays one single-flight fetch.
 func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 	now := c.now() // one instant for every page and the window filter
 	vars := map[string]any{"q": BuildSearch(now, c.closedDays)}
@@ -147,6 +262,14 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 		var resp wireResp
 		err := c.gql.DoWithContext(ctx, discoveryQuery, vars, &resp)
 		if err != nil {
+			err = classify(err, c.capture.latest())
+			var ce *Error
+			isErr := errors.As(err, &ce)
+			if isErr && ce.Kind == KindRateLimited {
+				// On any page: never show a partial or truncated list while
+				// rate limited. The previous data stays and the model pauses.
+				return domain.Snapshot{}, err
+			}
 			if page > 1 {
 				if errors.Is(err, context.Canceled) {
 					return domain.Snapshot{}, err
@@ -158,8 +281,9 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 			}
 			// GitHub reports errors together with data: show the rows that loaded.
 			var ge *api.GraphQLError
-			if !errors.As(err, &ge) || (resp.Viewer.Login == "" && len(resp.Search.Nodes) == 0) {
-				return domain.Snapshot{}, classify(err)
+			if !isErr || ce.Kind != KindGraphQL || !errors.As(err, &ge) ||
+				(resp.Viewer.Login == "" && len(resp.Search.Nodes) == 0) {
+				return domain.Snapshot{}, err
 			}
 			msg := "Some data could not be loaded"
 			if len(ge.Errors) > 0 {
@@ -181,6 +305,7 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 			snap.PRs = append(snap.PRs, pr)
 		}
 		snap.RateLimit.Cost += pageSnap.RateLimit.Cost
+		snap.RateLimit.Limit = pageSnap.RateLimit.Limit
 		snap.RateLimit.Remaining = pageSnap.RateLimit.Remaining
 		snap.RateLimit.ResetAt = pageSnap.RateLimit.ResetAt
 
@@ -194,9 +319,23 @@ func (c *Client) Fetch(ctx context.Context) (domain.Snapshot, error) {
 		vars["after"] = resp.Search.PageInfo.EndCursor
 	}
 
+	for i := range snap.PRs {
+		snap.PRs[i].Auto = true
+	}
+	saved := c.savedRefs(&snap)
+	rest := domain.MarkWatched(snap.PRs, saved)
+	looked, err := c.lookupRefs(ctx, rest, &snap)
+	if err != nil {
+		return domain.Snapshot{}, err
+	}
+	snap.PRs = domain.Combine(snap.PRs, looked)
+
 	snap.PRs = slices.DeleteFunc(snap.PRs, func(pr domain.PR) bool {
 		return !domain.InWindow(pr, now, c.closedDays)
 	})
+	if err := c.fetchFailing(ctx, &snap); err != nil {
+		return domain.Snapshot{}, err
+	}
 	domain.Sort(snap.PRs)
 	return snap, nil
 }
@@ -213,6 +352,7 @@ func mapResponse(resp wireResp) domain.Snapshot {
 	snap := domain.Snapshot{
 		Viewer: domain.Clean(resp.Viewer.Login),
 		RateLimit: domain.RateLimit{
+			Limit:     resp.RateLimit.Limit,
 			Cost:      resp.RateLimit.Cost,
 			Remaining: resp.RateLimit.Remaining,
 			ResetAt:   resp.RateLimit.ResetAt,
@@ -222,37 +362,49 @@ func mapResponse(resp wireResp) domain.Snapshot {
 		if n == nil || n.Typename != "PullRequest" {
 			continue
 		}
-		author := "ghost"
-		if n.Author != nil {
-			author = domain.Clean(n.Author.Login)
-		}
-		decision := ""
-		if n.ReviewDecision != nil {
-			decision = *n.ReviewDecision
-		}
-		var reviewStates []string
-		for _, r := range n.LatestOpinionatedReviews.Nodes {
-			if r != nil {
-				reviewStates = append(reviewStates, r.State)
-			}
-		}
-		var rollup *string
-		if n.StatusCheckRollup != nil {
-			rollup = &n.StatusCheckRollup.State
-		}
-		snap.PRs = append(snap.PRs, domain.PR{
-			ID:        n.ID,
-			Ref:       domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
-			Title:     domain.Clean(n.Title),
-			URL:       n.URL,
-			Author:    author,
-			IsDraft:   n.IsDraft,
-			State:     domain.ParseState(n.State),
-			Review:    domain.DeriveReview(decision, reviewStates),
-			CI:        domain.ClassifyRollup(rollup),
-			UpdatedAt: n.UpdatedAt,
-			ClosedAt:  n.ClosedAt,
-		})
+		snap.PRs = append(snap.PRs, mapNode(n))
 	}
 	return snap
+}
+
+// mapNode maps one PullRequest node into a domain.PR. Every remote string is
+// cleaned here, at the seam.
+func mapNode(n *wireNode) domain.PR {
+	author := "ghost"
+	if n.Author != nil {
+		author = domain.Clean(n.Author.Login)
+	}
+	decision := ""
+	if n.ReviewDecision != nil {
+		decision = *n.ReviewDecision
+	}
+	var reviewStates []string
+	for _, r := range n.LatestOpinionatedReviews.Nodes {
+		if r != nil {
+			reviewStates = append(reviewStates, r.State)
+		}
+	}
+	var rollup *string
+	if n.StatusCheckRollup != nil {
+		rollup = &n.StatusCheckRollup.State
+	}
+	state := domain.ParseState(n.State)
+	return domain.PR{
+		ID:      n.ID,
+		Ref:     domain.Ref{Repo: domain.Clean(n.Repository.NameWithOwner), Number: n.Number},
+		Title:   domain.Clean(n.Title),
+		URL:     n.URL,
+		Author:  author,
+		IsDraft: n.IsDraft,
+		State:   state,
+		Review:  domain.DeriveReview(decision, reviewStates),
+		CI:      domain.ClassifyRollup(rollup),
+		Merge:   domain.DeriveMerge(state, n.IsDraft, n.MergeStateStatus, n.Mergeable),
+		// List rows never read latestReviews (RESEARCH F8): the third
+		// argument is for the detail view.
+		Reviewers: domain.MergeReviewers(reviewInputs(n.LatestOpinionatedReviews.Nodes), requestInputs(n.ReviewRequests.Nodes), nil),
+		CreatedAt: n.CreatedAt,
+		UpdatedAt: n.UpdatedAt,
+		ClosedAt:  n.ClosedAt,
+	}
 }

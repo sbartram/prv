@@ -1,0 +1,24 @@
+prv — keys and badges
+
+k/↑ up         /   PR #       enter details    ? help
+j/↓ down       esc clear #    esc   back       q quit
+r   refresh    1   open       j/k   scroll
+o   open       2   merged     e     expand
+a   add        3   closed
+d   remove
+
+Badges
+  review  ✓ approved  ✗ changes  ○ required  – none
+  ci      ✓ passing  ✗ failing  ● running  – no checks  ? unknown
+  merge   ✓ mergeable  ⊘ blocked  ↓ behind  ✗ conflicts  – unknown or draft
+  reviewers ✗ changes requested  … pending  ✓ approved
+            …team name hidden  +N more
+  checks    ✗ failing  ⊘ cancelled  ● running  ✓ passing  – skipped
+  [draft] draft PR · dimmed rows are drafts, merged or closed
+  + added by you; d removes it
+  ⚠ unavailable: a saved PR GitHub could not return; enter shows why
+
+config ~/.config/prv/config.toml · every 60s · 14 days
+api 4812 / 5000, resets 15:02
+
+press any key to return

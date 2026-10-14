@@ -1,0 +1,170 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-10-11T13:00:00Z"
+    },
+    "nodes": [
+      {
+        "__typename": "PullRequest",
+        "id": "PR_11",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 5,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "build",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 21,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T08:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "lint",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 22,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "test (ubuntu)",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "databaseId": 23,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "vet",
+                "status": "COMPLETED",
+                "conclusion": "TIMED_OUT",
+                "databaseId": 24,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              },
+              {
+                "__typename": "CheckRun",
+                "name": "build",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+                "databaseId": 25,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "ci"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_12",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 1,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "StatusContext",
+                "context": "ci/jenkins",
+                "state": "ERROR"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "id": "PR_16",
+        "statusCheckRollup": {
+          "state": "FAILURE",
+          "contexts": {
+            "totalCount": 1,
+            "pageInfo": {
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "__typename": "CheckRun",
+                "name": "deploy",
+                "status": "COMPLETED",
+                "conclusion": "CANCELLED",
+                "databaseId": 31,
+                "checkSuite": {
+                  "createdAt": "2026-10-11T09:00:00Z",
+                  "app": {
+                    "name": "GitHub Actions"
+                  },
+                  "workflowRun": {
+                    "workflow": {
+                      "name": "release"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

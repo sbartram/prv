@@ -1,0 +1,9 @@
+prv · @octo · [open merged closed] · 6 PRs · 2 unavailable · updated 14:32:05
+  PR               TITLE       STATE  REVIEW     REVIEWERS MERGE       CI       
+> + acme/gone#5    ⚠ unavailable: not found (deleted, renamed, or no access)    
+  + samlcorp/app#3 ⚠ unavailable: SSO: authorize your token for samlcorp        
+    acme/api#1     Rework the… open   ✗ changes            ⊘ blocked   ✗ failing
+  + octo/tools#42  Speed up t… open   ✓ approved           ✓ mergeable ✓ passing
+  + acme/api#7     Add retry … open   ○ required                       ● running
+  + octo/old#8     Drop the l… merged ✓ approved                       ✓ passing
+add PR: octo/new#7█   saving octo/new#7 ⣾ 

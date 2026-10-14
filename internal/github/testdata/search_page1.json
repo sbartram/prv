@@ -4,6 +4,7 @@
    "login": "octo"
   },
   "rateLimit": {
+   "limit": 5000,
    "cost": 1,
    "remaining": 4990,
    "resetAt": "2026-10-11T12:30:00Z"
@@ -23,6 +24,7 @@
      "url": "https://github.com/acme/api/pull/481",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-01T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-11T10:00:00Z",
@@ -36,7 +38,9 @@
      "latestOpinionatedReviews": {
       "nodes": []
      },
-     "statusCheckRollup": null
+     "statusCheckRollup": {
+      "state": "FAILURE"
+     }
     },
     {
      "__typename": "PullRequest",
@@ -46,6 +50,7 @@
      "url": "https://github.com/acme/web/pull/77",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-05T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-11T11:00:00Z",
@@ -73,6 +78,7 @@
      "url": "https://github.com/acme/old/pull/3",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2024-12-01T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2025-01-01T00:00:00Z",
@@ -94,6 +100,7 @@
      "url": "https://github.com/acme/b/pull/10",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-03T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-09T00:00:00Z",
@@ -117,6 +124,7 @@
      "url": "https://github.com/acme/a/pull/10",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-03T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-09T00:00:00Z",
@@ -140,6 +148,7 @@
      "url": "https://github.com/acme/a/pull/9",
      "isDraft": false,
      "state": "OPEN",
+     "createdAt": "2026-10-03T00:00:00Z",
      "closedAt": null,
      "mergedAt": null,
      "updatedAt": "2026-10-09T00:00:00Z",
@@ -163,6 +172,7 @@
      "url": "https://github.com/acme/one/pull/7",
      "isDraft": false,
      "state": "MERGED",
+     "createdAt": "2026-10-02T00:00:00Z",
      "closedAt": "2026-10-08T00:00:00Z",
      "mergedAt": "2026-10-08T00:00:00Z",
      "updatedAt": "2026-10-08T00:00:00Z",
@@ -186,6 +196,7 @@
      "url": "https://github.com/acme/two/pull/7",
      "isDraft": false,
      "state": "CLOSED",
+     "createdAt": "2026-10-06T00:00:00Z",
      "closedAt": "2026-10-07T00:00:00Z",
      "mergedAt": null,
      "updatedAt": "2026-10-07T00:00:00Z",

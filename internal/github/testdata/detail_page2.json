@@ -1,0 +1,1101 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4980,
+      "resetAt": "2026-10-11T13:00:00Z"
+    },
+    "node": {
+      "__typename": "PullRequest",
+      "id": "PR_11",
+      "latestOpinionatedReviews": {
+        "nodes": [
+          {
+            "state": "APPROVED",
+            "author": {
+              "__typename": "User",
+              "login": "alice"
+            }
+          }
+        ]
+      },
+      "latestReviews": {
+        "nodes": [
+          {
+            "state": "APPROVED",
+            "author": {
+              "__typename": "User",
+              "login": "alice"
+            }
+          }
+        ]
+      },
+      "reviewRequests": {
+        "nodes": []
+      },
+      "statusCheckRollup": {
+        "state": "FAILURE",
+        "contexts": {
+          "totalCount": 150,
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": ""
+          },
+          "nodes": [
+            {
+              "__typename": "CheckRun",
+              "name": "job-100",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2100,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-101",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2101,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-102",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2102,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-103",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2103,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-104",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2104,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-105",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2105,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-106",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2106,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-107",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2107,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-108",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2108,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-109",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2109,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-110",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2110,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-111",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2111,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-112",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2112,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-113",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2113,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-114",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2114,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-115",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2115,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-116",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2116,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-117",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2117,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-118",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2118,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-119",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2119,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-120",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2120,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-121",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2121,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-122",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2122,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-123",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2123,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-124",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2124,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-125",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2125,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-126",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2126,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-127",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2127,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-128",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2128,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-129",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2129,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-130",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2130,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-131",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2131,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-132",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2132,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-133",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2133,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-134",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2134,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-135",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2135,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-136",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2136,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-137",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2137,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-138",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2138,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-139",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2139,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-140",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2140,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-141",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2141,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-142",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2142,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-143",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2143,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-144",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2144,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-145",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2145,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-146",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2146,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-147",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2147,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "job-148",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2148,
+              "checkSuite": {
+                "createdAt": "2026-10-11T08:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            },
+            {
+              "__typename": "CheckRun",
+              "name": "build",
+              "status": "COMPLETED",
+              "conclusion": "SUCCESS",
+              "databaseId": 2100,
+              "checkSuite": {
+                "createdAt": "2026-10-11T09:00:00Z",
+                "app": {
+                  "name": "GitHub Actions"
+                },
+                "workflowRun": {
+                  "workflow": {
+                    "name": "ci"
+                  },
+                  "file": {
+                    "path": ".github/workflows/ci.yml"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

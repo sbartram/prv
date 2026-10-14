@@ -18,26 +18,99 @@ import (
 	"github.com/sbartram/prv/internal/domain"
 )
 
-// fixtureTransport serves the named testdata files in order and records the
-// request bodies.
+// failingNoneBody answers a FailingChecks request with no nodes. It has no
+// rateLimit block on purpose, so the cost and Limit assertions of the discovery
+// tests stay valid.
+const failingNoneBody = `{"data":{"nodes":[]}}`
+
+// opName returns the GraphQL operation name of a request body ("Watch",
+// "FailingChecks", "Detail"), or "" when the body is not a query.
+func opName(body []byte) string {
+	var payload struct {
+		Query string `json:"query"`
+	}
+	if json.Unmarshal(body, &payload) != nil {
+		return ""
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(payload.Query), "query ")
+	if !ok {
+		return ""
+	}
+	if i := strings.IndexAny(rest, "( {"); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
+}
+
+// fixtureTransport routes by operation. "Watch" requests are served from files
+// in order (only they count in calls and bodies); "FailingChecks" requests are
+// served from failing in order, then with failingNoneBody; "Detail" requests
+// are served from detail in order, and a request past the list fails the test.
+// "Lookup" requests are served from lookup in the same way.
 type fixtureTransport struct {
-	t      *testing.T
-	files  []string
-	calls  int
-	bodies [][]byte
+	t            *testing.T
+	files        []string
+	calls        int
+	bodies       [][]byte
+	failing      []string
+	failBodies   [][]byte
+	detail       []string
+	detailBodies [][]byte
+	lookup       []string
+	lookupBodies [][]byte
 }
 
 func (f *fixtureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	raw, _ := io.ReadAll(req.Body)
-	f.bodies = append(f.bodies, raw)
-	if f.calls >= len(f.files) {
-		f.t.Fatalf("unexpected request %d; only %d fixtures", f.calls+1, len(f.files))
+	var data []byte
+	switch op := opName(raw); op {
+	case "Watch":
+		f.bodies = append(f.bodies, raw)
+		if f.calls >= len(f.files) {
+			f.t.Fatalf("unexpected request %d; only %d fixtures", f.calls+1, len(f.files))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.files[f.calls]))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+		f.calls++
+	case "FailingChecks":
+		n := len(f.failBodies)
+		f.failBodies = append(f.failBodies, raw)
+		data = []byte(failingNoneBody)
+		if n < len(f.failing) {
+			var err error
+			data, err = os.ReadFile(filepath.Join("testdata", f.failing[n]))
+			if err != nil {
+				f.t.Fatal(err)
+			}
+		}
+	case "Detail":
+		n := len(f.detailBodies)
+		f.detailBodies = append(f.detailBodies, raw)
+		if n >= len(f.detail) {
+			f.t.Fatalf("unexpected Detail request %d; only %d fixtures", n+1, len(f.detail))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.detail[n]))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+	case "Lookup":
+		n := len(f.lookupBodies)
+		f.lookupBodies = append(f.lookupBodies, raw)
+		if n >= len(f.lookup) {
+			f.t.Fatalf("unexpected Lookup request %d; only %d fixtures", n+1, len(f.lookup))
+		}
+		var err error
+		data, err = os.ReadFile(filepath.Join("testdata", f.lookup[n]))
+		if err != nil {
+			f.t.Fatal(err)
+		}
+	default:
+		f.t.Fatalf("unexpected operation %q", op)
 	}
-	data, err := os.ReadFile(filepath.Join("testdata", f.files[f.calls]))
-	if err != nil {
-		f.t.Fatal(err)
-	}
-	f.calls++
 	return &http.Response{
 		StatusCode: 200,
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
@@ -158,9 +231,14 @@ func TestCleanAtSeam(t *testing.T) {
 	if !strings.Contains(pr.Title, "title x") {
 		t.Errorf("Title = %q, want the tab turned into a space", pr.Title)
 	}
+	// go-gh shows the ESC as a visible "^[" (see above); the bidi override is gone.
+	if got := reviewerNames(pr); !slices.Equal(got, []string{"req^[[2Juser", "rev^[[31miewer"}) {
+		t.Errorf("PR 18 reviewer names = %q, want [req^[[2Juser rev^[[31miewer]", got)
+	}
 	all := []string{snap.Viewer}
 	for _, p := range snap.PRs {
 		all = append(all, p.Title, p.Author, p.Ref.Repo)
+		all = append(all, reviewerNames(p)...)
 	}
 	for _, s := range all {
 		if why := noUnsafe(s); why != "" {
@@ -201,13 +279,25 @@ func TestMapperCleansRemoteStrings(t *testing.T) {
 	if pr.Ref.Repo != "acme/repo" {
 		t.Errorf("Repo = %q, want %q", pr.Ref.Repo, "acme/repo")
 	}
+	if got := reviewerNames(pr); !slices.Equal(got, []string{"requser", "reviewer"}) {
+		t.Errorf("Reviewer names = %q, want [requser reviewer]", got)
+	}
 	for _, p := range snap.PRs {
-		for _, s := range []string{p.Title, p.Author, p.Ref.Repo} {
+		for _, s := range append([]string{p.Title, p.Author, p.Ref.Repo}, reviewerNames(p)...) {
 			if why := noUnsafe(s); why != "" {
 				t.Errorf("mapped string %q has a %s", s, why)
 			}
 		}
 	}
+}
+
+// reviewerNames returns the names of a PR's reviewers, in order.
+func reviewerNames(pr domain.PR) []string {
+	var out []string
+	for _, r := range pr.Reviewers {
+		out = append(out, r.Name)
+	}
+	return out
 }
 
 func refs(snap domain.Snapshot) []string {
@@ -227,7 +317,7 @@ func TestMembership(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"acme/web#77", "acme/api#481", "deps/bot#1", "acme/a#9", "acme/a#10", "acme/b#10",
+		"acme/api#481", "deps/bot#1", "acme/web#77", "acme/a#9", "acme/a#10", "acme/b#10",
 		"acme/old#3", "acme/one#7", "acme/api#500", "acme/two#7", "acme/api#503",
 	}
 	if got := refs(snap); !slices.Equal(got, want) {
@@ -248,6 +338,13 @@ func TestMembership(t *testing.T) {
 	}
 	if got := byRef["deps/bot#1"].Author; got != "dependabot" {
 		t.Errorf("deps/bot#1 author = %q, want dependabot", got)
+	}
+	// createdAt comes from the query and is kept at full precision.
+	if got, want := byRef["acme/api#481"].CreatedAt, time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("acme/api#481 CreatedAt = %v, want %v", got, want)
+	}
+	if got, want := byRef["deps/bot#1"].CreatedAt, time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("deps/bot#1 CreatedAt = %v, want %v", got, want)
 	}
 	// Same number in two repositories gives two rows.
 	if _, ok := byRef["acme/one#7"]; !ok {
@@ -276,6 +373,30 @@ func TestMembership(t *testing.T) {
 	}
 	if snap.Truncated {
 		t.Error("two pages ending in hasNextPage false must not be truncated")
+	}
+}
+
+// TestFetchAttentionOrder: Fetch hands rows back in D-01 bucket order, and the
+// discovery query asks for createdAt (the D-02 tie-break key).
+func TestFetchAttentionOrder(t *testing.T) {
+	c, tr := newFixtureClient(t, "status.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.PRs) < 2 {
+		t.Fatalf("fixture gave %d PRs, want several", len(snap.PRs))
+	}
+	prev := 0
+	for _, pr := range snap.PRs {
+		b := domain.Bucket(pr)
+		if b < prev {
+			t.Errorf("%s is in bucket %d after bucket %d: order is not attention order", pr.Ref, b, prev)
+		}
+		prev = b
+	}
+	if len(tr.bodies) == 0 || !strings.Contains(string(tr.bodies[0]), "createdAt") {
+		t.Error("the discovery query must request createdAt")
 	}
 }
 
@@ -323,16 +444,196 @@ func TestTruncatedAfterFivePages(t *testing.T) {
 }
 
 func TestRateLimitDecoded(t *testing.T) {
-	c, _ := newFixtureClient(t, "search_page1.json", "search_page2.json")
+	c, tr := newFixtureClient(t, "search_page1.json", "search_page2.json")
 	snap, err := c.Fetch(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	rl := snap.RateLimit
-	if rl.Cost != 2 || rl.Remaining != 4989 {
-		t.Errorf("RateLimit cost/remaining = %d/%d, want 2/4989", rl.Cost, rl.Remaining)
+	if rl.Limit != 5000 || rl.Cost != 2 || rl.Remaining != 4989 {
+		t.Errorf("RateLimit limit/cost/remaining = %d/%d/%d, want 5000/2/4989", rl.Limit, rl.Cost, rl.Remaining)
 	}
 	if want := time.Date(2026, 10, 11, 13, 0, 0, 0, time.UTC); !rl.ResetAt.Equal(want) {
 		t.Errorf("ResetAt = %v, want %v", rl.ResetAt, want)
+	}
+	if len(tr.bodies) == 0 || !strings.Contains(string(tr.bodies[0]), "rateLimit { limit cost remaining resetAt }") {
+		t.Error("the discovery query must request rateLimit { limit cost remaining resetAt }")
+	}
+	// status.json carries no limit field on purpose: it decodes as 0.
+	snap, _ = fetchStatus(t)
+	if snap.RateLimit.Limit != 0 {
+		t.Errorf("Limit without a limit field = %d, want 0", snap.RateLimit.Limit)
+	}
+}
+
+// TestMergeMapping: Fetch maps mergeStateStatus and mergeable through
+// DeriveMerge, deciding state and draft first (D-07, RESEARCH F4/F5).
+func TestMergeMapping(t *testing.T) {
+	c, tr := newFixtureClient(t, "blockers.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]domain.Merge{
+		1: domain.MergeMergeable, 2: domain.MergeMergeable, 3: domain.MergeMergeable,
+		4: domain.MergeBlocked, 5: domain.MergeBehind, 6: domain.MergeConflicts,
+		7: domain.MergeUnknown, 8: domain.MergeConflicts, 9: domain.MergeUnknown,
+		10: domain.MergeNone, 11: domain.MergeNone, 12: domain.MergeUnknown,
+	}
+	if len(snap.PRs) != len(want) {
+		t.Fatalf("PRs = %d, want %d", len(snap.PRs), len(want))
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Merge; got != want[pr.Ref.Number] {
+			t.Errorf("PR %d Merge = %q, want %q", pr.Ref.Number, got.Badge(), want[pr.Ref.Number].Badge())
+		}
+	}
+	if len(tr.failBodies) != 0 {
+		t.Errorf("FailingChecks requests = %d, want 0 (no failing rollup in the fixture)", len(tr.failBodies))
+	}
+	for _, field := range []string{"mergeStateStatus mergeable"} {
+		if !strings.Contains(string(tr.bodies[0]), field) {
+			t.Errorf("the discovery query must request %q", field)
+		}
+	}
+}
+
+// TestReviewerMapping: Fetch merges latestOpinionatedReviews and reviewRequests
+// into D-06 order, pending wins over an old review, and a null requested
+// reviewer is a hidden pending reviewer, never dropped.
+func TestReviewerMapping(t *testing.T) {
+	c, tr := newFixtureClient(t, "blockers.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending := func(n string) domain.Reviewer { return domain.Reviewer{Name: n} }
+	hidden := domain.Reviewer{Kind: domain.ReviewerHidden}
+	want := map[int][]domain.Reviewer{
+		1: {pending("carol"), {Name: "alice", State: domain.ReviewerApproved}},
+		2: {{Name: "bob", State: domain.ReviewerChangesRequested}, pending("alice")},
+		3: {{Name: "acme/core", Kind: domain.ReviewerTeam}, hidden, hidden},
+		4: {pending("renovate")},
+		5: nil,
+		6: {pending("old-user"), {Name: "ent/reviewers", Kind: domain.ReviewerTeam}},
+		7: {{Name: "octo", State: domain.ReviewerApproved}},
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Reviewers; !slices.Equal(got, want[pr.Ref.Number]) {
+			t.Errorf("PR %d Reviewers =\n%v\nwant\n%v", pr.Ref.Number, got, want[pr.Ref.Number])
+		}
+	}
+	body := string(tr.bodies[0])
+	for _, field := range []string{"reviewRequests(first: 20)", "combinedSlug", "requestedReviewer", "__typename"} {
+		if !strings.Contains(body, field) {
+			t.Errorf("the discovery query must request %q", field)
+		}
+	}
+}
+
+// TestNoFailingNoRequest: a refresh in which no listed PR has a FAILURE or
+// ERROR rollup sends no FailingChecks request (D-01).
+func TestNoFailingNoRequest(t *testing.T) {
+	c, tr := newFixtureClient(t, "search_page2.json")
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.PRs) == 0 {
+		t.Fatal("no PRs: the test would prove nothing")
+	}
+	if len(tr.failBodies) != 0 {
+		t.Errorf("FailingChecks requests = %d, want 0", len(tr.failBodies))
+	}
+	for _, pr := range snap.PRs {
+		if pr.Failing != (domain.FailingCheck{}) {
+			t.Errorf("%s Failing = %+v, want the zero value", pr.Ref, pr.Failing)
+		}
+	}
+}
+
+// TestFailingNames: step 2 names the failing check of every failing PR, from
+// the de-duplicated contexts, with one request carrying all three ids.
+func TestFailingNames(t *testing.T) {
+	c, tr := newFixtureClient(t, "status.json")
+	tr.failing = []string{"failing_contexts.json"}
+	snap, err := c.Fetch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]domain.FailingCheck{
+		11: {Known: true, Name: "lint", More: 2},           // build failed, then passed in a newer suite
+		12: {Known: true, Name: "ci/jenkins"},              // a commit status
+		16: {Known: true, Name: "deploy", Cancelled: true}, // only a cancelled job
+	}
+	for _, pr := range snap.PRs {
+		if got := pr.Failing; got != want[pr.Ref.Number] {
+			t.Errorf("PR %d Failing = %+v, want %+v", pr.Ref.Number, got, want[pr.Ref.Number])
+		}
+	}
+	if len(tr.failBodies) != 1 {
+		t.Fatalf("FailingChecks requests = %d, want 1", len(tr.failBodies))
+	}
+	var payload struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal(tr.failBodies[0], &payload); err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := payload.Variables["ids"].([]any)
+	if !slices.Equal(ids, []any{"PR_11", "PR_12", "PR_16"}) {
+		t.Errorf("variables.ids = %v, want [PR_11 PR_12 PR_16]", ids)
+	}
+	for _, id := range []string{"PR_11", "PR_12", "PR_16"} {
+		if strings.Contains(payload.Query, id) {
+			t.Errorf("query text contains %s: ids must travel only as a variable", id)
+		}
+	}
+	// The row's colour and bucket still come from the rollup: PR 16 is failing.
+	for _, pr := range snap.PRs {
+		if pr.Ref.Number == 16 && pr.CI != domain.CIFailing {
+			t.Errorf("PR 16 CI = %v, want failing even when only a cancelled check is named", pr.CI)
+		}
+	}
+	// Cost is summed over both queries (1 + 1); limit and remaining come from
+	// the step-2 response, because status.json carries no limit.
+	if snap.RateLimit.Cost != 2 || snap.RateLimit.Limit != 5000 || snap.RateLimit.Remaining != 4987 {
+		t.Errorf("RateLimit = %+v, want cost 2, limit 5000, remaining 4987 from the step-2 response", snap.RateLimit)
+	}
+}
+
+// TestFailingCleansNames calls mapContext directly, bypassing go-gh's own
+// sanitiser, so the mapper's domain.Clean calls are what get tested.
+func TestFailingCleansNames(t *testing.T) {
+	run := mapContext(&wireContext{
+		Typename: "CheckRun", Name: "li\x1b[31mnt‮", Status: "COMPLETED", Conclusion: "FAILURE", DatabaseID: 3,
+		CheckSuite: &wireSuite{
+			CreatedAt: time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC),
+			App:       &struct{ Name string }{"App\x1b[1m‭"},
+			WorkflowRun: &struct {
+				Workflow *struct{ Name string }
+				File     *struct{ Path string }
+			}{Workflow: &struct{ Name string }{"c\x1b[0mi⁦"}},
+		},
+	})
+	if run.Name != "lint" || run.Workflow != "ci" {
+		t.Errorf("check run Name/Workflow = %q/%q, want lint/ci", run.Name, run.Workflow)
+	}
+	appOnly := mapContext(&wireContext{
+		Typename: "CheckRun", Name: "x", Status: "COMPLETED", Conclusion: "SUCCESS",
+		CheckSuite: &wireSuite{App: &struct{ Name string }{"App\x1b[1m‭"}},
+	})
+	if appOnly.Workflow != "App" {
+		t.Errorf("Workflow without a workflow run = %q, want the app name %q", appOnly.Workflow, "App")
+	}
+	status := mapContext(&wireContext{Typename: "StatusContext", Context: "ci/je\x1b[2Jnkins‮", State: "ERROR"})
+	if status.Name != "ci/jenkins" || !status.Context || status.State != domain.CheckFailing {
+		t.Errorf("status context = %+v, want Name ci/jenkins, Context true, failing", status)
+	}
+	for _, s := range []string{run.Name, run.Workflow, appOnly.Workflow, status.Name} {
+		if why := noUnsafe(s); why != "" {
+			t.Errorf("mapped string %q has a %s", s, why)
+		}
 	}
 }
