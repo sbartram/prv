@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: "Address tech debt: watch-list locking + live smoke"
-status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-10-14T03:41:23.940Z"
+status: verifying
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-10-14T03:49:32.516Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 05 execution started
-state_head: 1a7d04d9e72ffaf9f9f586b64cf8c247ecad3af0
+state_head: 73d8b4d8ffcd6a335e3ba81b8a6008b2b8123015
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
   percent: 80
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-13)
 
 Phase: 05 (Address tech debt: watch-list locking + live smoke) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-13 — Phase 05 execution started
 
 Progress: [████████░░] 80%
@@ -93,6 +93,7 @@ Progress: [████████░░] 80%
 | Phase 04 P07 | 20 min | 2 tasks | 49 files |
 | Phase 05 P01 | 4 min | 2 tasks | 5 files |
 | Phase 05 P03 | 5 min | 3 tasks | 4 files |
+| Phase 05 P02 | 6 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,9 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-07: the unavailable detail wraps the reason and Help text to the pane instead of cutting them, so the SSO hint stays whole at 60 columns
 - [Phase 04]: 04-07: the d remove footer hint shows only when the selected row is saved (Manual), the same test askRemove uses
 - [Phase 05]: 05-01: x/sys/unix flock (3 s wait, 10 ms poll, reads lock-free); version classified before entries decoded, version != 1 (0 and absent included) refused; backup via temp+sync+no-clobber link named by hash of bytes copied
+- [Phase 05]: 05-02: ui imports the leaf package internal/watchlist for Result and the sentinel errors (still never internal/github)
+- [Phase 05]: 05-02: started-over notice leads the footer text and uses warnFor (8 s); jumpTo takes the flash duration
+- [Phase 05]: 05-02: failed saves and removals show fixed phrases from saveReason, never err.Error()
 
 ### Pending Todos
 
@@ -198,6 +202,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-14T03:41:23.873Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-10-14T03:49:32.453Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
