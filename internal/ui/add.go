@@ -36,6 +36,7 @@ const maxAddRunes = 256
 // on screen; checking is true from enter until the PR is checked and saved.
 type addState struct {
 	open, checking bool
+	saving         bool // stub for the RED commit: not set yet
 	text           string
 	ref            domain.Ref // the ref being checked
 	errText        string     // why the last attempt failed; the typed text stays

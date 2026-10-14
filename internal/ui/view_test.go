@@ -482,6 +482,15 @@ func stateModel(t *testing.T, state string, w, h int) Model {
 		m, _ = m.Update(tea.PasteMsg{Content: "acme/api#42"})
 		m, _ = m.Update(special(tea.KeyEnter))
 		return m.(Model)
+	case "add-saving":
+		// The save Cmd is not run: the answer never arrives.
+		m, _ := watchModel(t, &addFetcher{snap: fixtureWatch()}, w, h).Update(key("a"))
+		m, _ = m.Update(tea.PasteMsg{Content: "octo/new#7"})
+		m, _ = m.Update(special(tea.KeyEnter))
+		ref := domain.Ref{Repo: "octo/new", Number: 7}
+		m, _ = m.Update(addCheckedMsg{seq: m.(Model).addSeq, ref: ref,
+			pr: domain.PR{ID: "PR_NEW7", Ref: ref, Title: "New", URL: "https://github.com/octo/new/pull/7", State: domain.StateOpen}})
+		return m.(Model)
 	case "add-error":
 		m, _ := watchModel(t, &addFetcher{snap: fixtureWatch()}, w, h).Update(key("a"))
 		m, _ = m.Update(tea.PasteMsg{Content: "github.com/o/r/issues/3"})
@@ -530,7 +539,7 @@ func TestGolden(t *testing.T) {
 	sizes := [][2]int{{60, 15}, {80, 24}, {120, 40}, {0, 0}}
 	for _, state := range []string{"loading", "error", "empty", "list", "filtered", "prompt", "detail", "detail-expanded",
 		"detail-loading", "detail-error", "detail-gone", "detail-scrolled", "detail-partial",
-		"watch", "add-checking", "add-error", "confirm", "watch-detail"} {
+		"watch", "add-checking", "add-error", "add-saving", "confirm", "watch-detail"} {
 		for _, sz := range sizes {
 			name := state + "_" + itoa(sz[0]) + "x" + itoa(sz[1])
 			t.Run(name, func(t *testing.T) {

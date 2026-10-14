@@ -728,6 +728,86 @@ func TestAddEscDropsLateResult(t *testing.T) {
 	}
 }
 
+// savingModel submits octo/tools#42, delivers the lookup answer and returns the
+// model in the saving state, with the save Cmd that has not run yet.
+func savingModel(t *testing.T, w *memWatch) (tea.Model, tea.Cmd) {
+	t.Helper()
+	f := &addFetcher{pr: toolsPR(domain.StateOpen)}
+	m, _ := submit(addModel(t, f, w, addSnap()), "octo/tools#42")
+	m, save := m.Update(addCheckedMsg{seq: m.(Model).addSeq, ref: domain.Ref{Repo: "octo/tools", Number: 42}, pr: toolsPR(domain.StateOpen)})
+	return m, save
+}
+
+// TestAddEscIgnoredWhileSaving: once the save is dispatched, esc, typed keys and
+// paste change nothing and the result applies (D-05, WR-05). ctrl+c still quits.
+func TestAddEscIgnoredWhileSaving(t *testing.T) {
+	w := &memWatch{added: true}
+	m, save := savingModel(t, w)
+	if save == nil {
+		t.Fatal("the lookup answer returned no save Cmd")
+	}
+	if mm := m.(Model); !mm.add.saving || mm.add.checking {
+		t.Fatalf("saving = %v, checking = %v, want true, false", mm.add.saving, mm.add.checking)
+	}
+
+	m, _ = m.Update(special(tea.KeyEscape))
+	if !addOpen(m) || !m.(Model).add.saving {
+		t.Fatal("esc closed the prompt or ended the saving state")
+	}
+	m, _ = m.Update(key("x"))
+	m, _ = m.Update(tea.PasteMsg{Content: "zzz"})
+	if got, want := m.(Model).add.text, "octo/tools#42"; got != want {
+		t.Errorf("text = %q, want %q (typing and paste are ignored)", got, want)
+	}
+
+	if _, cmd := m.Update(key("ctrl+c")); cmd == nil {
+		t.Error("ctrl+c returned no Cmd")
+	} else if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Errorf("ctrl+c Cmd gave %T, want tea.QuitMsg", cmd())
+	}
+
+	m = drainUI(m, save)
+	ref := domain.Ref{Repo: "octo/tools", Number: 42}
+	if n := countRef(m, ref); n != 1 {
+		t.Errorf("%d rows for %v, want 1", n, ref)
+	}
+	if got := selectedRef(m); got != ref {
+		t.Errorf("selected = %v, want %v", got, ref)
+	}
+	if addOpen(m) {
+		t.Error("the prompt is still open after the save")
+	}
+	if len(w.adds) != 1 || w.adds[0] != ref {
+		t.Errorf("saved %v, want [%v]", w.adds, ref)
+	}
+}
+
+// TestAddSavingLine: the prompt says it is saving and offers no cancel.
+func TestAddSavingLine(t *testing.T) {
+	m, _ := savingModel(t, &memWatch{added: true})
+	got := lastLine(m)
+	if !strings.Contains(got, "saving octo/tools#42") {
+		t.Errorf("last line = %q, want it to contain 'saving octo/tools#42'", got)
+	}
+	for _, bad := range []string{"esc cancel", "checking"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("last line = %q, must not contain %q", got, bad)
+		}
+	}
+}
+
+// TestAddSpinnerWhileSaving: the spinner keeps turning during a slow save.
+func TestAddSpinnerWhileSaving(t *testing.T) {
+	m, _ := savingModel(t, &memWatch{added: true})
+	mm := m.(Model)
+	if mm.inFlight || !mm.add.saving {
+		t.Fatalf("setup: inFlight = %v, saving = %v, want false, true", mm.inFlight, mm.add.saving)
+	}
+	if _, cmd := m.Update(mm.spin.Tick()); cmd == nil {
+		t.Error("the spinner tick returned no Cmd while saving; the spinner froze")
+	}
+}
+
 func TestAddSaveError(t *testing.T) {
 	f, w := &addFetcher{pr: toolsPR(domain.StateOpen)}, &memWatch{addErr: errors.New("disk full")}
 	m, cmd := submit(addModel(t, f, w, addSnap()), "octo/tools#42")
