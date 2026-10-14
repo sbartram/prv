@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
+	"github.com/sbartram/prv/internal/watchlist"
 )
 
 // Looker loads one PR by ref for the add prompt (D-02). It is optional: the
@@ -23,8 +24,8 @@ type Looker interface {
 // Watchlist saves and removes manually added PRs. It reads and writes a file, so
 // the model only calls it inside a tea.Cmd. *watchlist.Store implements it.
 type Watchlist interface {
-	Add(ref domain.Ref) (bool, error)
-	Remove(ref domain.Ref) (bool, error)
+	AddRef(ref domain.Ref) (watchlist.Result, error)
+	RemoveRef(ref domain.Ref) (watchlist.Result, error)
 }
 
 // maxAddRunes caps the add prompt's text. A longer paste is cut.
@@ -78,8 +79,8 @@ func saveCmd(w Watchlist, pr domain.PR, seq int) tea.Cmd {
 				msg = addSavedMsg{seq: seq, pr: pr, err: errors.New("unexpected internal error while saving the watch list")}
 			}
 		}()
-		added, err := w.Add(pr.Watched)
-		return addSavedMsg{seq: seq, pr: pr, added: added, err: err}
+		r, err := w.AddRef(pr.Watched)
+		return addSavedMsg{seq: seq, pr: pr, added: r.Changed, err: err}
 	}
 }
 

@@ -35,8 +35,8 @@ func removeCmd(w Watchlist, ref domain.Ref) tea.Cmd {
 				msg = removedMsg{ref: ref, err: errors.New("unexpected internal error while updating the watch list")}
 			}
 		}()
-		removed, err := w.Remove(ref)
-		return removedMsg{ref: ref, removed: removed, err: err}
+		r, err := w.RemoveRef(ref)
+		return removedMsg{ref: ref, removed: r.Changed, err: err}
 	}
 }
 

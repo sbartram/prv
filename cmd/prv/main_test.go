@@ -1042,6 +1042,65 @@ func TestAddEndToEnd(t *testing.T) {
 	}
 }
 
+// addTestClient is a github.Client over the routed fixtures for the add tests.
+func addTestClient(t *testing.T) *github.Client {
+	t.Helper()
+	rt := &routedTransport{t: t, watch: fixtureHead + fixtureNodes + fixtureTail, lookup: lookupOKBody}
+	client, err := github.NewClient(github.Options{
+		Token:      "test-token-not-real",
+		ClosedDays: 14,
+		Now:        func() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC) },
+		Transport:  rt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
+
+// TestAddOverCorruptEndToEnd: adding a PR over an unparseable watchlist.json
+// starts a new list, keeps the old bytes in a backup and says so in the footer
+// (D-04): the real store, the real ui.Model.
+func TestAddOverCorruptEndToEnd(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const broken = "{not json"
+	if err := os.WriteFile(path, []byte(broken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := watchlist.New(path)
+	var m tea.Model = ui.New(context.Background(), addTestClient(t), ui.Options{ClosedDays: 14, Watchlist: store})
+	m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = runCmd(m, m.Init())
+
+	m = addViaPrompt(t, m, "octo/tools#42")
+
+	backups, err := filepath.Glob(path + ".corrupt-*")
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("backups = %v, %v, want exactly one", backups, err)
+	}
+	got, err := os.ReadFile(backups[0])
+	if err != nil || string(got) != broken {
+		t.Errorf("backup holds %q, %v, want %q", got, err, broken)
+	}
+
+	view := plain(m)
+	if row := lineWith(view, "+ octo/tools#42"); !strings.HasPrefix(row, ">") {
+		t.Errorf("the new row is not listed with the cursor on it:\n%s", view)
+	}
+	lines := strings.Split(view, "\n")
+	last := lines[len(lines)-1]
+	if want := "previous list saved to " + filepath.Base(backups[0]); !strings.Contains(last, want) {
+		t.Errorf("last line = %q, want it to contain %q", last, want)
+	}
+	refs, _, err := store.Load()
+	if err != nil || len(refs) != 1 || refs[0] != (domain.Ref{Repo: "octo/tools", Number: 42}) {
+		t.Errorf("store.Load() = %v, %v, want [octo/tools#42]", refs, err)
+	}
+}
+
 // TestRestartEndToEnd: a PR added in one session is listed again after a restart,
 // with its full status and the + marker. A saved PR that discovery already found
 // is one row and costs no Lookup; only the other saved PR is looked up.

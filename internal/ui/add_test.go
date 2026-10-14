@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/sbartram/prv/internal/domain"
+	"github.com/sbartram/prv/internal/watchlist"
 )
 
 // addFetcher is a Fetcher that is also a Looker. Plans 04-05..04-07 reuse it.
@@ -45,16 +46,18 @@ type memWatch struct {
 	removed   bool
 	removeErr error
 	removes   []domain.Ref
+	// note and removeNote are the StartedOver values AddRef and RemoveRef report.
+	note, removeNote string
 }
 
-func (w *memWatch) Add(ref domain.Ref) (bool, error) {
+func (w *memWatch) AddRef(ref domain.Ref) (watchlist.Result, error) {
 	w.adds = append(w.adds, ref)
-	return w.added, w.addErr
+	return watchlist.Result{Changed: w.added, StartedOver: w.note}, w.addErr
 }
 
-func (w *memWatch) Remove(ref domain.Ref) (bool, error) {
+func (w *memWatch) RemoveRef(ref domain.Ref) (watchlist.Result, error) {
 	w.removes = append(w.removes, ref)
-	return w.removed, w.removeErr
+	return watchlist.Result{Changed: w.removed, StartedOver: w.removeNote}, w.removeErr
 }
 
 // addModelWith builds a 120x40 model with the fakes, loaded with snap. after
@@ -296,6 +299,48 @@ func TestAddHiddenAfterSave(t *testing.T) {
 	}
 	if got, want := flashOf(m), "added octo/tools#42 · hidden by filters"; got != want {
 		t.Errorf("flash = %q, want %q", got, want)
+	}
+}
+
+// TestAddStartedOverNotice: an add that replaced a broken watchlist.json says where
+// the old list went, for warnFor and ahead of any other footer text (D-04).
+func TestAddStartedOverNotice(t *testing.T) {
+	const note = "watchlist.json.corrupt-0a1b2c3d"
+	const notice = "previous list saved to " + note
+	ref := domain.Ref{Repo: "octo/tools", Number: 42}
+	cases := []struct {
+		name   string
+		added  bool
+		merged bool // the merged PR is hidden after pressing 2
+		want   string
+	}{
+		{"visible row", true, false, notice},
+		{"hidden by filters", true, true, notice + " · added octo/tools#42 · hidden by filters"},
+		{"already saved", false, false, notice + " · already watching octo/tools#42"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			state := domain.StateOpen
+			if c.merged {
+				state = domain.StateMerged
+			}
+			f, w := &addFetcher{pr: toolsPR(state)}, &memWatch{added: c.added, note: note}
+			m := addModel(t, f, w, addSnap())
+			if c.merged {
+				m = press(m, "2")
+			}
+			m, cmd := submit(m, "octo/tools#42")
+			m = drainUI(m, cmd)
+			if got := flashOf(m); got != c.want {
+				t.Errorf("flash = %q, want %q", got, c.want)
+			}
+			if got, want := m.(Model).flashUntil, fixedNow().Add(warnFor); !got.Equal(want) {
+				t.Errorf("flashUntil = %v, want %v (warnFor)", got, want)
+			}
+			if !c.merged && !rowsHave(m, ref) {
+				t.Error("the new row is not listed")
+			}
+		})
 	}
 }
 

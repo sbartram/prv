@@ -309,6 +309,21 @@ func TestRemoveError(t *testing.T) {
 	}
 }
 
+// TestRemoveStartedOverNotice: a removal that reports a notice flashes it first,
+// for warnFor (D-04). The real store reports none today; the ui still shows one.
+func TestRemoveStartedOverNotice(t *testing.T) {
+	w := &memWatch{removed: true, removeNote: "watchlist.json.corrupt-0a1b2c3d"}
+	m := removeVia(confirmOn(t, addModel(t, &addFetcher{}, w, removeSnap()), toolsRef))
+
+	want := "previous list saved to watchlist.json.corrupt-0a1b2c3d · removed octo/tools#42"
+	if got := flashOf(m); got != want {
+		t.Errorf("flash = %q, want %q", got, want)
+	}
+	if got, wantAt := m.(Model).flashUntil, fixedNow().Add(warnFor); !got.Equal(wantAt) {
+		t.Errorf("flashUntil = %v, want %v (warnFor)", got, wantAt)
+	}
+}
+
 func TestRemoveLastRow(t *testing.T) {
 	snap := domain.Snapshot{Viewer: "octo", PRs: []domain.PR{removeSnap().PRs[1]}}
 	if snap.PRs[0].Ref != toolsRef {
