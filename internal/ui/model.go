@@ -317,7 +317,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncDetail()
 		}
 	case spinner.TickMsg:
-		if m.inFlight || m.state == stateLoading || m.add.checking {
+		if m.inFlight || m.state == stateLoading || m.add.checking || m.add.saving {
 			var cmd tea.Cmd
 			m.spin, cmd = m.spin.Update(msg)
 			return m, cmd

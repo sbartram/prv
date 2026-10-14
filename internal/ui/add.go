@@ -33,10 +33,13 @@ type Watchlist interface {
 const maxAddRunes = 256
 
 // addState is the add prompt (WATCH-04). open is true while the prompt line is
-// on screen; checking is true from enter until the PR is checked and saved.
+// on screen; checking is true from enter until the PR is looked up. saving is
+// true from the moment the save Cmd is dispatched until its result arrives; it
+// is separate from checking because esc can drop a lookup but not a save that
+// the file will honour (D-05).
 type addState struct {
 	open, checking bool
-	saving         bool // stub for the RED commit: not set yet
+	saving         bool
 	text           string
 	ref            domain.Ref // the ref being checked
 	errText        string     // why the last attempt failed; the typed text stays
@@ -109,6 +112,10 @@ func (m *Model) addKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch {
 	case msg.String() == "ctrl+c":
 		return tea.Quit
+	case m.add.saving:
+		// The save is on its way and the file will change: esc, typing and
+		// paste do nothing, so the screen and the file agree (D-05).
+		return nil
 	case bkey.Matches(msg, m.pkeys.Cancel):
 		m.add = addState{}
 		m.addSeq++ // a result that is still on its way is dropped
@@ -151,7 +158,7 @@ func (m *Model) appendAdd(s string) {
 // addPaste handles a bracketed paste into the add prompt. Newlines become
 // spaces first, so a pasted link with a trailing newline is not run as enter.
 func (m *Model) addPaste(s string) {
-	if m.add.checking {
+	if m.add.checking || m.add.saving {
 		return
 	}
 	s = strings.NewReplacer("\r", " ", "\n", " ").Replace(s)
@@ -220,7 +227,7 @@ func (m *Model) applyAddChecked(msg addCheckedMsg) tea.Cmd {
 	pr := msg.pr
 	pr.Manual = true
 	pr.Watched = saved
-	m.add.checking = true
+	m.add.saving = true
 	return saveCmd(m.watchlist, pr, m.addSeq)
 }
 
@@ -231,7 +238,7 @@ func (m *Model) applyAddSaved(msg addSavedMsg) tea.Cmd {
 		return nil
 	}
 	if msg.err != nil {
-		m.add.checking = false
+		m.add.checking, m.add.saving = false, false
 		m.add.errText = "could not save the watch list"
 		return nil
 	}
@@ -334,6 +341,9 @@ func (m Model) addLine() string {
 	switch {
 	case m.add.errText != "":
 		suffix = "   " + warnStyle.Render("✗ "+m.add.errText) + " · esc cancel"
+	case m.add.saving:
+		// No cancel hint: the save cannot be cancelled (D-05).
+		suffix = "   saving " + m.add.ref.String() + " " + m.spin.View()
 	case m.add.checking:
 		suffix = "   checking " + m.add.ref.String() + " " + m.spin.View()
 	default:
