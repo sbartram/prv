@@ -202,12 +202,12 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
   4. A failed add or remove says why (list full, another prv writing, another version, permission denied, disk full) and never shows a file path or raw OS text.
   5. `PRV_LIVE=1 go test ./internal/github -run TestLive -count=1 -v` checks state, review, CI and MERGE for pinned public PRs on github.com, while plain `go test ./...` stays offline and green. 05-UAT.md holds the manual checks (the Phase 2 UI set, and badges and MERGE by eye) for /gsd-verify-work.
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
 - [x] 05-01-PLAN.md — Tracer: 8 real processes add at once and all 8 survive (flock on watchlist.json.lock, 3 s wait then "busy", lock-free reads); then crash-safe backup (temp + Sync + os.Link), version-mismatch refusal and a started-over Result from AddRef/RemoveRef (D-02..D-04, D-07..D-11)
-- [ ] 05-03-PLAN.md — Opt-in live smoke: PRV_LIVE=1 TestLive runs the real Fetch on 11 pinned public PRs (state, review, CI, MERGE, not found) with drift turned into re-pin skips; README Development note; 05-UAT.md manual checklist (D-12..D-17)
+- [x] 05-03-PLAN.md — Opt-in live smoke: PRV_LIVE=1 TestLive runs the real Fetch on 11 pinned public PRs (state, review, CI, MERGE, not found) with drift turned into re-pin skips; README Development note; 05-UAT.md manual checklist (D-12..D-17)
 
 **Wave 2** *(blocked on 05-01 completion)*
 - [ ] 05-02-PLAN.md — Tracer: adding over a broken watchlist.json flashes where the old list went; then esc is ignored once the save starts ("saving ..."), and every add/remove failure names a cleaned reason (D-04..D-06, D-09)
