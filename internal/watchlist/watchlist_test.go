@@ -464,9 +464,9 @@ func TestBackupPublishedComplete(t *testing.T) {
 	s, path := wlStore(t)
 	const bad = "{not json"
 	wlWrite(t, path, bad)
-	called := false
+	calls := 0
 	s.link = func(oldname, newname string) error {
-		called = true
+		calls++
 		if !regexp.MustCompile(`^\.corrupt-.*\.tmp$`).MatchString(filepath.Base(oldname)) {
 			t.Errorf("link source %q, want a .corrupt-*.tmp temp file", oldname)
 		}
@@ -478,14 +478,14 @@ func TestBackupPublishedComplete(t *testing.T) {
 				t.Errorf("temp file = %v, %v, want mode 0600", fi, err)
 			}
 		}
-		if _, err := os.Stat(newname); !os.IsNotExist(err) {
+		if _, err := os.Stat(newname); calls == 1 && !os.IsNotExist(err) {
 			t.Errorf("the final name %q exists before it is published: %v", newname, err)
 		}
 		return os.Link(oldname, newname)
 	}
-	wlCheckBackup(t, s, path, bad)
-	if !called {
-		t.Error("the backup was not published through s.link")
+	wlCheckBackup(t, s, path, bad) // its second Load meets the existing name: counts as done
+	if calls != 2 {
+		t.Errorf("the backup was published through s.link %d times, want 2 (one per Load)", calls)
 	}
 	left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".corrupt-*.tmp"))
 	if len(left) != 0 {
