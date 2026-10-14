@@ -1,6 +1,8 @@
 package watchlist
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -354,8 +356,13 @@ func wlCheckBackup(t *testing.T, s *Store, path, bad string) {
 	if !corruptName.MatchString(backups[0]) {
 		t.Errorf("backup name %q, want watchlist.json.corrupt- plus 8 hex digits", backups[0])
 	}
-	if got := wlRead(t, backups[0]); got != bad {
+	got := wlRead(t, backups[0])
+	if got != bad {
 		t.Errorf("backup differs from the bad file (len %d, want %d)", len(got), len(bad))
+	}
+	sum := sha256.Sum256([]byte(got))
+	if want := ".corrupt-" + hex.EncodeToString(sum[:])[:8]; !strings.HasSuffix(backups[0], want) {
+		t.Errorf("backup name %q, want it to end in %s (the hash of its own bytes)", backups[0], want)
 	}
 	if got := wlRead(t, path); got != bad {
 		t.Error("Load changed the bad file")
@@ -420,13 +427,13 @@ func TestAddOverCorrupt(t *testing.T) {
 	s, path := wlStore(t)
 	const bad = "{not json"
 	wlWrite(t, path, bad)
-	added, err := s.Add(domain.Ref{Repo: "octo/tools", Number: 42})
-	if err != nil || !added {
-		t.Fatalf("Add = %v, %v, want true, nil", added, err)
-	}
+	res, err := s.AddRef(domain.Ref{Repo: "octo/tools", Number: 42})
 	backups := wlBackups(t, path)
 	if len(backups) != 1 || wlRead(t, backups[0]) != bad {
 		t.Fatalf("backups = %v, want one holding the old bytes", backups)
+	}
+	if want := (Result{Changed: true, StartedOver: filepath.Base(backups[0])}); err != nil || res != want {
+		t.Fatalf("AddRef = %+v, %v, want %+v, nil", res, err, want)
 	}
 	refs, warns, err := s.Load()
 	if err != nil || len(warns) != 0 || len(refs) != 1 || refs[0] != (domain.Ref{Repo: "octo/tools", Number: 42}) {
@@ -434,6 +441,202 @@ func TestAddOverCorrupt(t *testing.T) {
 	}
 	if !strings.Contains(wlRead(t, path), `"version": 1`) {
 		t.Errorf("the new file is not version 1:\n%s", wlRead(t, path))
+	}
+}
+
+func TestRemoveOverCorrupt(t *testing.T) {
+	s, path := wlStore(t)
+	const bad = "{not json"
+	wlWrite(t, path, bad)
+	res, err := s.RemoveRef(domain.Ref{Repo: "a/a", Number: 1})
+	if err != nil || res != (Result{}) {
+		t.Errorf("RemoveRef = %+v, %v, want Result{}, nil", res, err)
+	}
+	if got := wlRead(t, path); got != bad {
+		t.Errorf("RemoveRef changed the file: %q", got)
+	}
+	if backups := wlBackups(t, path); len(backups) != 1 || wlRead(t, backups[0]) != bad {
+		t.Errorf("backups = %v, want exactly one holding the bad bytes", backups)
+	}
+}
+
+func TestBackupPublishedComplete(t *testing.T) {
+	s, path := wlStore(t)
+	const bad = "{not json"
+	wlWrite(t, path, bad)
+	called := false
+	s.link = func(oldname, newname string) error {
+		called = true
+		if !regexp.MustCompile(`^\.corrupt-.*\.tmp$`).MatchString(filepath.Base(oldname)) {
+			t.Errorf("link source %q, want a .corrupt-*.tmp temp file", oldname)
+		}
+		if got, err := os.ReadFile(oldname); err != nil || string(got) != bad {
+			t.Errorf("temp file holds %q, %v when published, want the bad bytes", got, err)
+		}
+		if runtime.GOOS != "windows" {
+			if fi, err := os.Stat(oldname); err != nil || fi.Mode().Perm() != 0o600 {
+				t.Errorf("temp file = %v, %v, want mode 0600", fi, err)
+			}
+		}
+		if _, err := os.Stat(newname); !os.IsNotExist(err) {
+			t.Errorf("the final name %q exists before it is published: %v", newname, err)
+		}
+		return os.Link(oldname, newname)
+	}
+	wlCheckBackup(t, s, path, bad)
+	if !called {
+		t.Error("the backup was not published through s.link")
+	}
+	left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".corrupt-*.tmp"))
+	if len(left) != 0 {
+		t.Errorf("temp files left behind: %v", left)
+	}
+}
+
+func TestBackupLinkFails(t *testing.T) {
+	s, path := wlStore(t)
+	const bad = "{not json"
+	wlWrite(t, path, bad)
+	s.link = func(string, string) error { return errors.New("no hard links") }
+	if _, _, err := s.Load(); err == nil || errors.Is(err, ErrCorrupt) {
+		t.Errorf("Load = %v, want an error that does not wrap ErrCorrupt", err)
+	}
+	if res, err := s.AddRef(domain.Ref{Repo: "a/a", Number: 1}); err == nil || res != (Result{}) {
+		t.Errorf("AddRef = %+v, %v, want Result{} and an error", res, err)
+	}
+	if res, err := s.RemoveRef(domain.Ref{Repo: "a/a", Number: 1}); err == nil || res != (Result{}) {
+		t.Errorf("RemoveRef = %+v, %v, want Result{} and an error", res, err)
+	}
+	if got := wlRead(t, path); got != bad {
+		t.Errorf("the file changed: %q", got)
+	}
+	if b := wlBackups(t, path); len(b) != 0 {
+		t.Errorf("backups = %v, want none", b)
+	}
+	left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".corrupt-*.tmp"))
+	if len(left) != 0 {
+		t.Errorf("temp files left behind: %v", left)
+	}
+}
+
+func TestVersionMismatchRefused(t *testing.T) {
+	cases := []struct {
+		name, body string
+		found      int
+		missing    bool
+	}{
+		{"version 2", `{"version": 2, "prs": [{"repo":"a/a","number":1}]}`, 2, false},
+		{"version 7 with prs of another shape", `{"version": 7, "prs": {"x": 1}}`, 7, false},
+		{"version 0", `{"version": 0, "prs": [{"repo":"a/a","number":1}]}`, 0, false},
+		{"empty object", `{}`, 0, true},
+		{"no version key", `{"prs": [{"repo":"a/a","number":1}]}`, 0, true},
+		{"null version", `{"version": null}`, 0, true},
+		{"string version", `{"version": "1"}`, 0, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s, path := wlStore(t)
+			wlWrite(t, path, tc.body)
+			wantText := fmt.Sprintf("watchlist.json is version %d; this prv writes version 1", tc.found)
+			if tc.missing {
+				wantText = "watchlist.json has no version number; this prv writes version 1"
+			}
+			check := func(op string, res Result, err error) {
+				t.Helper()
+				var ve *VersionError
+				if !errors.As(err, &ve) {
+					t.Fatalf("%s error = %v, want a *VersionError", op, err)
+				}
+				if ve.Found != tc.found || ve.Missing != tc.missing {
+					t.Errorf("%s VersionError = %+v, want Found %d Missing %v", op, *ve, tc.found, tc.missing)
+				}
+				if errors.Is(err, ErrCorrupt) {
+					t.Errorf("%s error wraps ErrCorrupt, so a caller could start over", op)
+				}
+				if err.Error() != wantText {
+					t.Errorf("%s error text = %q, want %q", op, err.Error(), wantText)
+				}
+				if res != (Result{}) {
+					t.Errorf("%s result = %+v, want Result{}", op, res)
+				}
+			}
+			res, err := s.AddRef(domain.Ref{Repo: "b/b", Number: 2})
+			check("AddRef", res, err)
+			res, err = s.RemoveRef(domain.Ref{Repo: "a/a", Number: 1})
+			check("RemoveRef", res, err)
+			if got := wlRead(t, path); got != tc.body {
+				t.Errorf("the file changed: %q", got)
+			}
+			if left, _ := filepath.Glob(filepath.Join(filepath.Dir(path), ".watchlist-*.tmp")); len(left) != 0 {
+				t.Errorf("temp files left behind: %v", left)
+			}
+
+			_, _, err = s.Load()
+			var ce *CorruptError
+			if !errors.Is(err, ErrCorrupt) || !errors.As(err, &ce) || ce.Backup == "" {
+				t.Fatalf("Load error = %v, want a *CorruptError that wraps ErrCorrupt and names a backup", err)
+			}
+			if ce.Version == nil || ce.Version.Found != tc.found || ce.Version.Missing != tc.missing {
+				t.Errorf("CorruptError.Version = %+v, want Found %d Missing %v", ce.Version, tc.found, tc.missing)
+			}
+			if backups := wlBackups(t, path); len(backups) != 1 || wlRead(t, backups[0]) != tc.body {
+				t.Errorf("backups = %v, want exactly one holding the original bytes", backups)
+			}
+		})
+	}
+}
+
+func TestNonObjectStartsOver(t *testing.T) {
+	bodies := []string{`[]`, `"x"`, `3`, `null`, `{"version": 1, "prs": {"x": 1}}`}
+	for _, body := range bodies {
+		t.Run(body, func(t *testing.T) {
+			s, path := wlStore(t)
+			wlWrite(t, path, body)
+			res, err := s.AddRef(domain.Ref{Repo: "a/a", Number: 1})
+			backups := wlBackups(t, path)
+			if len(backups) != 1 || wlRead(t, backups[0]) != body {
+				t.Fatalf("backups = %v, want exactly one holding %q", backups, body)
+			}
+			if want := (Result{Changed: true, StartedOver: filepath.Base(backups[0])}); err != nil || res != want {
+				t.Errorf("AddRef = %+v, %v, want %+v, nil", res, err, want)
+			}
+			refs, _, err := s.Load()
+			if err != nil || len(refs) != 1 || refs[0] != (domain.Ref{Repo: "a/a", Number: 1}) {
+				t.Errorf("Load = %v, %v, want [a/a#1]", refs, err)
+			}
+		})
+	}
+}
+
+func TestAddRefRemoveRefResult(t *testing.T) {
+	s, _ := wlStore(t)
+	a := domain.Ref{Repo: "a/a", Number: 1}
+	steps := []struct {
+		name string
+		do   func() (Result, error)
+		want Result
+	}{
+		{"AddRef", func() (Result, error) { return s.AddRef(a) }, Result{Changed: true}},
+		{"AddRef duplicate", func() (Result, error) { return s.AddRef(domain.Ref{Repo: "A/A", Number: 1}) }, Result{}},
+		{"RemoveRef", func() (Result, error) { return s.RemoveRef(a) }, Result{Changed: true}},
+		{"RemoveRef missing", func() (Result, error) { return s.RemoveRef(a) }, Result{}},
+	}
+	for _, st := range steps {
+		if got, err := st.do(); err != nil || got != st.want {
+			t.Errorf("%s = %+v, %v, want %+v, nil", st.name, got, err, st.want)
+		}
+	}
+	if added, err := s.Add(a); err != nil || !added {
+		t.Errorf("Add = %v, %v, want true, nil", added, err)
+	}
+	if added, err := s.Add(a); err != nil || added {
+		t.Errorf("Add duplicate = %v, %v, want false, nil", added, err)
+	}
+	if removed, err := s.Remove(a); err != nil || !removed {
+		t.Errorf("Remove = %v, %v, want true, nil", removed, err)
+	}
+	if removed, err := s.Remove(a); err != nil || removed {
+		t.Errorf("Remove missing = %v, %v, want false, nil", removed, err)
 	}
 }
 
@@ -479,8 +682,8 @@ func TestMaxEntries(t *testing.T) {
 
 	wlWrite(t, path, wlEntries(MaxEntries))
 	added, err := s.Add(domain.Ref{Repo: "new/one", Number: 1})
-	if added || err == nil || err.Error() != "the watch list is full (500 PRs)" {
-		t.Errorf("Add past the cap = %v, %v, want false and the full error", added, err)
+	if added || !errors.Is(err, ErrFull) || err.Error() != "the watch list is full (500 PRs)" {
+		t.Errorf("Add past the cap = %v, %v, want false and ErrFull", added, err)
 	}
 	if got := wlRead(t, path); got != wlEntries(MaxEntries) {
 		t.Error("a refused Add changed the file")

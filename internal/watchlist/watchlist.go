@@ -35,6 +35,8 @@ var ErrCorrupt = errors.New("the watch list file is not valid")
 type CorruptError struct {
 	Backup  string
 	Problem string
+	// Version is non-nil exactly when the file is a version mismatch.
+	Version *VersionError
 }
 
 func (e *CorruptError) Error() string {
@@ -42,6 +44,35 @@ func (e *CorruptError) Error() string {
 }
 
 func (e *CorruptError) Unwrap() error { return ErrCorrupt }
+
+// VersionError is a RED-phase stub.
+type VersionError struct {
+	Found   int
+	Missing bool
+}
+
+func (e *VersionError) Error() string { return "stub" }
+
+// ErrFull is a RED-phase stub.
+var ErrFull = errors.New("stub")
+
+// Result is a RED-phase stub.
+type Result struct {
+	Changed     bool
+	StartedOver string
+}
+
+// AddRef is a RED-phase stub.
+func (s *Store) AddRef(ref domain.Ref) (Result, error) {
+	added, err := s.Add(ref)
+	return Result{Changed: added}, err
+}
+
+// RemoveRef is a RED-phase stub.
+func (s *Store) RemoveRef(ref domain.Ref) (Result, error) {
+	removed, err := s.Remove(ref)
+	return Result{Changed: removed}, err
+}
 
 // MaxEntries is the most PRs that are watched.
 const MaxEntries = 500
@@ -85,6 +116,8 @@ type Store struct {
 	rename func(oldpath, newpath string) error
 	// lockWait is how long a writer waits for the lock; tests shorten it.
 	lockWait time.Duration
+	// link publishes a finished backup (test seam, os.Link in New).
+	link func(oldname, newname string) error
 	// afterRead is a test hook. When non-nil, Add calls it inside the lock right
 	// after readForWrite returns, so a test can hold the critical section open.
 	// New leaves it nil.
@@ -93,7 +126,7 @@ type Store struct {
 
 // New returns a Store for path. It touches no file.
 func New(path string) *Store {
-	return &Store{path: path, now: time.Now, rename: os.Rename, lockWait: defaultLockWait}
+	return &Store{path: path, now: time.Now, rename: os.Rename, lockWait: defaultLockWait, link: os.Link}
 }
 
 // Path returns the file path of the store.
