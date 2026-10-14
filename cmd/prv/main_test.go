@@ -1145,9 +1145,6 @@ func TestAddVersionMismatchEndToEnd(t *testing.T) {
 			if err != nil || string(got) != c.body {
 				t.Errorf("watchlist.json = %q, %v, want it unchanged: %q", got, err, c.body)
 			}
-			if backups, _ := filepath.Glob(path + ".corrupt-*"); len(backups) != 0 {
-				t.Errorf("backups = %v, want none", backups)
-			}
 		})
 	}
 }

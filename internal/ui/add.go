@@ -3,8 +3,10 @@ package ui
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	bkey "charm.land/bubbles/v2/key"
@@ -239,7 +241,11 @@ func (m *Model) applyAddSaved(msg addSavedMsg) tea.Cmd {
 	}
 	if msg.err != nil {
 		m.add.checking, m.add.saving = false, false
-		m.add.errText = "could not save the watch list"
+		if errors.Is(msg.err, watchlist.ErrFull) {
+			m.add.errText = watchlist.ErrFull.Error() + "; remove a PR first"
+		} else {
+			m.add.errText = "could not save (" + saveReason(msg.err) + ")"
+		}
 		return nil
 	}
 	m.add = addState{}
@@ -272,6 +278,27 @@ func (m *Model) applyAddSaved(msg addSavedMsg) tea.Cmd {
 		return nil
 	}
 	return m.setFlash(joinNotice(notice, "added "+target.Ref.String()+" · hidden by filters"), d)
+}
+
+// saveReason is the short reason a watch-list write failed (D-06, IN-02). The
+// message of a store error holds file paths and OS text, so it is never shown:
+// only the store's own sentinel errors and the error classes below are named.
+func saveReason(err error) string {
+	var ve *watchlist.VersionError
+	var reason string
+	switch {
+	case errors.As(err, &ve):
+		reason = ve.Error()
+	case errors.Is(err, watchlist.ErrBusy):
+		reason = "another prv is writing the list"
+	case errors.Is(err, fs.ErrPermission):
+		reason = "permission denied"
+	case errors.Is(err, syscall.ENOSPC):
+		reason = "disk full"
+	default:
+		reason = "write failed"
+	}
+	return domain.Clean(reason)
 }
 
 // startedOverNotice is the footer text for a save that replaced a broken

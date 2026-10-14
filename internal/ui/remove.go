@@ -78,7 +78,7 @@ func (m *Model) applyRemoved(msg removedMsg) tea.Cmd {
 		return nil
 	}
 	if msg.err != nil {
-		return m.setFlash("could not update the watch list", flashFor)
+		return m.setFlash("could not update ("+saveReason(msg.err)+")", flashFor)
 	}
 	m.markMutation()
 	k := msg.ref.Key()
