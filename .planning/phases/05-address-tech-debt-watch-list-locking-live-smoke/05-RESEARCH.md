@@ -573,18 +573,22 @@ The pins cover: MERGED, CLOSED, review `approved` / `changes requested` / `requi
 | A6 | `syscall` package frozen / x/sys is the maintained replacement | State of the Art | None for the decision |
 | A7 | Linux behaves like the macOS run for `flock` polling and `link` (only cross-compiled, plus the man pages) | Patterns 1, 2 | Low: both are POSIX-standard calls documented in the cited man pages. There is no Linux machine or Docker daemon here. The executor should run `go test ./internal/watchlist -race` on Linux if one is available |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Return shape for the "started over" notice**
    - What we know: ~41 test call sites use `(bool, error)`; the UI fake is one struct.
    - What's unclear: whether the user prefers a signature change over added methods.
    - Recommendation: add `AddRef`/`RemoveRef` returning `Result`, keep `Add`/`Remove` as wrappers (Pattern 4).
+   - **RESOLVED:** as recommended (CONTEXT Claude's Discretion), adopted in plan 05-01.
 2. **Lock timeout value**
    - Recommendation: 3 s total, 10 ms poll. The real hold is a few ms (one fsync). 3 s is "a few seconds" and keeps the spinner from looking stuck.
+   - **RESOLVED:** 3 s, 10 ms poll, `Store.lockWait` for tests (plan 05-01).
 3. **Version `0`/absent**
    - Recommendation: treat as unparseable (start over with a backup), not as a refusal (Pattern 3).
+   - **RESOLVED (superseded by the user, 2026-10-13):** version 0 or an absent version is REFUSED with `VersionError`, per CONTEXT D-04 notes; a version-1 object whose body does not decode starts over with a backup. Pattern 3's edge note and Pitfall 9 are void on this point.
 4. **Backup flash duration**
    - Recommendation: use `warnFor` (8 s) for this one flash (Pitfall 8).
+   - **RESOLVED:** `warnFor`, adopted in plan 05-02.
 
 ## Environment Availability
 
