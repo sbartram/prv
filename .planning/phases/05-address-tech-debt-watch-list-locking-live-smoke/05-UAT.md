@@ -3,7 +3,7 @@ status: complete
 phase: 05-address-tech-debt-watch-list-locking-live-smoke
 source: [05-CONTEXT.md D-16, 01-UAT.md, 02-UAT.md, 03-UAT.md]
 started: 2026-10-14T03:40:00Z
-updated: 2026-10-14T15:32:28.353Z
+updated: 2026-10-14T15:36:47.301Z
 ---
 
 ## Current Test
@@ -21,7 +21,7 @@ result: pass
 steps: From the prv source directory, run `PRV_SHOW=1 go test ./internal/ui -run '^TestShowRateWarning$' -count=1 -v` in your usual terminal, then again inside a tmux or herdr pane. It prints prv's real list screen with a low API budget (999 of 5000, below 20% of the hourly limit) at 80 and then 40 columns. Look at the yellow 'api 999/5000 · resets 15:02' warning in the header and the faint 'api 999' at the right end of the last line.
 expected: The api number is legible but quiet; the warning reads as a warning in your usual terminal and inside the tmux/herdr pane. (02-UAT #2; the other theme comparison stays deferred per D-17)
 result: skipped
-reason: "Deferred per D-17 (theme/legibility comparison)"
+reason: "Deferred follow-up: test 2 deferred per D-17"
 
 ### 3. Filter keys, / prompt and paste
 steps: Press 1, 2 and 3 in turn. Type / and then digits. Paste digits, then text with letters, into the prompt. Press esc, then try enter.
@@ -42,7 +42,7 @@ result: pass
 steps: Edit ~/.config/prv/config.toml and restart prv after each edit: add a misspelt key (refresh_intervall = 30); then set refresh_interval = "banana"; then set show = ["open"] and closed_days = 7.
 expected: Misspelt key: prv starts, the footer shows 'config: unknown key ...' for about 8 s, and ? lists it. Bad value: prv exits with status 2 and prints 'PATH line N: ...' before the TUI starts. show and closed_days: the header indicator and the closed window follow the file. (02-UAT #7)
 result: skipped
-reason: "Covered by 02-UAT #7; config loading unchanged in phase 5"
+reason: "Deferred follow-up: test 6 deferred again (02-UAT #7 was itself deferred, never run live)"
 
 ### 7. REVIEW and CI badges match github.com
 steps: Press a and add public PRs by URL: an approved PR on a repo with no required-review rule (for example komoot/photon#254), a PR with no checks, an open PR with a failing check and an open PR whose checks are still running (busy repos such as cli/cli have both). Press o on each and compare.
@@ -71,3 +71,12 @@ blocked: 0
 ## Gaps
 
 [none yet]
+
+## Deferred Follow-Ups
+
+- test: 2
+  idea: "test 2 deferred per D-17"
+  deferred_at: 2026-10-14
+- test: 6
+  idea: "config.toml live edits (02-UAT #7) deferred again; never run live"
+  deferred_at: 2026-10-14
