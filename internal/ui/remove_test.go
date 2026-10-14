@@ -298,10 +298,10 @@ func TestRemoveError(t *testing.T) {
 	if !rowsHave(m, toolsRef) {
 		t.Errorf("the row left the list although the write failed:\n%s", plain(m))
 	}
-	if got, want := flashOf(m), "could not update the watch list"; got != want {
+	if got, want := flashOf(m), "could not update (write failed)"; got != want {
 		t.Errorf("flash = %q, want %q", got, want)
 	}
-	if !strings.Contains(lastLine(m), "could not update the watch list") {
+	if !strings.Contains(lastLine(m), "could not update (write failed)") {
 		t.Errorf("last line = %q", lastLine(m))
 	}
 	if m.(Model).confirm.open {
@@ -321,6 +321,28 @@ func TestRemoveStartedOverNotice(t *testing.T) {
 	}
 	if got, wantAt := m.(Model).flashUntil, fixedNow().Add(warnFor); !got.Equal(wantAt) {
 		t.Errorf("flashUntil = %v, want %v (warnFor)", got, wantAt)
+	}
+}
+
+// TestRemoveReasons: a failed removal says why in the same fixed words as a failed
+// save, the row stays and the confirm line is closed (D-06, IN-02).
+func TestRemoveReasons(t *testing.T) {
+	for _, c := range saveFailures() {
+		t.Run(c.name, func(t *testing.T) {
+			w := &memWatch{removed: true, removeErr: c.err}
+			m := removeVia(confirmOn(t, addModel(t, &addFetcher{}, w, removeSnap()), toolsRef))
+
+			if got, want := flashOf(m), "could not update ("+c.reason+")"; got != want {
+				t.Errorf("flash = %q, want %q", got, want)
+			}
+			noLeak(t, flashOf(m))
+			if !rowsHave(m, toolsRef) {
+				t.Errorf("the row left the list although the write failed:\n%s", plain(m))
+			}
+			if m.(Model).confirm.open {
+				t.Error("the confirm line is still open")
+			}
+		})
 	}
 }
 

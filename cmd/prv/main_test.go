@@ -1101,6 +1101,57 @@ func TestAddOverCorruptEndToEnd(t *testing.T) {
 	}
 }
 
+// TestAddVersionMismatchEndToEnd: adding a PR over a watchlist.json that is a JSON
+// object whose version is not 1, or that has no version, changes nothing on disk
+// and says why in the prompt (D-04, user-confirmed 2026-10-13): the real store,
+// the real ui.Model.
+func TestAddVersionMismatchEndToEnd(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"version2", `{"version": 2, "prs": [{"repo":"a/b","number":1}]}`,
+			"✗ could not save (watchlist.json is version 2; this prv writes version 1)"},
+		{"noversion", `{"prs": [{"repo":"a/b","number":1}]}`,
+			"✗ could not save (watchlist.json has no version number; this prv writes version 1)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "prv", "watchlist.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(c.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var m tea.Model = ui.New(context.Background(), addTestClient(t), ui.Options{ClosedDays: 14, Watchlist: watchlist.New(path)})
+			m, _ = send(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+			m = runCmd(m, m.Init())
+
+			m = addViaPrompt(t, m, "octo/tools#42")
+
+			view := plain(m)
+			lines := strings.Split(view, "\n")
+			last := lines[len(lines)-1]
+			if !strings.HasPrefix(last, "add PR:") || !strings.Contains(last, c.want) {
+				t.Errorf("last line = %q, want the prompt with %q", last, c.want)
+			}
+			if strings.Contains(view, "previous list saved to") {
+				t.Errorf("a refused save shows the started-over notice:\n%s", view)
+			}
+			if row := lineWith(view, "+ octo/tools#42"); row != "" {
+				t.Errorf("octo/tools#42 is listed although the save was refused: %q", row)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != c.body {
+				t.Errorf("watchlist.json = %q, %v, want it unchanged: %q", got, err, c.body)
+			}
+			if backups, _ := filepath.Glob(path + ".corrupt-*"); len(backups) != 0 {
+				t.Errorf("backups = %v, want none", backups)
+			}
+		})
+	}
+}
+
 // TestRestartEndToEnd: a PR added in one session is listed again after a restart,
 // with its full status and the + marker. A saved PR that discovery already found
 // is one row and costs no Lookup; only the other saved PR is looked up.

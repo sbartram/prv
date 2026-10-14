@@ -3,11 +3,15 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
+	"unicode"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -812,7 +816,7 @@ func TestAddSaveError(t *testing.T) {
 	f, w := &addFetcher{pr: toolsPR(domain.StateOpen)}, &memWatch{addErr: errors.New("disk full")}
 	m, cmd := submit(addModel(t, f, w, addSnap()), "octo/tools#42")
 	m = drainUI(m, cmd)
-	if got := lastLine(m); !strings.Contains(got, "✗ could not save the watch list") || !strings.Contains(got, "octo/tools#42") {
+	if got := lastLine(m); !strings.Contains(got, "✗ could not save (write failed)") || !strings.Contains(got, "octo/tools#42") {
 		t.Errorf("last line = %q, want the save error and the kept text", got)
 	}
 	if !addOpen(m) {
@@ -820,6 +824,72 @@ func TestAddSaveError(t *testing.T) {
 	}
 	if n := countRef(m, domain.Ref{Repo: "octo/tools", Number: 42}); n != 0 {
 		t.Errorf("%d rows for the PR after a failed save, want 0", n)
+	}
+}
+
+// saveFailures are the store errors saveReason must turn into a short fixed
+// phrase. The wrapped ones carry full paths, as the real store's errors do.
+func saveFailures() []struct {
+	name   string
+	err    error
+	reason string // the phrase inside "could not save (...)" / "could not update (...)"
+} {
+	return []struct {
+		name   string
+		err    error
+		reason string
+	}{
+		{"busy", watchlist.ErrBusy, "another prv is writing the list"},
+		{"version", &watchlist.VersionError{Found: 2}, "watchlist.json is version 2; this prv writes version 1"},
+		{"no version", &watchlist.VersionError{Missing: true}, "watchlist.json has no version number; this prv writes version 1"},
+		{"permission", fmt.Errorf("reading /home/u/.local/share/prv/watchlist.json: %w",
+			&fs.PathError{Op: "open", Path: "/home/u/.local/share/prv/watchlist.json", Err: syscall.EACCES}), "permission denied"},
+		{"disk full", fmt.Errorf("writing /home/u/x: %w", &fs.PathError{Op: "write", Path: "/home/u/x", Err: syscall.ENOSPC}), "disk full"},
+		{"other", errors.New("\x1b[31m/secret/path exploded"), "write failed"},
+	}
+}
+
+// noLeak fails the test when text holds a path fragment or a control character.
+func noLeak(t *testing.T, text string) {
+	t.Helper()
+	for _, bad := range []string{"home", "secret"} {
+		if strings.Contains(text, bad) {
+			t.Errorf("%q leaks %q", text, bad)
+		}
+	}
+	for _, r := range text {
+		if unicode.IsControl(r) {
+			t.Errorf("%q holds the control character %U", text, r)
+		}
+	}
+}
+
+// TestAddSaveReasons: a failed save says why in a few fixed words and never shows
+// a path or OS text (D-06, IN-02).
+func TestAddSaveReasons(t *testing.T) {
+	cases := append(saveFailures(), struct {
+		name   string
+		err    error
+		reason string
+	}{"full", watchlist.ErrFull, ""})
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			want := "could not save (" + c.reason + ")"
+			if c.err == watchlist.ErrFull {
+				want = "the watch list is full (500 PRs); remove a PR first"
+			}
+			f, w := &addFetcher{pr: toolsPR(domain.StateOpen)}, &memWatch{addErr: c.err}
+			m, cmd := submit(addModel(t, f, w, addSnap()), "octo/tools#42")
+			m = drainUI(m, cmd)
+			mm := m.(Model)
+			if mm.add.errText != want {
+				t.Errorf("errText = %q, want %q", mm.add.errText, want)
+			}
+			if !mm.add.open || mm.add.text != "octo/tools#42" {
+				t.Errorf("open = %v, text = %q, want the prompt open with the text kept", mm.add.open, mm.add.text)
+			}
+			noLeak(t, mm.add.errText)
+		})
 	}
 }
 
