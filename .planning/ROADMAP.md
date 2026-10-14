@@ -188,3 +188,25 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Live Monitoring | 10/10 | Complete    | 2026-10-12 |
 | 3. Blocker Detail | 11/11 | Complete    | 2026-10-12 |
 | 4. Curated Watch List | 7/7 | Complete    | 2026-10-13 |
+
+### Phase 5: Address tech debt: watch-list locking + live smoke
+
+**Goal:** Close the v1 tech debt from the milestone audit: two prv instances can write the watch list at the same time without losing a change, a broken or newer-version watchlist.json is never lost silently, the add prompt never lies about a save, and prv's state, review, CI and MERGE mapping is checked against real github.com (an opt-in live test plus a manual UAT checklist). No new user-facing features.
+**Requirements**: TBD
+**Depends on:** Phase 4
+**Requirements note:** no new requirements (tech debt). The plans cite the existing requirements they protect (WATCH-04..06) or re-verify live (LIST-02, LIST-03, LIST-05, LIST-06, LIST-09 and the Phase 2 UI requirements).
+**Success Criteria** (what must be TRUE):
+  1. Two prv panes that add or remove PRs at the same moment keep every change. A test that starts 8 real processes, each adding a different PR to one file, ends with all 8 saved. A writer waits at most 3 s for the lock and then says another prv is writing the list; refreshes never wait for it.
+  2. A watchlist.json that declares another version is never written over: add and remove refuse with "watchlist.json is version N; this prv writes version 1". An unparseable or oversized file is copied to a backup that is complete before it gets its final name, and the add that replaces the file flashes "previous list saved to watchlist.json.corrupt-XXXXXXXX".
+  3. Once a save has started, esc does not cancel it and the prompt shows "saving ..." without "esc cancel", so the screen and the file always agree.
+  4. A failed add or remove says why (list full, another prv writing, another version, permission denied, disk full) and never shows a file path or raw OS text.
+  5. `PRV_LIVE=1 go test ./internal/github -run TestLive -count=1 -v` checks state, review, CI and MERGE for pinned public PRs on github.com, while plain `go test ./...` stays offline and green. 05-UAT.md holds the manual checks (the Phase 2 UI set, and badges and MERGE by eye) for /gsd-verify-work.
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+- [ ] 05-01-PLAN.md — Tracer: 8 real processes add at once and all 8 survive (flock on watchlist.json.lock, 3 s wait then "busy", lock-free reads); then crash-safe backup (temp + Sync + os.Link), version-mismatch refusal and a started-over Result from AddRef/RemoveRef (D-02..D-04, D-07..D-11)
+- [ ] 05-03-PLAN.md — Opt-in live smoke: PRV_LIVE=1 TestLive runs the real Fetch on 11 pinned public PRs (state, review, CI, MERGE, not found) with drift turned into re-pin skips; README Development note; 05-UAT.md manual checklist (D-12..D-17)
+
+**Wave 2** *(blocked on 05-01 completion)*
+- [ ] 05-02-PLAN.md — Tracer: adding over a broken watchlist.json flashes where the old list went; then esc is ignored once the save starts ("saving ..."), and every add/remove failure names a cleaned reason (D-04..D-06, D-09)
