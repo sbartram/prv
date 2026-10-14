@@ -211,3 +211,21 @@ Plans:
 
 **Wave 2** *(blocked on 05-01 completion)*
 - [x] 05-02-PLAN.md — Tracer: adding over a broken watchlist.json flashes where the old list went; then esc is ignored once the save starts ("saving ..."), and every add/remove failure names a cleaned reason (D-04..D-06, D-09)
+
+## Backlog
+
+### Phase 999.1: Follow-up — Phase 05 deferred UAT follow-up: Test 2 (BACKLOG)
+
+**Goal:** Resolve the UAT checkpoint deferred during Phase 05 verification
+**Source phase:** 05
+**Deferred at:** 2026-10-14 during /gsd-verify-work 5 session completion
+**Follow-ups:**
+- [ ] Test 2: test 2 deferred per D-17 (deferred 2026-10-14)
+
+### Phase 999.2: Follow-up — Phase 05 deferred UAT follow-up: Test 6 (BACKLOG)
+
+**Goal:** Resolve the UAT checkpoint deferred during Phase 05 verification
+**Source phase:** 05
+**Deferred at:** 2026-10-14 during /gsd-verify-work 5 session completion
+**Follow-ups:**
+- [ ] Test 6: config.toml live edits (02-UAT #7) deferred again; never run live (deferred 2026-10-14)
