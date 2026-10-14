@@ -242,12 +242,16 @@ func (m Model) detailLines(width int) []string {
 
 // unavailLines is the body of the detail view of an unavailable saved PR
 // (D-11): the reason, the help text when there is one, and how to remove the
-// entry. The texts are fixed strings or cleaned at the seam.
+// entry. The texts are fixed strings or cleaned at the seam. They wrap to the
+// pane, so the SSO hint stays whole on a narrow pane.
 func (m Model) unavailLines() []string {
 	u := m.detail.pr.Unavail
-	lines := []string{warnStyle.Render("⚠ unavailable: " + u.Reason)}
+	var lines []string
+	for _, l := range strings.Split(m.wrap("⚠ unavailable: "+u.Reason), "\n") {
+		lines = append(lines, warnStyle.Render(l))
+	}
 	if u.Help != "" {
-		lines = append(lines, u.Help)
+		lines = append(lines, strings.Split(m.wrap(u.Help), "\n")...)
 	}
 	return append(lines, "", faintStyle.Render("saved in your watch list · esc, then d to remove it"))
 }

@@ -197,7 +197,7 @@ func TestHelpWatchLegend(t *testing.T) {
 			}
 		}
 		for _, k := range [][2]string{{"a", "add"}, {"d", "remove"}} {
-			if v := strings.Join(ls, "\n"); !strings.Contains(v, k[0]+" "+k[1]) {
+			if v := strings.Join(ls, "\n"); !regexp.MustCompile(`(?m)\b` + k[0] + `\s+` + k[1] + `\b`).MatchString(v) {
 				t.Errorf("%dx%d: overlay lacks the key %q %q", sz[0], sz[1], k[0], k[1])
 			}
 		}

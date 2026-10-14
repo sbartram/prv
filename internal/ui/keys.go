@@ -28,13 +28,12 @@ type keyMap struct {
 	// number filter in list mode.
 	Filter, Clear bkey.Binding
 
-	// Add opens the add-PR prompt (D-01); the list and empty screens only. It is
-	// not in the footer hints or the help yet.
+	// Add opens the add-PR prompt (D-01); the list and empty screens only.
 	Add bkey.Binding
 
 	// Remove asks to take the selected PR off the watch list (D-06); the list
-	// screen only, and only rows marked +. It is not in the footer hints or the
-	// help yet.
+	// screen only, and only rows marked +. The footer lists it only when the
+	// selected row is saved (D-15).
 	Remove bkey.Binding
 }
 
@@ -87,7 +86,7 @@ func defaultKeys() keyMap {
 
 // ShortHelp implements help.KeyMap.
 func (k keyMap) ShortHelp() []bkey.Binding {
-	return []bkey.Binding{k.Move, k.Refresh, k.Enter, k.Open, k.Filter, k.States, k.Help, k.Quit}
+	return []bkey.Binding{k.Move, k.Refresh, k.Enter, k.Open, k.Add, k.Filter, k.States, k.Help, k.Quit}
 }
 
 // DetailShortHelp is the footer hint list while the detail view is open (D-09).
@@ -97,5 +96,5 @@ func (k keyMap) DetailShortHelp() []bkey.Binding {
 
 // FullHelp implements help.KeyMap.
 func (k keyMap) FullHelp() [][]bkey.Binding {
-	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh, k.Open}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Enter, k.Back, k.Scroll, k.Expand}, {k.Help, k.Quit}}
+	return [][]bkey.Binding{{k.Up, k.Down, k.Refresh, k.Open, k.Add, k.Remove}, {k.Filter, k.Clear, k.ToggleOpen, k.ToggleMerged, k.ToggleClosed}, {k.Enter, k.Back, k.Scroll, k.Expand}, {k.Help, k.Quit}}
 }

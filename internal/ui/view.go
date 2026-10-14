@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	bkey "charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
@@ -83,7 +84,7 @@ func (m Model) renderFilteredEmpty() string {
 // partial (truncated or with warnings) it must not claim there are no open PRs
 // (WR-02): the notes in the footer say why the list is short.
 func (m Model) renderEmpty() string {
-	msg := fmt.Sprintf("No open PRs authored by or assigned to @%s, and none closed in the last %d days.",
+	msg := fmt.Sprintf("No open PRs authored by or assigned to @%s, and none closed in the last %d days. · press a to add any PR",
 		m.snap.Viewer, m.opts.ClosedDays)
 	if m.snap.Truncated || len(m.snap.Warnings) > 0 {
 		msg = fmt.Sprintf("No PRs could be listed for @%s.", m.snap.Viewer)
@@ -157,7 +158,7 @@ func (m Model) footer() string {
 	}
 
 	h := m.help // a copy: SetWidth must not change the model
-	hints := m.keys.ShortHelp()
+	hints := m.listHints()
 	if m.detail.open {
 		hints = m.keys.DetailShortHelp() // D-09
 	}
@@ -207,6 +208,24 @@ func (m Model) footer() string {
 	}
 	pad := m.w - lipgloss.Width(left) - lipgloss.Width(api)
 	return left + strings.Repeat(" ", max(pad, 1)) + api
+}
+
+// listHints are the footer hints of the list: the short help, with d remove
+// right after a add when the selected row is saved, the only time d does
+// something (D-15).
+func (m Model) listHints() []bkey.Binding {
+	hints := m.keys.ShortHelp()
+	if m.state != stateList || m.cursor >= len(m.rows) || !m.rows[m.cursor].Manual {
+		return hints
+	}
+	out := make([]bkey.Binding, 0, len(hints)+1)
+	for _, b := range hints {
+		out = append(out, b)
+		if b.Help().Key == m.keys.Add.Help().Key {
+			out = append(out, m.keys.Remove)
+		}
+	}
+	return out
 }
 
 // clock formats t in the zone of the model's clock: the local zone in

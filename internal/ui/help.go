@@ -64,7 +64,9 @@ func (m Model) renderHelp() string {
 		}
 		b.WriteString(checkStyle(c.state).Render(c.state.Glyph() + " " + c.word))
 	}
-	b.WriteString("\n  [draft] draft PR · dimmed rows are drafts, merged or closed\n\n")
+	b.WriteString("\n  [draft] draft PR · dimmed rows are drafts, merged or closed")
+	b.WriteString("\n  + added by you; d removes it")
+	b.WriteString("\n  " + warnStyle.Render("⚠ unavailable") + ": a saved PR GitHub could not return; enter shows why\n\n")
 
 	b.WriteString("config " + domain.Clean(m.configPath) + " · every " + fmtInterval(m.interval) +
 		" · " + strconv.Itoa(m.opts.ClosedDays) + " days\n")

@@ -1407,6 +1407,10 @@ func TestDetailUnavailableNarrow(t *testing.T) {
 					t.Errorf("line %d is %d cells wide, pane is %d: %q", i, lw, w, l)
 				}
 			}
+			// The SSO hint wraps; nothing of it is cut away.
+			if v := strings.Join(strings.Fields(plain(m)), " "); !strings.Contains(v, "gh auth refresh") {
+				t.Errorf("the help text is cut:\n%s", plain(m))
+			}
 		})
 	}
 }
