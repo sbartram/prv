@@ -4,6 +4,19 @@
 
 `prv` is a terminal UI for monitoring a chosen group of GitHub pull requests. It starts with every PR the user authored or is assigned to, and lets them add any other PR by pasting its URL. It shows each PR's state, approval status, and workflow status, and refreshes on its own. It replaces a pile of GitHub browser tabs that the user refreshes by hand.
 
+## Current State
+
+**Shipped:** v1.0 MVP on 2026-10-14 (5 phases, 35 plans; tag v1.0). See `.planning/MILESTONES.md` and `.planning/milestones/v1.0-*`.
+
+prv is usable day to day: authored + assigned PRs plus a curated watch list, state/review/CI/merge badges, a detail view, auto-refresh within rate limits, and safe concurrent use from several panes. v1.0 closed as an override: phases 1–4 verification read stale at close and the milestone audit predates Phase 5.
+
+## Next Milestone Goals
+
+Not yet defined — start with `/gsd-new-milestone`. Candidates already on record:
+- Live UAT still deferred: ROADMAP backlog 999.1 (api footer legibility) and 999.2 (live config.toml edits, never run live), plus the D-17 set (SSO, live rate-limit pause, assignee:@me, CJK glyphs, team reviews, large CI matrix, bad-token 401, theme/narrow pane)
+- Remaining audit tech debt: captureTransport shared header slot (P3 WR-03), detail/Lookup rate cost not counted (G2), unknown JSON keys dropped in watchlist.json (P4 WR-04), open Info findings
+- Release packaging (GoReleaser, Homebrew cask) was planned in research but not built in v1.0
+
 ## Core Value
 
 At a glance, without opening a browser, the user can see which of their watched PRs are approved, blocked, or failing CI.
@@ -45,6 +58,7 @@ At a glance, without opening a browser, the user can see which of their watched 
 - Intended use: a long-running TUI in a terminal pane (e.g. a multiplexer split)
 - Prior art: `gh-dash` (Go + Bubble Tea) is the closest existing tool; `prv` is narrower, with a curated watch list and a focus on approvals and CI
 - GitHub GraphQL API can return review decision, reviews, and status check rollup in one query, which keeps polling cheap against rate limits
+- After v1.0: ~21.2k lines of Go (~14.7k of them tests, incl. golden files and an opt-in live smoke test); stack as in Constraints, no cgo
 
 ## Constraints
 
@@ -59,10 +73,10 @@ At a glance, without opening a browser, the user can see which of their watched 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Go + Bubble Tea | Single binary; gh-dash shows it fits this domain | ✓ Good (Phase 1) |
-| "Owned" = authored + assigned | User's definition; review-requested excluded | — Pending |
+| "Owned" = authored + assigned | User's definition; review-requested excluded | ✓ Good (v1.0) |
 | Three PR states: Open / Merged / Closed | User wants merged and closed-unmerged kept apart | ✓ Good (Phase 1) |
-| Closed PRs limited to a recent window | Avoids years of history flooding the list | — Pending |
-| Watch-only + open in browser | Keeps v1 small; actions stay on github.com | — Pending |
+| Closed PRs limited to a recent window | Avoids years of history flooding the list | ✓ Good (v1.0) |
+| Watch-only + open in browser | Keeps v1 small; actions stay on github.com | ✓ Good (v1.0) |
 | Auth matches gh: GH_TOKEN → GITHUB_TOKEN → gh login | Same token gh uses; go-gh TokenForHost unchanged | ✓ Good (Phase 1) |
 | Manually added PRs exempt from closed window | User added them on purpose; they stay until removed | ✓ Good (Phase 4) |
 | Clean remote strings once at the mapper seam | One audit point; go-gh already defangs C0 controls, Clean adds bidi/other controls | ✓ Good (Phase 1) |
@@ -94,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-14 after Phase 5*
+*Last updated: 2026-10-14 after v1.0 milestone*
