@@ -56,12 +56,17 @@ steps: Add open PRs in different merge states (mergeable, blocked, behind, confl
 expected: Each MERGE cell agrees with GitHub's merge box. Merged and closed PRs show a blank MERGE cell. (03-UAT #4)
 result: [pending]
 
+### 9. Two prv panes add and remove at the same time
+steps: Open prv in two panes (tmux or herdr) on the same machine. In each pane, press a and add a different PR within a second or two of each other, then press d then y on a different saved PR in each pane. Wait for one refresh. Repeat on Linux if you have a Linux host (flock there was only cross-compiled, not run).
+expected: After the refresh both panes list every added PR and neither removed PR. No change is lost, and no pane shows an error other than a brief "busy" if a save had to wait. (05-VERIFICATION human_verification)
+result: [pending]
+
 ## Summary
 
-total: 8
+total: 9
 passed: 0
 issues: 0
-pending: 8
+pending: 9
 skipped: 0
 blocked: 0
 
